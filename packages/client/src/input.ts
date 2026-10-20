@@ -11,6 +11,8 @@ export type SendInput = (dx: number, dy: number) => void;
 export type InputOptions = {
   /** Space bar: attack whatever is closest and in reach. */
   onAttack?: () => void;
+  /** The attack key was pressed down or let go; drives the held combo. */
+  onAttackHold?: (held: boolean) => void;
   /** Y key: pick up the closest item in reach. */
   onPickup?: () => void;
   /** A short tap or click on the world, in screen pixels. */
@@ -73,7 +75,7 @@ const TAP_SLOP = 10;
 const TAP_MAX_MS = 350;
 
 export function initInput(options: InputOptions): void {
-  const { onAttack, onPickup, onTap } = options;
+  const { onAttack, onAttackHold, onPickup, onTap } = options;
 
   const pressed = new Set<string>();
 
@@ -144,8 +146,10 @@ export function initInput(options: InputOptions): void {
 
     if (event.code === 'Space') {
       event.preventDefault();
-      // A held key repeats on its own; one press is one swing.
-      if (!event.repeat) onAttack?.();
+      if (!event.repeat) {
+        onAttack?.();
+        onAttackHold?.(true);
+      }
       return;
     }
     if (event.code === 'KeyY') {
@@ -162,6 +166,10 @@ export function initInput(options: InputOptions): void {
 
   window.addEventListener('keyup', (event) => {
     if (isTyping(event)) return;
+    if (event.code === 'Space') {
+      onAttackHold?.(false);
+      return;
+    }
     if (event.code in KEY_VECTORS) {
       event.preventDefault();
       pressed.delete(event.code);
@@ -173,6 +181,7 @@ export function initInput(options: InputOptions): void {
   window.addEventListener('blur', () => {
     pressed.clear();
     commit();
+    onAttackHold?.(false);
   });
 
   window.addEventListener(

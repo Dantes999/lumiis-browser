@@ -6,7 +6,7 @@ import { WorldScene } from './scene/world-scene';
 import { Connection } from './net';
 import { audioState, sfx } from './audio';
 import { initInput } from './input';
-import { attackAt, setAttackSender, swingForward } from './combat';
+import { attackAt, setAttackHeld, setAttackSender, swingForward } from './combat';
 import { initAudio, resumeAudio, unlockAudioOnFirstGesture } from './audio';
 import { initController } from './controller';
 import { itemNear, orderPickup, pickupNearestInRange, setPickupSender, tickPickup } from './loot';
@@ -71,6 +71,9 @@ connection.setWelcomeHandler(() => {
 initInput({
   onAttack: () => {
     swingForward();
+  },
+  onAttackHold: (held) => {
+    setAttackHeld(held);
   },
   onPickup: () => {
     pickupNearestInRange();

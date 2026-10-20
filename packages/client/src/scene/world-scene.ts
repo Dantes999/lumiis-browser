@@ -19,7 +19,7 @@ import {
 } from '@lumiis/shared';
 import { sfx } from '../audio';
 import { PlayerView, readTables, spriteSheets, type ArtTables } from '../art';
-import { attackPose } from '../combat';
+import { attackPose, heldAttack } from '../combat';
 import { MOB_CELL_H, MOB_CELL_W, MonsterView } from '../mobart';
 import { renderedSelfPosition, stepLocal } from '../sim';
 import { view, type RemotePlayer } from '../state';
@@ -155,6 +155,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   override update(_time: number, delta: number): void {
+    heldAttack();
     this.syncMap();
     this.applyZoom();
     stepLocal(delta);

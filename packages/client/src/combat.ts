@@ -85,6 +85,21 @@ export function swingForward(): void {
   begin(nearest(view.self.x, view.self.y, profile.range), view.self.dir);
 }
 
+/** Whether the attack key is being held down. */
+let attackHeld = false;
+
+export const setAttackHeld = (held: boolean): void => {
+  attackHeld = held;
+};
+
+/**
+ * Called every frame: while the key is held, keep swinging at the weapon's own
+ * pace. The swing alternates left-right on its own, which makes the combo.
+ */
+export const heldAttack = (): void => {
+  if (attackHeld && canSwing()) swingForward();
+};
+
 /**
  * Tap or click in the world: a monster under the pointer is aimed at, empty
  * ground is swung at. Returns false only when there is no direction at all.
