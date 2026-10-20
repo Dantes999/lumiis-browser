@@ -73,20 +73,34 @@ describe('protocol', () => {
     expect(parseClientMessage({ t: 'ping', at: '1' }).ok).toBe(false);
   });
 
-  it('accepts an attack on a monster id', () => {
+  it('accepts an attack on a monster id, a direction, or nothing at all', () => {
     expect(parseClientMessage({ t: 'attack', target: 7 })).toEqual({
       ok: true,
-      message: { t: 'attack', target: 7 },
+      message: { t: 'attack', target: 7, dir: undefined },
+    });
+    expect(parseClientMessage({ t: 'attack' })).toEqual({
+      ok: true,
+      message: { t: 'attack', dir: undefined },
+    });
+    expect(parseClientMessage({ t: 'attack', dir: 3 })).toEqual({
+      ok: true,
+      message: { t: 'attack', dir: 3 },
+    });
+    expect(parseClientMessage({ t: 'attack', target: 7, dir: 1 })).toEqual({
+      ok: true,
+      message: { t: 'attack', target: 7, dir: 1 },
     });
   });
 
-  it('rejects an attack without a usable target', () => {
+  it('rejects an attack with a nonsense target or direction', () => {
     for (const bad of [
-      { t: 'attack' },
       { t: 'attack', target: 0 },
       { t: 'attack', target: -3 },
       { t: 'attack', target: 1.5 },
       { t: 'attack', target: '7' },
+      { t: 'attack', dir: 8 },
+      { t: 'attack', dir: -1 },
+      { t: 'attack', dir: 1.5 },
     ]) {
       expect(parseClientMessage(bad).ok).toBe(false);
     }

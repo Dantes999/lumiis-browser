@@ -6,7 +6,7 @@ import { WorldScene } from './scene/world-scene';
 import { Connection } from './net';
 import { audioState, sfx } from './audio';
 import { initInput } from './input';
-import { attackAt, attackNearestInRange, setAttackSender } from './combat';
+import { attackAt, setAttackSender, swingForward } from './combat';
 import { initAudio, resumeAudio, unlockAudioOnFirstGesture } from './audio';
 import { initController } from './controller';
 import { itemNear, orderPickup, pickupNearestInRange, setPickupSender, tickPickup } from './loot';
@@ -36,7 +36,7 @@ const game = new Phaser.Game({
 });
 
 const connection = new Connection();
-setAttackSender((target) => connection.attack(target));
+setAttackSender((message) => connection.attack(message));
 setPickupSender((itemId) => connection.pickup(itemId));
 initController((dx, dy) => connection.setInput(dx, dy));
 
@@ -70,7 +70,7 @@ connection.setWelcomeHandler(() => {
 
 initInput({
   onAttack: () => {
-    attackNearestInRange();
+    swingForward();
   },
   onPickup: () => {
     pickupNearestInRange();
@@ -81,12 +81,14 @@ initInput({
 
     const point = scene.cameras.main.getWorldPoint(screenX, screenY);
 
-    // A tap on a monster within reach is a hit.
-    if (attackAt(point.x, point.y)) return;
-
-    // A tap on an item is an order to take it.
+    // A tap on an item is an order to take it; anything else is a swing.
     const item = itemNear(point.x, point.y);
-    if (item !== null) orderPickup(item.id);
+    if (item !== null) {
+      orderPickup(item.id);
+      return;
+    }
+
+    attackAt(point.x, point.y);
   },
 });
 

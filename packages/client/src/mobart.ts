@@ -66,6 +66,27 @@ export class MonsterView {
     this.sprite.setFrame(view * MOB_FRAMES_PER_VIEW + frame);
   }
 
+  /** A solid white flash while a blow lands; Phaser treats a white tint as "none". */
+  setFlash(on: boolean): void {
+    if (on) this.sprite.setTintFill(0xffffff);
+    else this.sprite.clearTint();
+  }
+
+  /** Fade the body out as it falls. */
+  setDead(on: boolean): void {
+    if (on) {
+      this.container.scene.tweens.add({
+        targets: this.container,
+        alpha: 0,
+        duration: 320,
+        ease: 'Quad.easeIn',
+      });
+    } else {
+      this.container.scene.tweens.killTweensOf(this.container);
+      this.container.setAlpha(1);
+    }
+  }
+
   setHealth(hp: number, maxHp: number): void {
     if (hp === this.shownHp && maxHp === this.shownMaxHp) return;
     this.shownHp = hp;

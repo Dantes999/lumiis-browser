@@ -105,8 +105,9 @@ export class Connection {
     this.send({ t: 'input', dx, dy });
   }
 
-  attack(target: number): void {
-    this.send({ t: 'attack', target });
+  /** A swing; with a monster id it turns towards it, without it goes ahead. */
+  attack(message: { target?: number; dir?: number }): void {
+    this.send({ t: 'attack', ...message });
   }
 
   pickup(target: number): void {
@@ -266,6 +267,7 @@ export class Connection {
           hp: monster.hp,
           maxHp: monster.maxHp,
           moving: monster.moving,
+          dead: monster.dead === true,
           renderX: monster.x,
           renderY: monster.y,
         });
@@ -276,6 +278,7 @@ export class Connection {
         existing.hp = monster.hp;
         existing.maxHp = monster.maxHp;
         existing.moving = monster.moving;
+        existing.dead = monster.dead === true;
       }
     }
 

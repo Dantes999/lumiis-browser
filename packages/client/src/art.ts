@@ -139,6 +139,11 @@ export class PlayerView {
     this.applyLook(tables, { weapon: null, armor: null }, true);
   }
 
+  /** A slight forward/backward tilt of the whole figure while swinging. */
+  setLean(radians: number): void {
+    this.container.setRotation(radians);
+  }
+
   setPosition(x: number, y: number): void {
     this.container.setPosition(x, y);
     // Lower on screen means in front, so depth follows the feet.

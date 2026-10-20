@@ -4,12 +4,14 @@
 
 import {
   ATTACK_COOLDOWN_TICKS,
+  isDirection,
   DROP_PROTECT_TICKS,
   INVENTORY_SLOTS,
   ITEMS,
   MAX_LEVEL,
   MONSTER_ATTACK_COOLDOWN_TICKS,
   MONSTER_ATTACK_RANGE,
+  MONSTER_DEATH_TICKS,
   MONSTER_GIVE_UP_FACTOR,
   MONSTER_RESPAWN_TICKS,
   MONSTER_TYPES,
@@ -158,6 +160,8 @@ export type Monster = {
   damage: number;
   /** 0 while alive, otherwise the tick this monster returns on. */
   respawnAt: number;
+  /** 0 while alive, otherwise the tick this monster was slain on. */
+  deadAt: number;
   targetId: number | null;
   lastAttackTick: number;
   stuckTicks: number;
@@ -337,7 +341,11 @@ export class World {
    * One melee hit. Every rule is checked here: the target exists, it is alive,
    * the cooldown has passed and it is actually in reach.
    */
-  attack(playerId: number, targetId: number): AttackResult {
+  attack(
+    playerId: number,
+    targetId: number | null = null,
+    direction: number | null = null,
+  ): AttackResult {
     const player = this.playersById.get(playerId);
     if (player === undefined) return { ok: false, reason: 'You are not in the world.' };
     if (player.deadUntil > 0) return { ok: false, reason: 'You are down.' };
@@ -346,18 +354,16 @@ export class World {
       return { ok: false, reason: 'Not so fast.' };
     }
 
-    const monster = this.monstersById.get(targetId);
-    if (monster === undefined || monster.respawnAt > 0) {
-      return { ok: false, reason: 'That monster is gone.' };
+    // A swing always happens, even at empty air. It goes where the body faces,
+    // or towards the monster that was aimed at if that one still exists.
+    const aimed = targetId === null ? undefined : this.monstersById.get(targetId);
+    if (aimed !== undefined && aimed.respawnAt <= 0) {
+      player.dir = facingTowards(player, aimed, player.dir);
+    } else if (direction !== null && isDirection(direction)) {
+      player.dir = direction;
     }
 
     const profile = swingFor(player.equipment.weapon);
-    if (Math.hypot(monster.x - player.x, monster.y - player.y) > profile.range) {
-      return { ok: false, reason: 'Out of reach.' };
-    }
-
-    // Turn towards the target; the blow lands where the body points.
-    player.dir = facingTowards(player, monster, player.dir);
     player.swing = {
       dir: player.dir,
       hitAt: this.tickCount + profile.hitAt,
@@ -494,6 +500,7 @@ export class World {
 
   private killMonster(monster: Monster, killer: Player): void {
     monster.hp = 0;
+    monster.deadAt = this.tickCount;
     monster.respawnAt = this.tickCount + MONSTER_RESPAWN_TICKS;
     monster.wanderDir = null;
     monster.targetId = null;
@@ -613,16 +620,19 @@ export class World {
 
     const monsters: MonsterSnapshot[] = [];
     for (const monster of this.monstersById.values()) {
-      if (monster.respawnAt > 0) continue;
+      // A slain monster stays visible for a moment so the death reads on screen.
+      const dead = monster.deadAt !== 0;
+      if (dead && this.tickCount - monster.deadAt >= MONSTER_DEATH_TICKS) continue;
       monsters.push({
         id: monster.id,
         key: monster.key,
         x: Math.round(monster.x * 10) / 10,
         y: Math.round(monster.y * 10) / 10,
         dir: monster.dir,
-        hp: monster.hp,
+        hp: dead ? 0 : monster.hp,
         maxHp: monster.maxHp,
-        moving: monster.wanderDir !== null || monster.targetId !== null,
+        moving: !dead && (monster.wanderDir !== null || monster.targetId !== null),
+        ...(dead ? { dead: true } : {}),
       });
     }
 
@@ -905,6 +915,7 @@ export class World {
         aggro: type.aggro,
         damage: type.damage,
         respawnAt: 0,
+        deadAt: 0,
         targetId: null,
         lastAttackTick: -MONSTER_ATTACK_COOLDOWN_TICKS,
         stuckTicks: 0,
@@ -1075,6 +1086,7 @@ export class World {
 
   private reviveMonster(monster: Monster): void {
     monster.respawnAt = 0;
+    monster.deadAt = 0;
     monster.hp = monster.maxHp;
     monster.x = monster.homeX;
     monster.y = monster.homeY;

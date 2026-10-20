@@ -92,10 +92,14 @@ export class Realm {
     this.worldOf(playerId)?.setInput(playerId, dx, dy);
   }
 
-  attack(playerId: number, targetId: number): AttackResult {
+  attack(
+    playerId: number,
+    targetId: number | null,
+    direction: number | null = null,
+  ): AttackResult {
     const world = this.worldOf(playerId);
     if (world === null) return { ok: false, reason: 'You are not in the world.' };
-    return world.attack(playerId, targetId);
+    return world.attack(playerId, targetId, direction);
   }
 
   pickup(

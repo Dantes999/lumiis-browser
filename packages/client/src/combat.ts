@@ -1,22 +1,33 @@
-// Turning a click or a key press into an attack intent.
-// The client only says "I want to hit that one"; the server decides whether the
-// hit lands.
+// Turning a click or a key press into a swing.
+// A swing always happens: it goes where the body faces, or towards the monster
+// that was aimed at. Whether anything is hit is decided by the server, by the
+// arc of the swing at the moment the blade is through.
 
-import { swingFor, swingMs } from '@lumiis/shared';
+import { dirFromInput, swingFor, swingMs, type Direction } from '@lumiis/shared';
 import { sfx } from './audio';
 import { view, type MonsterState } from './state';
 
 /** How close to the pointer a monster has to be to count as clicked. */
 const TAP_RADIUS = 26;
 
-let sender: (target: number) => void = () => {
+/** What the server is told: a monster to turn to, or a direction to swing in. */
+export type SwingMessage = { target?: number; dir?: number };
+
+let sender: (message: SwingMessage) => void = () => {
   // Replaced once the connection exists.
 };
 
 /** The swing the figure is showing right now, for the scene. */
-type AttackPose = { startedAt: number; durationMs: number };
+export type AttackPose = {
+  startedAt: number;
+  durationMs: number;
+  dir: Direction;
+  /** +1 sweeps one way, -1 the other; hits alternate like real swings. */
+  sweep: 1 | -1;
+};
 
 let pose: AttackPose | null = null;
+let swings = 0;
 
 export const attackPose = (): AttackPose | null => pose;
 
@@ -34,38 +45,52 @@ const nearest = (x: number, y: number, radius: number): MonsterState | null => {
   return best;
 };
 
-/** True when the monster stands inside the reach of the weapon in hand. */
-const inReach = (monster: MonsterState): boolean => {
-  const profile = swingFor(view.equipment.weapon);
-  return Math.hypot(monster.x - view.self.x, monster.y - view.self.y) <= profile.range;
-};
-
-/** Starts the visible swing and tells the server; false when nothing is in reach. */
-const swingAt = (target: MonsterState): boolean => {
+const begin = (target: MonsterState | null, fallback: Direction): void => {
   const profile = swingFor(view.equipment.weapon);
 
-  sender(target.id);
-  pose = { startedAt: performance.now(), durationMs: swingMs(profile) };
+  const toward =
+    target === null ? null : dirFromInput(target.x - view.self.x, target.y - view.self.y);
+  const dir = toward ?? fallback;
+
+  sender(target === null ? { dir } : { target: target.id });
+
+  // The figure turns straight away; the server will agree.
+  view.self.dir = dir;
+  swings += 1;
+  pose = {
+    startedAt: performance.now(),
+    durationMs: swingMs(profile),
+    dir,
+    sweep: swings % 2 === 0 ? -1 : 1,
+  };
+
   sfx.swing();
-  return true;
 };
 
-/** Space bar: hit the closest monster that is already within reach. */
-export function attackNearestInRange(): boolean {
+/** Space bar: swing at the closest monster in reach, otherwise straight ahead. */
+export function swingForward(): void {
   const profile = swingFor(view.equipment.weapon);
-  const target = nearest(view.self.x, view.self.y, profile.range);
-  if (target === null) return false;
-  return swingAt(target);
+  begin(nearest(view.self.x, view.self.y, profile.range), view.self.dir);
 }
 
-/** Tap or click: only a monster under the pointer, and only within reach. */
+/**
+ * Tap or click in the world: a monster under the pointer is aimed at, empty
+ * ground is swung at. Returns false only when there is no direction at all.
+ */
 export function attackAt(worldX: number, worldY: number): boolean {
   const target = nearest(worldX, worldY, TAP_RADIUS);
-  if (target === null) return false;
-  if (!inReach(target)) return false;
-  return swingAt(target);
+  if (target !== null) {
+    begin(target, view.self.dir);
+    return true;
+  }
+
+  const dir = dirFromInput(worldX - view.self.x, worldY - view.self.y);
+  if (dir === null) return false;
+
+  begin(null, dir);
+  return true;
 }
 
-export const setAttackSender = (fn: (target: number) => void): void => {
+export const setAttackSender = (fn: (message: SwingMessage) => void): void => {
   sender = fn;
 };

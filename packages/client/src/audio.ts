@@ -117,9 +117,41 @@ const burst = (duration: number, gain: number, frequency: number): void => {
   played += 1;
 };
 
+/** A band of noise sweeping downwards: the air a blade pushes aside. */
+const whoosh = (duration: number, gain: number, from: number, to: number): void => {
+  if (context === null || master === null || level() === 0) return;
+
+  const now = context.currentTime;
+  const frames = Math.floor(context.sampleRate * duration);
+  const buffer = context.createBuffer(1, frames, context.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let index = 0; index < frames; index += 1) data[index] = Math.random() * 2 - 1;
+
+  const source = context.createBufferSource();
+  source.buffer = buffer;
+
+  const filter = context.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.Q.value = 1.1;
+  filter.frequency.setValueAtTime(from, now);
+  filter.frequency.exponentialRampToValueAtTime(to, now + duration);
+
+  const envelope = context.createGain();
+  envelope.gain.setValueAtTime(0.0001, now);
+  envelope.gain.linearRampToValueAtTime(gain, now + duration * 0.25);
+  envelope.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+  source.connect(filter);
+  filter.connect(envelope);
+  envelope.connect(master);
+  source.start(now);
+  played += 1;
+};
+
 export const sfx = {
   swing(): void {
-    tone({ frequency: 340, duration: 0.1, type: 'square', gain: 0.25, slideTo: 150 });
+    whoosh(0.22, 0.55, 1500, 300);
+    tone({ frequency: 320, duration: 0.09, type: 'square', gain: 0.12, slideTo: 160 });
   },
   hit(): void {
     burst(0.14, 0.9, 1100);

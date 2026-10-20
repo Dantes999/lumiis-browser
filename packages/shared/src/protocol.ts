@@ -12,6 +12,7 @@ import {
 } from './constants.js';
 import { isItemKey, type Equipment, type InventorySlot } from './items.js';
 import { INVENTORY_SLOTS } from './items.js';
+import { isDirection } from './movement.js';
 
 export type PlayerSnapshot = {
   id: number;
@@ -40,6 +41,8 @@ export type MonsterSnapshot = {
   hp: number;
   maxHp: number;
   moving: boolean;
+  /** Present only while the monster is in its short death animation. */
+  dead?: boolean;
 };
 
 export type GroundItemSnapshot = {
@@ -56,7 +59,7 @@ export type ClientMessage =
   | { t: 'select'; id: number }
   | { t: 'createCharacter'; name: string }
   | { t: 'input'; dx: number; dy: number }
-  | { t: 'attack'; target: number }
+  | { t: 'attack'; target?: number; dir?: number }
   | { t: 'pickup'; target: number }
   | { t: 'equip'; slot: number }
   | { t: 'unequip'; piece: 'weapon' | 'armor' }
@@ -147,11 +150,21 @@ export function parseClientMessage(input: unknown): ParsedMessage {
     }
 
     case 'attack': {
+      // A swing at nothing is allowed: it just goes wherever the body faces,
+      // or wherever the player pointed at.
       const target = message.target;
-      if (typeof target !== 'number' || !Number.isInteger(target) || target < 1) {
-        return fail('attack needs a monster id');
+      const rawDir = message.dir;
+
+      if (rawDir !== undefined && !isDirection(rawDir)) return fail('attack dir must be 0..7');
+      const dir = isDirection(rawDir) ? rawDir : undefined;
+
+      if (target !== undefined) {
+        if (typeof target !== 'number' || !Number.isInteger(target) || target < 1) {
+          return fail('attack target must be a monster id');
+        }
+        return { ok: true, message: { t: 'attack', target, dir } };
       }
-      return { ok: true, message: { t: 'attack', target } };
+      return { ok: true, message: { t: 'attack', dir } };
     }
 
     case 'equip': {

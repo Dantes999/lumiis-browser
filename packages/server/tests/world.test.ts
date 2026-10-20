@@ -3,6 +3,7 @@ import {
   swingFor,
   DROP_PROTECT_TICKS,
   MAX_LEVEL,
+  MONSTER_DEATH_TICKS,
   MONSTER_RESPAWN_TICKS,
   MONSTER_TYPES,
   PLAYER_DAMAGE,
@@ -32,8 +33,11 @@ const grassMap = (): MapData => ({
 const spawn = spawnPosition(grassMap());
 
 /** Health of a monster as the client sees it; null while it is down. */
-const monsterHp = (world: World, id = 1): number | null =>
-  world.snapshot().monsters.find((monster) => monster.id === id)?.hp ?? null;
+const monsterHp = (world: World, id = 1): number | null => {
+  const monster = world.snapshot().monsters.find((entry) => entry.id === id);
+  if (monster === undefined || monster.dead === true) return null;
+  return monster.hp;
+};
 
 /** Long enough for the slowest swing to land and end. */
 const SWING_TICKS = 20;
@@ -240,18 +244,61 @@ describe('monsters', () => {
     expect(world.attack(player.id, 1).ok).toBe(true);
   });
 
-  it('refuses a hit on a monster that is far away', () => {
+  it('swings at a monster that is far away, but does not reach it', () => {
     const world = new World(withWolf(13, 13));
     const player = world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
+    const monster = world.getMonster(1);
+    if (monster === undefined) throw new Error('no monster');
 
-    expect(world.attack(player.id, 1).ok).toBe(false);
+    expect(world.attack(player.id, 1).ok).toBe(true);
+    for (let tick = 0; tick < SWING_TICKS; tick += 1) world.step();
+    expect(monster.hp).toBe(MONSTER_TYPES.wolf.maxHp);
   });
 
-  it('refuses a hit on a monster that does not exist', () => {
+  it('swings even when the aimed monster is already gone', () => {
     const world = new World(withWolf());
     const player = world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
 
-    expect(world.attack(player.id, 999).ok).toBe(false);
+    expect(world.attack(player.id, 999).ok).toBe(true);
+  });
+
+  it('swings at empty air and hits whatever is in front by itself', () => {
+    const world = new World(withWolf(9, 8));
+    const player = world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
+    const monster = world.getMonster(1);
+    if (monster === undefined) throw new Error('no monster');
+
+    // Facing east already, no monster named at all.
+    player.dir = 6;
+    expect(world.attack(player.id).ok).toBe(true);
+    for (let tick = 0; tick < SWING_TICKS; tick += 1) world.step();
+
+    expect(monster.hp).toBe(MONSTER_TYPES.wolf.maxHp - PLAYER_DAMAGE);
+  });
+
+  it('swings in the direction the player asks for', () => {
+    const map = grassMap();
+    map.spawns = [{ kind: 'mob', key: 'wolf', tx: 7, ty: 8 }];
+    const world = new World(map);
+    const player = world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
+    const monster = world.getMonster(1);
+    if (monster === undefined) throw new Error('no monster');
+
+    // The wolf is to the west; turn there with the swing itself.
+    expect(world.attack(player.id, null, 2).ok).toBe(true);
+    expect(player.dir).toBe(2);
+
+    for (let tick = 0; tick < SWING_TICKS; tick += 1) world.step();
+    expect(monster.hp).toBe(MONSTER_TYPES.wolf.maxHp - PLAYER_DAMAGE);
+  });
+
+  it('swings at nothing at all without a monster on the map', () => {
+    const world = new World(grassMap());
+    const player = world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
+
+    expect(world.attack(player.id).ok).toBe(true);
+    for (let tick = 0; tick < SWING_TICKS; tick += 1) world.step();
+    expect(player.exp).toBe(0);
   });
 
   it('kills a monster and brings it back with full health', () => {
@@ -262,12 +309,10 @@ describe('monsters', () => {
 
     for (let hit = 0; hit < hits; hit += 1) strike(world, player.id);
 
-    expect(world.snapshot().monsters).toHaveLength(0);
+    expect(monsterHp(world)).toBeNull();
 
-    for (let tick = 0; tick < MONSTER_RESPAWN_TICKS; tick += 1) world.step();
-    const back = world.snapshot().monsters;
-    expect(back).toHaveLength(1);
-    expect(back[0]?.hp).toBe(MONSTER_TYPES.wolf.maxHp);
+    for (let tick = 0; tick < MONSTER_RESPAWN_TICKS + MONSTER_DEATH_TICKS; tick += 1) world.step();
+    expect(monsterHp(world)).toBe(MONSTER_TYPES.wolf.maxHp);
   });
 
   it('keeps wandering monsters near their spawn', () => {
@@ -759,12 +804,30 @@ describe('swings', () => {
 
   it('a two-handed sword reaches further than a one-handed one', () => {
     // Diagonal neighbours are about 45 pixels apart: out of a sword's reach,
-    // inside a great sword's.
-    const sword = arena([[9, 9]], 'wooden_sword');
-    expect(sword.world.attack(sword.player.id, 1).ok).toBe(false);
+    // inside a great sword's. The wolf must stand still, or it walks into
+    // range while the arm is on its way.
+    const wolf = MONSTER_TYPES.wolf as { speed: number; chaseSpeed: number; aggro: number };
+    const { speed, chaseSpeed, aggro } = wolf;
+    wolf.speed = 0;
+    wolf.chaseSpeed = 0;
+    wolf.aggro = 0;
 
-    const great = arena([[9, 9]], 'great_sword');
-    expect(great.world.attack(great.player.id, 1).ok).toBe(true);
+    try {
+      const hurt = (weapon: ItemKey): number => {
+        const { world, player } = arena([[9, 9]], weapon);
+        const monster = world.getMonster(1);
+        if (monster === undefined) throw new Error('no monster');
+        land(world, player.id, 1);
+        return MONSTER_TYPES.wolf.maxHp - monster.hp;
+      };
+
+      expect(hurt('wooden_sword')).toBe(0);
+      expect(hurt('great_sword')).toBeGreaterThan(0);
+    } finally {
+      wolf.speed = speed;
+      wolf.chaseSpeed = chaseSpeed;
+      wolf.aggro = aggro;
+    }
   });
 
   it('turns the body towards the target', () => {

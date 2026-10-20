@@ -40,6 +40,7 @@ export type MonsterState = {
   hp: number;
   maxHp: number;
   moving: boolean;
+  dead: boolean;
   renderX: number;
   renderY: number;
 };

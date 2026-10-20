@@ -93,3 +93,6 @@ export const PLAYER_REGEN_HP = 1;
 /** 20 ticks = one point of health per second while alive. */
 export const PLAYER_REGEN_TICKS = 20;
 
+/** How long a slain monster stays on screen before it disappears. */
+export const MONSTER_DEATH_TICKS = 8;
+

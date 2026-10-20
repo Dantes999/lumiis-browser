@@ -264,7 +264,11 @@ export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store
             break;
           }
           // The blow lands a few ticks later; rewards follow through the tick loop.
-          const result = realm.attack(session.player.id, parsed.message.target);
+          const result = realm.attack(
+            session.player.id,
+            parsed.message.target ?? null,
+            parsed.message.dir ?? null,
+          );
           if (!result.ok) send(session, { t: 'notice', text: result.reason });
           break;
         }

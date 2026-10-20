@@ -25,11 +25,37 @@ import { renderedSelfPosition, stepLocal } from '../sim';
 import { view, type RemotePlayer } from '../state';
 import { buildTilesetTexture } from '../tiles';
 import { setWorldMap } from '../world-map';
+import { SwingTrail } from './swing-trail';
 
 /** Milliseconds per walking frame. */
 const STEP_FRAME_MS = 180;
 /** The three columns of a swing: out, through, back. */
 const SWING_COLUMNS = [4, 5, 6] as const;
+
+/** Maps swing progress (0..1) to a column: held wind-up, fast strike, ease out. */
+const swingColumn = (progress: number): number => {
+  if (progress < 0.42) return SWING_COLUMNS[0];
+  if (progress < 0.6) return SWING_COLUMNS[1];
+  return SWING_COLUMNS[2];
+};
+
+/** Body tilt through a swing: cock back, commit, ease out. */
+const swingLean = (progress: number, sweep: 1 | -1): number => {
+  if (progress < 0.42) {
+    const t = progress / 0.42;
+    return sweep * -0.07 * Math.sin((t * Math.PI) / 2);
+  }
+  if (progress < 0.6) {
+    const t = (progress - 0.42) / 0.18;
+    return sweep * (-0.07 + 0.11 * t);
+  }
+  const t = (progress - 0.6) / 0.4;
+  return sweep * 0.04 * (1 - t);
+};
+
+/** Progress of a swing given its start and duration, clamped to 0..1. */
+const swingProgress = (startedAt: number, durationMs: number, now: number): number =>
+  Math.min(1, Math.max(0, (now - startedAt) / durationMs));
 /** Time constant for other players catching up to their reported position. */
 const OTHERS_TAU_MS = 60;
 
@@ -43,7 +69,20 @@ export class WorldScene extends Phaser.Scene {
   private mapId: string | null = null;
   private layer: Phaser.Tilemaps.TilemapLayer | null = null;
   private lastSelfHp = -1;
+  /** The streak of the last swing this client drew, to notice a new one. */
+  private shownSwingAt = 0;
+  private readonly trails: SwingTrail[] = [];
+  /** For other players: when their last seen swing ended, and how many they did. */
+  private readonly seenSwings = new Map<number, number>();
+  private readonly swingCounts = new Map<number, number>();
   private flashUntil = 0;
+  /** Camera shake: the moment it ends and how hard it was. */
+  private shakeUntil = 0;
+  private shakePower = 0;
+  /** Monsters flashing white after a hit, keyed by id. */
+  private readonly monsterFlashUntil = new Map<number, number>();
+  /** Monsters already in their death fade, keyed by id. */
+  private readonly deadMonsters = new Set<number>();
   private lastLevel = -1;
   private lastItemCount = -1;
   private readonly lastMonsterHp = new Map<number, number>();
@@ -76,6 +115,13 @@ export class WorldScene extends Phaser.Scene {
     this.tables = readTables(this);
     this.cameras.main.setBackgroundColor('#0b0f13');
     buildTilesetTexture(this);
+
+    // One soft dot, reused for the sparks a hit throws out.
+    const spark = this.add.graphics();
+    spark.fillStyle(0xffffff, 1);
+    spark.fillCircle(3, 3, 3);
+    spark.generateTexture('spark', 6, 6);
+    spark.destroy();
   }
 
   /** Loads and builds the map the server put us on, and swaps it on a portal. */
@@ -115,7 +161,86 @@ export class WorldScene extends Phaser.Scene {
     this.renderGround();
     this.renderMonsters(delta);
     this.renderPlayers(delta);
+    this.renderTrails(delta);
+    this.updateShake();
     this.watchInventory();
+  }
+
+  /** A short, decaying jolt for the camera after a blow. */
+  private updateShake(): void {
+    if (this.time.now < this.shakeUntil) {
+      const remaining = (this.shakeUntil - this.time.now) / 90;
+      const amplitude = this.shakePower * remaining;
+      this.cameras.main.setFollowOffset(
+        (Math.random() * 2 - 1) * amplitude,
+        (Math.random() * 2 - 1) * amplitude,
+      );
+    } else if (this.cameras.main.followOffset.x !== 0 || this.cameras.main.followOffset.y !== 0) {
+      this.cameras.main.setFollowOffset(0, 0);
+    }
+  }
+
+  private triggerShake(power: number): void {
+    this.shakeUntil = this.time.now + 90;
+    this.shakePower = power;
+  }
+
+  /** A small shower of sparks where a blade connected. */
+  private burstAt(x: number, y: number): void {
+    const emitter = this.add.particles(x, y, 'spark', {
+      speed: { min: 40, max: 150 },
+      angle: { min: 0, max: 360 },
+      lifespan: { min: 140, max: 300 },
+      scale: { start: 1, end: 0 },
+      tint: [0xffffff, 0xffe9a8, 0xffd479],
+      blendMode: Phaser.BlendModes.ADD,
+      emitting: false,
+    });
+    emitter.explode(12);
+    this.time.delayedCall(350, () => emitter.destroy());
+  }
+
+  /** Starts the streak for a new swing and lets the running ones fade out. */
+  private renderTrails(delta: number): void {
+    const shown = attackPose();
+    if (shown !== null && shown.startedAt !== this.shownSwingAt) {
+      this.shownSwingAt = shown.startedAt;
+      const self = view.self;
+      const reach = swingFor(view.equipment.weapon).range;
+      this.trails.push(
+        new SwingTrail(this, self.x, self.y, shown.dir, shown.sweep, shown.durationMs, reach),
+      );
+    }
+
+    for (const [id, player] of view.others) {
+      const ended = this.seenSwings.get(id) ?? 0;
+      if (player.attackUntil > this.time.now && ended <= this.time.now) {
+        const count = (this.swingCounts.get(id) ?? 0) + 1;
+        this.swingCounts.set(id, count);
+        const reach = swingFor(isItemKey(player.weapon) ? player.weapon : null).range;
+        this.trails.push(
+          new SwingTrail(
+            this,
+            player.renderX,
+            player.renderY,
+            player.dir,
+            count % 2 === 0 ? -1 : 1,
+            swingMs(swingFor(isItemKey(player.weapon) ? player.weapon : null)),
+            reach,
+          ),
+        );
+      }
+      if (player.attackUntil > ended) this.seenSwings.set(id, player.attackUntil);
+    }
+
+    for (let index = this.trails.length - 1; index >= 0; index -= 1) {
+      const trail = this.trails[index];
+      if (trail === undefined) continue;
+      trail.update(delta);
+      if (!trail.done) continue;
+      trail.destroy();
+      this.trails.splice(index, 1);
+    }
   }
 
   /** A rising number where the hit landed. */
@@ -197,11 +322,28 @@ export class WorldScene extends Phaser.Scene {
         const lost = previousHp - monster.hp;
         if (lost > 0) {
           this.showDamage(monster.renderX, monster.renderY - 30, lost, '#ffd479');
+          this.burstAt(monster.renderX, monster.renderY - 20);
+          this.triggerShake(3);
+          this.monsterFlashUntil.set(monster.id, this.time.now + 100);
           sfx.hit();
         }
-        if (monster.hp <= 0) sfx.kill();
       }
       this.lastMonsterHp.set(monster.id, monster.hp);
+
+      // The first snapshot that marks it dead: the killing blow landed.
+      if (monster.dead && !this.deadMonsters.has(monster.id)) {
+        this.deadMonsters.add(monster.id);
+        this.burstAt(monster.renderX, monster.renderY - 18);
+        this.triggerShake(4);
+        monsterView.setDead(true);
+        sfx.kill();
+      }
+
+      const flashUntil = this.monsterFlashUntil.get(monster.id);
+      monsterView.setFlash(flashUntil !== undefined && this.time.now < flashUntil);
+      if (flashUntil !== undefined && this.time.now >= flashUntil) {
+        this.monsterFlashUntil.delete(monster.id);
+      }
     }
 
     for (const [id, monsterView] of this.monsterViews) {
@@ -209,6 +351,8 @@ export class WorldScene extends Phaser.Scene {
       monsterView.destroy();
       this.monsterViews.delete(id);
       this.lastMonsterHp.delete(id);
+      this.deadMonsters.delete(id);
+      this.monsterFlashUntil.delete(id);
     }
   }
 
@@ -261,6 +405,18 @@ export class WorldScene extends Phaser.Scene {
         armor: isItemKey(player.armor) ? player.armor : null,
       });
       playerView.setPose(player.dir, this.poseColumn(player.dir, player));
+
+      const weapon = isItemKey(player.weapon) ? player.weapon : null;
+      const duration = swingMs(swingFor(weapon));
+      if (player.attackUntil > this.time.now) {
+        const count = this.swingCounts.get(player.id) ?? 0;
+        const sweep: 1 | -1 = count % 2 === 0 ? -1 : 1;
+        playerView.setLean(
+          swingLean(swingProgress(player.attackUntil - duration, duration, this.time.now), sweep),
+        );
+      } else {
+        playerView.setLean(0);
+      }
     }
 
     const selfId = view.selfId;
@@ -272,6 +428,13 @@ export class WorldScene extends Phaser.Scene {
       selfView.setPosition(drawn.x, drawn.y);
       selfView.setLook(tables, view.equipment);
       selfView.setPose(self.dir, this.selfColumn(column));
+
+      const shown = attackPose();
+      if (shown !== null) {
+        selfView.setLean(swingLean(swingProgress(shown.startedAt, shown.durationMs, this.time.now), shown.sweep));
+      } else {
+        selfView.setLean(0);
+      }
 
       // A hit is shown as a short red flash on the figure.
       if (self.hp < this.lastSelfHp) this.flashUntil = this.time.now + 140;
@@ -300,7 +463,7 @@ export class WorldScene extends Phaser.Scene {
 
     const progress = (this.time.now - shown.startedAt) / shown.durationMs;
     if (progress < 0 || progress >= 1) return view.self.moving ? walkColumn : 0;
-    return SWING_COLUMNS[Math.min(SWING_COLUMNS.length - 1, Math.floor(progress * 3))] ?? 0;
+    return swingColumn(progress);
   }
 
   /** The same for other players; their swing length comes from their weapon. */
@@ -310,7 +473,7 @@ export class WorldScene extends Phaser.Scene {
       const weapon = isItemKey(player.weapon) ? player.weapon : null;
       const duration = swingMs(swingFor(weapon));
       const progress = 1 - (player.attackUntil - now) / duration;
-      return SWING_COLUMNS[Math.min(2, Math.max(0, Math.floor(progress * 3)))] ?? 0;
+      return swingColumn(progress);
     }
     return player.moving ? Math.floor(now / STEP_FRAME_MS) % 2 === 0 ? 1 : 2 : 0;
   }
