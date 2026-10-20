@@ -25,6 +25,7 @@ import {
   TILE,
   dirFromInput,
   expForNextLevel,
+  findPath,
   canStand,
   EMPTY_EQUIPMENT,
   isItemKey,
@@ -36,6 +37,7 @@ import {
   withinAttackRange,
 } from '@lumiis/shared';
 import type { CharacterSave } from '../store/db.js';
+import type { Point } from '@lumiis/shared';
 import type {
   Direction,
   Equipment,
@@ -61,6 +63,10 @@ const PAUSE_MAX_TICKS = 50;
 const BLOCKED_PAUSE_TICKS = 5;
 /** A chasing monster that cannot get closer for this long loses interest. */
 const STUCK_LIMIT_TICKS = 40;
+/** How often a chasing monster looks for a new route (half a second). */
+const PATH_REFRESH_TICKS = 10;
+/** Close enough to a waypoint to take the next one. */
+const WAYPOINT_REACHED = 8;
 
 export type PlayerSeed = {
   accountId: number;
@@ -138,6 +144,13 @@ export type Monster = {
   targetId: number | null;
   lastAttackTick: number;
   stuckTicks: number;
+  /** Route to the target, recomputed when it gets stale. */
+  path: Point[];
+  pathStep: number;
+  /** Tile the current route leads to. */
+  pathTile: number;
+  /** Earliest tick for a fresh route. */
+  nextPathTick: number;
   wanderDir: Direction | null;
   wanderUntil: number;
   /** Damage each player dealt to this monster since it last appeared. */
@@ -808,6 +821,10 @@ export class World {
         targetId: null,
         lastAttackTick: -MONSTER_ATTACK_COOLDOWN_TICKS,
         stuckTicks: 0,
+        path: [],
+        pathStep: 0,
+        pathTile: -1,
+        nextPathTick: 0,
         wanderDir: null,
         wanderUntil: 0,
         damageBy: new Map(),
@@ -840,7 +857,7 @@ export class World {
         return true;
       }
 
-      const dir = dirFromInput(target.x - monster.x, target.y - monster.y);
+      const dir = this.chaseDirection(monster, target);
       if (dir !== null) {
         monster.dir = dir;
         const beforeX = monster.x;
@@ -868,11 +885,49 @@ export class World {
 
     // The target is gone or dead: look for a new one.
     monster.targetId = null;
+    monster.path = [];
+    monster.pathStep = 0;
+    monster.pathTile = -1;
     const found = this.findTarget(monster);
     if (found === null) return false;
 
     monster.targetId = found.id;
     return true;
+  }
+
+  /**
+   * The next direction towards the target, following a route around obstacles.
+   * The route is rebuilt when the target changes tile or after a short while.
+   */
+  private chaseDirection(monster: Monster, target: Player): Direction | null {
+    const targetTile =
+      Math.floor(target.y / TILE_SIZE) * this.map.width + Math.floor(target.x / TILE_SIZE);
+
+    const stale =
+      monster.path.length === 0 ||
+      monster.pathTile !== targetTile ||
+      this.tickCount >= monster.nextPathTick;
+
+    if (stale) {
+      monster.path =
+        findPath(this.map, { x: monster.x, y: monster.y }, { x: target.x, y: target.y }) ?? [];
+      monster.pathStep = 0;
+      monster.pathTile = targetTile;
+      monster.nextPathTick = this.tickCount + PATH_REFRESH_TICKS;
+    }
+
+    while (monster.pathStep < monster.path.length) {
+      const point = monster.path[monster.pathStep];
+      if (point === undefined) break;
+      if (Math.hypot(point.x - monster.x, point.y - monster.y) > WAYPOINT_REACHED) break;
+      monster.pathStep += 1;
+    }
+
+    const waypoint = monster.path[monster.pathStep];
+    if (waypoint === undefined) {
+      return dirFromInput(target.x - monster.x, target.y - monster.y);
+    }
+    return dirFromInput(waypoint.x - monster.x, waypoint.y - monster.y);
   }
 
   private findTarget(monster: Monster): Player | null {
@@ -940,6 +995,9 @@ export class World {
     monster.wanderUntil = this.tickCount + 10;
     monster.targetId = null;
     monster.lastAttackTick = this.tickCount - MONSTER_ATTACK_COOLDOWN_TICKS;
+    monster.path = [];
+    monster.pathStep = 0;
+    monster.pathTile = -1;
     monster.damageBy.clear();
   }
 

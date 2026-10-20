@@ -662,3 +662,40 @@ describe('equipment', () => {
     expect(world.unequip(player.id, 'weapon').ok).toBe(false);
   });
 });
+
+describe('chasing around walls', () => {
+  /** A wall between player and wolf, with a gap low on the map. */
+  const walledMap = (gap: boolean): MapData => {
+    const map = grassMap();
+    map.spawn = { x: 6, y: 8 };
+    for (let y = 0; y <= 12; y += 1) map.tiles[y * 16 + 8] = TILE.WALL;
+    if (gap) {
+      for (let y = 13; y <= 15; y += 1) map.tiles[y * 16 + 8] = TILE.GRASS;
+    } else {
+      for (let y = 13; y <= 15; y += 1) map.tiles[y * 16 + 8] = TILE.WALL;
+    }
+    map.spawns = [{ kind: 'mob', key: 'wolf', tx: 10, ty: 8 }];
+    return map;
+  };
+
+  it('walks around a wall to reach the player', () => {
+    const world = new World(walledMap(true));
+    const player = world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
+
+    for (let tick = 0; tick < 900; tick += 1) {
+      world.step();
+      if (player.hp < PLAYER_MAX_HP) break;
+    }
+
+    expect(player.hp).toBeLessThan(PLAYER_MAX_HP);
+  });
+
+  it('does not reach a player behind a closed wall', () => {
+    const world = new World(walledMap(false));
+    const player = world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
+
+    for (let tick = 0; tick < 900; tick += 1) world.step();
+
+    expect(player.hp).toBe(PLAYER_MAX_HP);
+  });
+});
