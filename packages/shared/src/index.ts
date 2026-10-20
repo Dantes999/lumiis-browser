@@ -2,6 +2,7 @@
 // Anything both the server and the browser need lives here, so a rule can only
 // ever be written once.
 
+export * from './combat.js';
 export * from './constants.js';
 export * from './items.js';
 export * from './map.js';

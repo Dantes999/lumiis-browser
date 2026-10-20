@@ -4,9 +4,10 @@
 import Phaser from 'phaser';
 import { WorldScene } from './scene/world-scene';
 import { Connection } from './net';
+import { audioState, sfx } from './audio';
 import { initInput } from './input';
 import { attackAt, attackNearestInRange, setAttackSender } from './combat';
-import { initAudio, resumeAudio } from './audio';
+import { initAudio, resumeAudio, unlockAudioOnFirstGesture } from './audio';
 import { initController } from './controller';
 import { itemNear, orderPickup, pickupNearestInRange, setPickupSender, tickPickup } from './loot';
 import { view } from './state';
@@ -43,8 +44,11 @@ const settings = createSettings((value) => {
   connection.setPickupSettings(value.autoPickup, value.types);
 });
 
+// The browser only allows sound after a gesture; the login click is one, and
+// this listener is the safety net for every other first interaction.
+unlockAudioOnFirstGesture();
+
 const login = createLogin((name, password, mode) => {
-  // The browser only allows sound after a click, so this is the moment.
   initAudio();
   resumeAudio();
   connection.submit(name, password, mode);
@@ -107,4 +111,6 @@ window.setInterval(() => {
 }, HUD_REFRESH_MS);
 
 // Handy for poking at the state from the console during development.
-Object.assign(window, { lumiis: { view, connection, game } });
+Object.assign(window, {
+  lumiis: { view, connection, game, audio: { state: audioState, sfx } },
+});

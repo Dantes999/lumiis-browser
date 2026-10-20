@@ -76,12 +76,20 @@ single port.
 
 - A client connects, says hello, and receives a welcome plus snapshots.
 - The server runs a fixed 20 Hz loop; every 2 ticks it broadcasts the world.
-- The client draws a tile grid and every player the server reports.
+- Walking with WASD, the arrow keys or a touch joystick; the server decides
+  where you end up, the client predicts and smooths in between.
+- Several maps, linked by portals; every map is its own world on the server.
+- Monsters that wander, notice you, follow a route around obstacles and bite.
+- Fighting: a swing has a wind-up, lands half way through and only hits what
+  stands inside its arc. A sword hits one monster, a great sword up to three.
+- Items on the ground, inventory with stacks, equipment with its own values.
+- Experience and Yang shared by damage dealt, levelling, dying and respawning.
+- Accounts and characters in SQLite; saves after login, on a timer and on exit.
+- Map editor at `/editor.html`.
 - Invalid or unknown messages close the connection instead of being guessed at.
-- Reconnect with backoff, ping measurement, mobile-safe layout.
+- Reconnect with backoff, ping measurement, mobile-safe layout, generated sound.
 
-There is no movement, combat, inventory or persistence yet. Those arrive as
-vertical slices; see `AGENTS.md` for the rules that keep the codebase readable.
+See `AGENTS.md` for the rules that keep the codebase readable.
 
 ## History
 

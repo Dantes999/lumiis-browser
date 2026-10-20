@@ -4,7 +4,14 @@
 // world that holds the player changes when he walks through a portal.
 
 import { encode, type MapData } from '@lumiis/shared';
-import type { AttackResult, Player, PlayerSeed, Warp, World } from './world.js';
+import type {
+  AttackResult,
+  Player,
+  PlayerSeed,
+  Warp,
+  World,
+  WorldEvent,
+} from './world.js';
 import { World as WorldClass } from './world.js';
 
 export type JoinSeed = PlayerSeed & { map: string };
@@ -131,6 +138,13 @@ export class Realm {
 
   saveOf(playerId: number): ReturnType<World['saveOf']> {
     return this.worldOf(playerId)?.saveOf(playerId) ?? null;
+  }
+
+  /** Messages from this tick, for every world. */
+  drainEvents(): WorldEvent[] {
+    const events: WorldEvent[] = [];
+    for (const world of this.worlds.values()) events.push(...world.drainEvents());
+    return events;
   }
 
   drainInventoryUpdates(): ReturnType<World['drainInventoryUpdates']> {

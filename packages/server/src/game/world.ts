@@ -25,7 +25,10 @@ import {
   TILE,
   dirFromInput,
   expForNextLevel,
+  facingTowards,
   findPath,
+  inSwingArc,
+  swingFor,
   canStand,
   EMPTY_EQUIPMENT,
   isItemKey,
@@ -34,10 +37,9 @@ import {
   nearestWalkable,
   spawnPosition,
   tileAt,
-  withinAttackRange,
 } from '@lumiis/shared';
 import type { CharacterSave } from '../store/db.js';
-import type { Point } from '@lumiis/shared';
+import type { Point, SwingProfile } from '@lumiis/shared';
 import type {
   Direction,
   Equipment,
@@ -110,7 +112,22 @@ export type Player = {
   autoPickup: boolean;
   autoPickupTypes: Set<ItemKey>;
   equipment: Equipment;
+  /** The swing in progress, if any. */
+  swing: SwingState | null;
 };
+
+/** One swing: it starts, the blow lands half way, the arm returns. */
+export type SwingState = {
+  dir: Direction;
+  hitAt: number;
+  endsAt: number;
+  range: number;
+  maxTargets: number;
+  resolved: boolean;
+};
+
+/** Something the player should be told, collected during the tick. */
+export type WorldEvent = { playerId: number; text: string };
 
 /** An item lying on the ground, waiting to be picked up. */
 export type GroundItem = {
@@ -168,15 +185,7 @@ export type KillReward = {
 /** A player walking into a portal; the realm moves him. */
 export type Warp = { playerId: number; to: string; x: number; y: number };
 
-export type AttackResult =
-  | {
-      ok: true;
-      damage: number;
-      killed: boolean;
-      /** Only present when the hit killed the monster; one entry per contributor. */
-      rewards?: KillReward[];
-    }
-  | { ok: false; reason: string };
+export type AttackResult = { ok: true; started: true } | { ok: false; reason: string };
 
 export class World {
   private readonly playersById = new Map<number, Player>();
@@ -186,6 +195,8 @@ export class World {
   private readonly inventoryUpdates = new Set<number>();
   /** Portals walked into during the last tick. */
   private readonly warps: Warp[] = [];
+  /** Messages that came up during the tick, for the players they belong to. */
+  private readonly events: WorldEvent[] = [];
   private nextPlayerId = 1;
   private nextMonsterId = 1;
   private nextGroundId = 1;
@@ -238,6 +249,7 @@ export class World {
       autoPickup: false,
       autoPickupTypes: new Set<ItemKey>(),
       equipment: seed.equipment ?? { ...EMPTY_EQUIPMENT },
+      swing: null,
     };
     this.recalcStats(player);
 
@@ -330,39 +342,40 @@ export class World {
     if (player === undefined) return { ok: false, reason: 'You are not in the world.' };
     if (player.deadUntil > 0) return { ok: false, reason: 'You are down.' };
 
+    if (player.swing !== null && this.tickCount < player.swing.endsAt) {
+      return { ok: false, reason: 'Not so fast.' };
+    }
+
     const monster = this.monstersById.get(targetId);
     if (monster === undefined || monster.respawnAt > 0) {
       return { ok: false, reason: 'That monster is gone.' };
     }
-    if (this.tickCount - player.lastAttackTick < ATTACK_COOLDOWN_TICKS) {
-      return { ok: false, reason: 'Not so fast.' };
-    }
-    if (!withinAttackRange(player, monster)) {
+
+    const profile = swingFor(player.equipment.weapon);
+    if (Math.hypot(monster.x - player.x, monster.y - player.y) > profile.range) {
       return { ok: false, reason: 'Out of reach.' };
     }
 
-    const damage = this.attackOf(player);
-    player.lastAttackTick = this.tickCount;
-    monster.hp -= damage;
-    monster.damageBy.set(playerId, (monster.damageBy.get(playerId) ?? 0) + damage);
+    // Turn towards the target; the blow lands where the body points.
+    player.dir = facingTowards(player, monster, player.dir);
+    player.swing = {
+      dir: player.dir,
+      hitAt: this.tickCount + profile.hitAt,
+      endsAt: this.tickCount + profile.ticks,
+      range: profile.range,
+      maxTargets: profile.maxTargets,
+      resolved: false,
+    };
 
-    if (monster.hp <= 0) {
-      monster.hp = 0;
-      monster.respawnAt = this.tickCount + MONSTER_RESPAWN_TICKS;
-      monster.wanderDir = null;
-      monster.targetId = null;
-      const rewards = this.rewardKill(monster, player);
-      monster.damageBy.clear();
-      this.dropLoot(monster, player);
-      return { ok: true, damage, killed: true, rewards };
-    }
-
-    return { ok: true, damage, killed: false };
+    return { ok: true, started: true };
   }
+
 
   /** One simulation step: players, monsters, deaths and respawns. */
   step(): void {
     this.tickCount += 1;
+
+    this.resolveSwings();
 
     for (const player of this.playersById.values()) {
       if (player.deadUntil > 0) {
@@ -432,6 +445,78 @@ export class World {
       x: (portal.spawnX + 0.5) * TILE_SIZE,
       y: (portal.spawnY + 0.9) * TILE_SIZE,
     });
+  }
+
+  /** Lands every swing whose moment has come. */
+  private resolveSwings(): void {
+    for (const player of this.playersById.values()) {
+      const swing = player.swing;
+      if (swing === null) continue;
+
+      if (this.tickCount >= swing.endsAt) {
+        player.swing = null;
+        continue;
+      }
+      if (swing.resolved || this.tickCount < swing.hitAt) continue;
+
+      swing.resolved = true;
+      this.landSwing(player, swing);
+    }
+  }
+
+  /** Everything standing in the arc gets hit, closest first. */
+  private landSwing(player: Player, swing: SwingState): void {
+    const caught: Array<{ monster: Monster; distance: number }> = [];
+
+    for (const monster of this.monstersById.values()) {
+      if (monster.respawnAt > 0) continue;
+      if (!inSwingArc(player, swing.dir, monster, swing.range)) continue;
+      caught.push({
+        monster,
+        distance: Math.hypot(monster.x - player.x, monster.y - player.y),
+      });
+    }
+
+    caught.sort((a, b) => a.distance - b.distance);
+
+    const damage = this.attackOf(player);
+    for (const entry of caught.slice(0, swing.maxTargets)) {
+      const monster = entry.monster;
+      monster.hp -= damage;
+      monster.damageBy.set(player.id, (monster.damageBy.get(player.id) ?? 0) + damage);
+
+      // Being hit makes a monster notice you.
+      if (monster.targetId === null) monster.targetId = player.id;
+
+      if (monster.hp <= 0) this.killMonster(monster, player);
+    }
+  }
+
+  private killMonster(monster: Monster, killer: Player): void {
+    monster.hp = 0;
+    monster.respawnAt = this.tickCount + MONSTER_RESPAWN_TICKS;
+    monster.wanderDir = null;
+    monster.targetId = null;
+
+    const rewards = this.rewardKill(monster, killer);
+    monster.damageBy.clear();
+    this.dropLoot(monster, killer);
+
+    for (const reward of rewards) {
+      const level = this.playersById.get(reward.playerId)?.level ?? 1;
+      const prefix = reward.levelUps > 0 ? `Level ${level}! ` : '';
+      this.events.push({
+        playerId: reward.playerId,
+        text: `${prefix}+${reward.exp} EXP, +${reward.yang} Yang`,
+      });
+    }
+  }
+
+  /** Messages produced during the tick; the gateway delivers them. */
+  drainEvents(): WorldEvent[] {
+    const list = [...this.events];
+    this.events.length = 0;
+    return list;
   }
 
   /** Weapon, armour and health bonus follow what is equipped. */
@@ -522,6 +607,7 @@ export class World {
         yang: player.yang,
         weapon: player.equipment.weapon,
         armor: player.equipment.armor,
+        ...(player.swing !== null ? { attacking: true } : {}),
       });
     }
 
@@ -587,6 +673,7 @@ export class World {
 
     player.deadUntil = this.tickCount + PLAYER_RESPAWN_TICKS;
     player.moving = false;
+    player.swing = null;
   }
 
   private revivePlayer(player: Player): void {

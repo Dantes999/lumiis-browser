@@ -27,6 +27,8 @@ export type PlayerSnapshot = {
   yang: number;
   weapon: string | null;
   armor: string | null;
+  /** Present only while a swing is running. */
+  attacking?: boolean;
 };
 
 export type MonsterSnapshot = {

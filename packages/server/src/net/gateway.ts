@@ -36,6 +36,8 @@ export type Gateway = {
   broadcastSnapshot(): void;
   /** Sends one player's inventory; used after a pickup. */
   sendInventory(playerId: number): void;
+  /** Tells one player something; used for rewards and other tick results. */
+  notify(playerId: number, text: string): void;
   /** Writes every logged in character to the store. */
   saveAll(): void;
   /** Connected sockets, including those that have not logged in yet. */
@@ -260,21 +262,10 @@ export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store
           if (session.player === null) {
             send(session, { t: 'notice', text: 'Log in first.' });
             break;
-          }          const result = realm.attack(session.player.id, parsed.message.target);
-          if (!result.ok) {
-            send(session, { t: 'notice', text: result.reason });
-            break;
           }
-          if (result.killed && result.rewards !== undefined) {
-            for (const reward of result.rewards) {
-              const level = realm.worldOf(reward.playerId)?.getPlayer(reward.playerId)?.level ?? 1;
-              const prefix = reward.levelUps > 0 ? `Level ${level}! ` : '';
-              sendToPlayer(reward.playerId, {
-                t: 'notice',
-                text: `${prefix}+${reward.exp} EXP, +${reward.yang} Yang`,
-              });
-            }
-          }
+          // The blow lands a few ticks later; rewards follow through the tick loop.
+          const result = realm.attack(session.player.id, parsed.message.target);
+          if (!result.ok) send(session, { t: 'notice', text: result.reason });
           break;
         }
         case 'equip': {
@@ -349,6 +340,10 @@ export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store
 
     get connectionCount(): number {
       return sessions.size;
+    },
+
+    notify(playerId: number, text: string): void {
+      sendToPlayer(playerId, { t: 'notice', text });
     },
 
     sendInventory(playerId: number): void {

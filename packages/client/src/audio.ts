@@ -16,6 +16,8 @@ let context: AudioContext | null = null;
 let master: GainNode | null = null;
 let enabled = true;
 let volume = 0.5;
+/** How many sounds were started; useful when nothing is audible. */
+let played = 0;
 
 const level = (): number => (enabled ? volume : 0);
 
@@ -24,14 +26,35 @@ export function initAudio(): void {
 
   try {
     context = new AudioContext();
-  } catch {
+  } catch (error) {
     context = null;
+    console.warn('sound is not available:', error);
     return;
   }
 
   master = context.createGain();
   master.gain.value = level();
   master.connect(context.destination);
+}
+
+/** What the browser thinks of us; handy when a sound does not arrive. */
+export const audioState = (): { state: string; played: number; volume: number } => ({
+  state: context?.state ?? 'none',
+  played,
+  volume: level(),
+});
+
+/** A first click or key press anywhere is enough to unlock sound. */
+export function unlockAudioOnFirstGesture(): void {
+  const unlock = (): void => {
+    initAudio();
+    resumeAudio();
+    window.removeEventListener('pointerdown', unlock);
+    window.removeEventListener('keydown', unlock);
+  };
+
+  window.addEventListener('pointerdown', unlock);
+  window.addEventListener('keydown', unlock);
 }
 
 export function resumeAudio(): void {
@@ -63,6 +86,7 @@ const tone = ({ frequency, duration, type, gain, slideTo }: Voice): void => {
   envelope.connect(master);
   oscillator.start(now);
   oscillator.stop(now + duration + 0.02);
+  played += 1;
 };
 
 /** A short burst of noise, used for hits. */
@@ -90,28 +114,30 @@ const burst = (duration: number, gain: number, frequency: number): void => {
   filter.connect(envelope);
   envelope.connect(master);
   source.start();
+  played += 1;
 };
 
 export const sfx = {
   swing(): void {
-    tone({ frequency: 320, duration: 0.08, type: 'square', gain: 0.12, slideTo: 170 });
+    tone({ frequency: 340, duration: 0.1, type: 'square', gain: 0.25, slideTo: 150 });
   },
   hit(): void {
-    burst(0.12, 0.5, 1200);
+    burst(0.14, 0.9, 1100);
+    tone({ frequency: 120, duration: 0.09, type: 'triangle', gain: 0.3, slideTo: 70 });
   },
   kill(): void {
-    tone({ frequency: 190, duration: 0.28, type: 'sawtooth', gain: 0.18, slideTo: 55 });
+    tone({ frequency: 190, duration: 0.3, type: 'sawtooth', gain: 0.35, slideTo: 55 });
   },
   hurt(): void {
-    tone({ frequency: 150, duration: 0.2, type: 'square', gain: 0.2, slideTo: 70 });
+    tone({ frequency: 150, duration: 0.22, type: 'square', gain: 0.4, slideTo: 70 });
   },
   pickup(): void {
-    tone({ frequency: 660, duration: 0.07, type: 'triangle', gain: 0.18, slideTo: 990 });
+    tone({ frequency: 660, duration: 0.08, type: 'triangle', gain: 0.35, slideTo: 990 });
   },
   levelUp(): void {
-    tone({ frequency: 440, duration: 0.12, type: 'triangle', gain: 0.2, slideTo: 880 });
+    tone({ frequency: 440, duration: 0.12, type: 'triangle', gain: 0.4, slideTo: 880 });
     window.setTimeout(() => {
-      tone({ frequency: 660, duration: 0.16, type: 'triangle', gain: 0.2, slideTo: 1320 });
+      tone({ frequency: 660, duration: 0.18, type: 'triangle', gain: 0.4, slideTo: 1320 });
     }, 110);
   },
 };

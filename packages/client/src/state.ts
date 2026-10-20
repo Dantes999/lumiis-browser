@@ -15,6 +15,8 @@ export type RemotePlayer = {
   moving: boolean;
   weapon: string | null;
   armor: string | null;
+  /** performance.now() when the shown swing ends; 0 when standing still. */
+  attackUntil: number;
   renderX: number;
   renderY: number;
 };

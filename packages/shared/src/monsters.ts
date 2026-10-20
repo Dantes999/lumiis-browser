@@ -27,6 +27,7 @@ export const MONSTER_TYPES = {
     drops: [
       { key: 'wolf_fur', chance: 0.65, min: 1, max: 2 },
       { key: 'iron_sword', chance: 0.05, min: 1, max: 1 },
+      { key: 'great_sword', chance: 0.05, min: 1, max: 1 },
     ],
   },
   boar: {
@@ -57,8 +58,7 @@ export const MONSTER_KEYS = Object.keys(MONSTER_TYPES) as MonsterKey[];
 export const isMonsterKey = (value: unknown): value is MonsterKey =>
   typeof value === 'string' && Object.hasOwn(MONSTER_TYPES, value);
 
-/** Melee reach between two foot positions, in pixels. */
-export const ATTACK_RANGE = 44;
+
 
 /** 12 ticks at 20 Hz: something over half a second between two hits. */
 export const ATTACK_COOLDOWN_TICKS = 12;
@@ -93,7 +93,3 @@ export const PLAYER_REGEN_HP = 1;
 /** 20 ticks = one point of health per second while alive. */
 export const PLAYER_REGEN_TICKS = 20;
 
-export const withinAttackRange = (
-  from: { x: number; y: number },
-  to: { x: number; y: number },
-): boolean => Math.hypot(to.x - from.x, to.y - from.y) <= ATTACK_RANGE;

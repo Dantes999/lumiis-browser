@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ATTACK_COOLDOWN_TICKS,
+  swingFor,
   DROP_PROTECT_TICKS,
   MAX_LEVEL,
   MONSTER_RESPAWN_TICKS,
@@ -31,12 +31,35 @@ const grassMap = (): MapData => ({
 
 const spawn = spawnPosition(grassMap());
 
-/** Attacks whenever possible, walks the world otherwise, until a kill lands. */
+/** Health of a monster as the client sees it; null while it is down. */
+const monsterHp = (world: World, id = 1): number | null =>
+  world.snapshot().monsters.find((monster) => monster.id === id)?.hp ?? null;
+
+/** Long enough for the slowest swing to land and end. */
+const SWING_TICKS = 20;
+
+/** Starts a swing and lets it run through; true when the monster died. */
+const strike = (world: World, playerId: number, targetId = 1): boolean => {
+  if (!world.attack(playerId, targetId).ok) return false;
+  for (let tick = 0; tick < SWING_TICKS; tick += 1) world.step();
+  return monsterHp(world, targetId) === null;
+};
+
+/** Swings until the player reaches the next level, waiting out respawns. */
+const levelUp = (world: World, playerId: number, player: Player): boolean => {
+  const target = player.level + 1;
+  for (let tick = 0; tick < 8000; tick += 1) {
+    if (player.level >= target) return true;
+    if (!strike(world, playerId)) world.step();
+  }
+  return player.level >= target;
+};
+
+/** Swings whenever possible, walks the world otherwise, until a kill lands. */
 const killOne = (world: World, playerId: number): boolean => {
   for (let tick = 0; tick < 800; tick += 1) {
-    const result = world.attack(playerId, 1);
-    if (result.ok && result.killed) return true;
-    world.step();
+    if (monsterHp(world) === null) return true;
+    if (!strike(world, playerId)) world.step();
   }
   return false;
 };
@@ -189,26 +212,31 @@ describe('monsters', () => {
     expect(monsters[0]?.maxHp).toBe(MONSTER_TYPES.wolf.maxHp);
   });
 
-  it('damages a monster in reach', () => {
-    const world = new World(withWolf());
+  it('starts a swing without damage and lands it half way', () => {
+    const world = new World(boxedWolf());
     const player = world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
+    const profile = swingFor(null);
 
-    expect(world.attack(player.id, 1)).toEqual({
-      ok: true,
-      damage: PLAYER_DAMAGE,
-      killed: false,
-    });
+    expect(world.attack(player.id, 1)).toEqual({ ok: true, started: true });
+    expect(world.getMonster(1)?.hp).toBe(MONSTER_TYPES.wolf.maxHp);
+
+    // Until the arm is through, nothing has happened yet.
+    for (let tick = 0; tick < profile.hitAt - 1; tick += 1) world.step();
+    expect(world.getMonster(1)?.hp).toBe(MONSTER_TYPES.wolf.maxHp);
+
+    world.step();
     expect(world.getMonster(1)?.hp).toBe(MONSTER_TYPES.wolf.maxHp - PLAYER_DAMAGE);
   });
 
-  it('refuses a second hit before the cooldown is over', () => {
+  it('refuses a second hit while the swing is still running', () => {
     const world = new World(boxedWolf());
     const player = world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
+    const profile = swingFor(null);
 
     expect(world.attack(player.id, 1).ok).toBe(true);
     expect(world.attack(player.id, 1).ok).toBe(false);
 
-    for (let tick = 0; tick < ATTACK_COOLDOWN_TICKS; tick += 1) world.step();
+    for (let tick = 0; tick < profile.ticks; tick += 1) world.step();
     expect(world.attack(player.id, 1).ok).toBe(true);
   });
 
@@ -231,16 +259,9 @@ describe('monsters', () => {
     const player = world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
 
     const hits = Math.ceil(MONSTER_TYPES.wolf.maxHp / PLAYER_DAMAGE);
-    let killed = false;
 
-    for (let hit = 0; hit < hits; hit += 1) {
-      const result = world.attack(player.id, 1);
-      expect(result.ok).toBe(true);
-      if (result.ok && result.killed) killed = true;
-      for (let tick = 0; tick < ATTACK_COOLDOWN_TICKS; tick += 1) world.step();
-    }
+    for (let hit = 0; hit < hits; hit += 1) strike(world, player.id);
 
-    expect(killed).toBe(true);
     expect(world.snapshot().monsters).toHaveLength(0);
 
     for (let tick = 0; tick < MONSTER_RESPAWN_TICKS; tick += 1) world.step();
@@ -365,12 +386,7 @@ describe('experience and yang', () => {
     const world = new World(boxedWolf());
     const player = world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
 
-    const result = world.attack(player.id, 1);
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.killed).toBe(false);
-      expect(result.rewards).toBeUndefined();
-    }
+    expect(strike(world, player.id)).toBe(false);
     expect(player.exp).toBe(0);
     expect(player.yang).toBe(0);
   });
@@ -379,29 +395,21 @@ describe('experience and yang', () => {
     const world = new World(boxedWolf());
     const player = world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
 
-    const needed = expForNextLevel(1);
-    const kills = Math.ceil(needed / MONSTER_TYPES.wolf.exp);
+    // The wolf must not bite in between, or the healed health is gone again.
+    const wolf = MONSTER_TYPES.wolf as { damage: number };
+    const bite = wolf.damage;
+    wolf.damage = 0;
+    player.hp = 40;
 
-    let levelled = false;
-    for (let kill = 0; kill < kills && !levelled; kill += 1) {
-      for (let tick = 0; tick < 800 && !levelled; tick += 1) {
-        const result = world.attack(player.id, 1);
-        if (result.ok && result.killed) {
-          const levelUps = (result.rewards ?? []).some((entry) => entry.levelUps > 0);
-          if (levelUps) {
-            // Checked immediately: before any further bite can happen.
-            expect(player.hp).toBe(player.maxHp);
-            levelled = true;
-          }
-          break;
-        }
-        world.step();
-      }
+    try {
+      expect(levelUp(world, player.id, player)).toBe(true);
+    } finally {
+      wolf.damage = bite;
     }
 
-    expect(levelled).toBe(true);
     expect(player.level).toBe(2);
-    expect(player.exp).toBe(MONSTER_TYPES.wolf.exp * kills - needed);
+    expect(player.hp).toBe(player.maxHp);
+    expect(player.exp).toBeLessThan(expForNextLevel(1));
   });
 
   it('never goes past the maximum level', () => {
@@ -422,9 +430,9 @@ describe('experience and yang', () => {
     let killed = false;
     for (let tick = 0; tick < 400 && !killed; tick += 1) {
       const attacker = tick % 2 === 0 ? first : second;
-      const result = world.attack(attacker.id, 1);
-      if (result.ok && result.killed) killed = true;
+      world.attack(attacker.id, 1);
       world.step();
+      killed = monsterHp(world) === null;
     }
 
     expect(killed).toBe(true);
@@ -439,14 +447,13 @@ describe('experience and yang', () => {
     const stay = world.addPlayer({ accountId: 0, characterId: 0, name: 'Stay' });
     const leave = world.addPlayer({ accountId: 0, characterId: 0, name: 'Leave' });
 
-    world.attack(stay.id, 1);
-    world.step();
+    strike(world, stay.id);
     world.attack(leave.id, 1);
+    world.step();
     world.removePlayer(leave.id);
 
-    for (let tick = 0; tick < 400; tick += 1) {
-      const result = world.attack(stay.id, 1);
-      if (result.ok && result.killed) break;
+    for (let tick = 0; tick < 400 && monsterHp(world) !== null; tick += 1) {
+      world.attack(stay.id, 1);
       world.step();
     }
 
@@ -459,11 +466,9 @@ describe('experience and yang', () => {
     const second = world.addPlayer({ accountId: 0, characterId: 0, name: 'Second' });
 
     // Together: second only gets part of the experience.
-    world.attack(first.id, 1);
-    world.step();
-    for (let tick = 0; tick < 400; tick += 1) {
-      const result = world.attack(second.id, 1);
-      if (result.ok && result.killed) break;
+    strike(world, first.id);
+    for (let tick = 0; tick < 400 && monsterHp(world) !== null; tick += 1) {
+      world.attack(second.id, 1);
       world.step();
     }
     const sharedExp = second.exp;
@@ -613,9 +618,8 @@ describe('equipment', () => {
     if (monster === undefined) throw new Error('no monster');
     const before = monster.hp;
 
-    const result = world.attack(player.id, 1);
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.damage).toBe(PLAYER_DAMAGE + 4);
+    expect(world.attack(player.id, 1).ok).toBe(true);
+    for (let tick = 0; tick < SWING_TICKS; tick += 1) world.step();
     expect(monster.hp).toBe(before - (PLAYER_DAMAGE + 4));
   });
 
@@ -697,5 +701,94 @@ describe('chasing around walls', () => {
     for (let tick = 0; tick < 900; tick += 1) world.step();
 
     expect(player.hp).toBe(PLAYER_MAX_HP);
+  });
+});
+
+describe('swings', () => {
+  /** Player on the middle tile, wolves around him as listed. */
+  const arena = (spawns: Array<[number, number]>, weapon: ItemKey | null) => {
+    const map = grassMap();
+    map.spawns = spawns.map(([tx, ty]) => ({ kind: 'mob', key: 'wolf', tx, ty }));
+    const world = new World(map);
+    const player = world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
+    if (weapon !== null) player.equipment.weapon = weapon;
+    return { world, player };
+  };
+
+  /** Runs the swing just past the moment the blow lands. */
+  const land = (world: World, playerId: number, targetId: number): void => {
+    expect(world.attack(playerId, targetId).ok).toBe(true);
+    const profile = swingFor(world.getPlayer(playerId)?.equipment.weapon ?? null);
+    for (let tick = 0; tick < profile.hitAt; tick += 1) world.step();
+  };
+
+  it('a one-handed sword only hits the closest of three', () => {
+    const { world, player } = arena(
+      [
+        [9, 8],
+        [9, 7],
+        [9, 9],
+      ],
+      'wooden_sword',
+    );
+
+    land(world, player.id, 1);
+
+    const hurt = world
+      .snapshot()
+      .monsters.filter((monster) => monster.hp < monster.maxHp)
+      .map((monster) => monster.id);
+    expect(hurt).toHaveLength(1);
+  });
+
+  it('a two-handed sword sweeps up to three monsters at once', () => {
+    const { world, player } = arena(
+      [
+        [9, 8],
+        [9, 7],
+        [9, 9],
+      ],
+      'great_sword',
+    );
+
+    land(world, player.id, 1);
+
+    const hurt = world.snapshot().monsters.filter((monster) => monster.hp < monster.maxHp);
+    expect(hurt).toHaveLength(3);
+  });
+
+  it('a two-handed sword reaches further than a one-handed one', () => {
+    // Diagonal neighbours are about 45 pixels apart: out of a sword's reach,
+    // inside a great sword's.
+    const sword = arena([[9, 9]], 'wooden_sword');
+    expect(sword.world.attack(sword.player.id, 1).ok).toBe(false);
+
+    const great = arena([[9, 9]], 'great_sword');
+    expect(great.world.attack(great.player.id, 1).ok).toBe(true);
+  });
+
+  it('turns the body towards the target', () => {
+    const { world, player } = arena([[9, 8]], null);
+    player.dir = 4;
+
+    expect(world.attack(player.id, 1).ok).toBe(true);
+    expect(player.dir).toBe(6);
+  });
+
+  it('misses a monster that walked out of the swing before the blow lands', () => {
+    const map = grassMap();
+    map.spawns = [{ kind: 'mob', key: 'wolf', tx: 9, ty: 8 }];
+    const world = new World(map);
+    const player = world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
+
+    expect(world.attack(player.id, 1).ok).toBe(true);
+
+    // The monster is gone (killed elsewhere, or it fled) before the arm is through.
+    const monster = world.getMonster(1);
+    if (monster === undefined) throw new Error('no monster');
+    monster.respawnAt = world.tick + 1;
+
+    for (let tick = 0; tick < 20; tick += 1) world.step();
+    expect(player.exp).toBe(0);
   });
 });

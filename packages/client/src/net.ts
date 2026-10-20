@@ -1,7 +1,7 @@
 // WebSocket client. Its only jobs are: keep the socket alive, translate frames
 // into state, and never invent game facts.
 
-import { decode, encode } from '@lumiis/shared';
+import { decode, encode, isItemKey, swingFor, swingMs } from '@lumiis/shared';
 import type {
   ClientMessage,
   GroundItemSnapshot,
@@ -11,6 +11,12 @@ import type {
 } from '@lumiis/shared';
 import { applyServerPosition } from './sim';
 import { view } from './state';
+
+/** When the swing of another player is over, judged by the weapon they hold. */
+const swingEnd = (player: PlayerSnapshot): number => {
+  const weapon = isItemKey(player.weapon) ? player.weapon : null;
+  return performance.now() + swingMs(swingFor(weapon));
+};
 
 const PING_INTERVAL_MS = 2000;
 const MAX_RECONNECT_DELAY_MS = 10000;
@@ -225,6 +231,7 @@ export class Connection {
           moving: player.moving,
           weapon: player.weapon,
           armor: player.armor,
+          attackUntil: player.attacking === true ? swingEnd(player) : 0,
           renderX: player.x,
           renderY: player.y,
         });
@@ -236,6 +243,7 @@ export class Connection {
         existing.moving = player.moving;
         existing.weapon = player.weapon;
         existing.armor = player.armor;
+        if (player.attacking === true) existing.attackUntil = swingEnd(player);
       }
     }
 

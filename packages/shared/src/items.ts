@@ -51,6 +51,17 @@ export const ITEMS = {
     stage: 2,
     attack: 9,
   },
+  // EIGENE WAHL: there was no two-handed weapon yet. Slower than a sword,
+  // but it reaches further and one swing can catch three monsters.
+  great_sword: {
+    name: 'Great sword',
+    stackMax: 1,
+    color: '#cfd6e0',
+    slot: 'weapon',
+    weaponArt: 'zweihand',
+    stage: 3,
+    attack: 14,
+  },
   padded_armor: {
     name: 'Padded armour',
     stackMax: 1,

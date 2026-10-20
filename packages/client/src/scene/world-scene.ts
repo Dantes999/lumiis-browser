@@ -10,21 +10,26 @@ import {
   TILE_SIZE,
   mapPixelHeight,
   mapPixelWidth,
+  swingFor,
+  swingMs,
   validateMap,
+  type Direction,
   type ItemKey,
   type MapData,
 } from '@lumiis/shared';
 import { sfx } from '../audio';
 import { PlayerView, readTables, spriteSheets, type ArtTables } from '../art';
-import { attackPoseUntil } from '../combat';
+import { attackPose } from '../combat';
 import { MOB_CELL_H, MOB_CELL_W, MonsterView } from '../mobart';
 import { renderedSelfPosition, stepLocal } from '../sim';
-import { view } from '../state';
+import { view, type RemotePlayer } from '../state';
 import { buildTilesetTexture } from '../tiles';
 import { setWorldMap } from '../world-map';
 
 /** Milliseconds per walking frame. */
 const STEP_FRAME_MS = 180;
+/** The three columns of a swing: out, through, back. */
+const SWING_COLUMNS = [4, 5, 6] as const;
 /** Time constant for other players catching up to their reported position. */
 const OTHERS_TAU_MS = 60;
 
@@ -255,7 +260,7 @@ export class WorldScene extends Phaser.Scene {
         weapon: isItemKey(player.weapon) ? player.weapon : null,
         armor: isItemKey(player.armor) ? player.armor : null,
       });
-      playerView.setPose(player.dir, player.moving ? column : 0);
+      playerView.setPose(player.dir, this.poseColumn(player.dir, player));
     }
 
     const selfId = view.selfId;
@@ -266,7 +271,7 @@ export class WorldScene extends Phaser.Scene {
       const selfView = this.viewFor(selfId, tables);
       selfView.setPosition(drawn.x, drawn.y);
       selfView.setLook(tables, view.equipment);
-      selfView.setPose(self.dir, self.moving ? column : 0);
+      selfView.setPose(self.dir, this.selfColumn(column));
 
       // A hit is shown as a short red flash on the figure.
       if (self.hp < this.lastSelfHp) this.flashUntil = this.time.now + 140;
@@ -286,6 +291,28 @@ export class WorldScene extends Phaser.Scene {
       playerView.destroy();
       this.views.delete(id);
     }
+  }
+
+  /** Walk frames, or the three swing frames while a blow is running. */
+  private selfColumn(walkColumn: number): number {
+    const shown = attackPose();
+    if (shown === null) return view.self.moving ? walkColumn : 0;
+
+    const progress = (this.time.now - shown.startedAt) / shown.durationMs;
+    if (progress < 0 || progress >= 1) return view.self.moving ? walkColumn : 0;
+    return SWING_COLUMNS[Math.min(SWING_COLUMNS.length - 1, Math.floor(progress * 3))] ?? 0;
+  }
+
+  /** The same for other players; their swing length comes from their weapon. */
+  private poseColumn(dir: Direction, player: RemotePlayer): number {
+    const now = this.time.now;
+    if (player.attackUntil > now) {
+      const weapon = isItemKey(player.weapon) ? player.weapon : null;
+      const duration = swingMs(swingFor(weapon));
+      const progress = 1 - (player.attackUntil - now) / duration;
+      return SWING_COLUMNS[Math.min(2, Math.max(0, Math.floor(progress * 3)))] ?? 0;
+    }
+    return player.moving ? Math.floor(now / STEP_FRAME_MS) % 2 === 0 ? 1 : 2 : 0;
   }
 
   private viewFor(id: number, tables: ArtTables): PlayerView {
