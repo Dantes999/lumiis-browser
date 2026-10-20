@@ -1,0 +1,65 @@
+:root {
+  color-scheme: dark;
+  --bg: #101418;
+  --panel: #1a2129;
+  --line: #2c3742;
+  --text: #d7e0e8;
+  --muted: #7f8f9e;
+  --accent: #6fd1c0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+  font-size: 14px;
+  /* No browser gestures on the game surface: the game owns touch. */
+  touch-action: none;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#game {
+  position: fixed;
+  inset: 0;
+}
+
+#hud {
+  position: fixed;
+  top: env(safe-area-inset-top, 0);
+  left: env(safe-area-inset-left, 0);
+  padding: 8px;
+  display: grid;
+  gap: 2px;
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  margin: 8px;
+  min-width: 150px;
+  /* The HUD is decoration for now; later panels opt in with pointer-events. */
+  pointer-events: none;
+}
+
+.hud-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hud-label {
+  color: var(--muted);
+}
+
+.hud-value {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}

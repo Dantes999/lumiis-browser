@@ -1,0 +1,24 @@
+{
+  "name": "lumiis",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace @lumiis/shared && npm run build --workspace @lumiis/client && npm run build --workspace @lumiis/server",
+    "start": "node packages/server/dist/index.js",
+    "dev": "node scripts/dev.mjs",
+    "test": "vitest run",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

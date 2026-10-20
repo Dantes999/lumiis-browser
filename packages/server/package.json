@@ -1,0 +1,19 @@
+{
+  "name": "@lumiis/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc -p .",
+    "watch": "tsc -p . --watch --preserveWatchOutput",
+    "typecheck": "tsc -p . --noEmit"
+  },
+  "dependencies": {
+    "@lumiis/shared": "*",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.12"
+  }
+}

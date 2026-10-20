@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#101418" />
+    <title>Lumiis</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="game"></div>
+
+    <div id="hud">
+      <div class="hud-row">
+        <span class="hud-label">Status</span>
+        <span id="status" class="hud-value">connecting</span>
+      </div>
+      <div class="hud-row">
+        <span class="hud-label">Tick</span>
+        <span id="tick" class="hud-value">0</span>
+      </div>
+      <div class="hud-row">
+        <span class="hud-label">Ping</span>
+        <span id="ping" class="hud-value">–</span>
+      </div>
+      <div class="hud-row">
+        <span class="hud-label">Players</span>
+        <span id="players" class="hud-value">0</span>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
