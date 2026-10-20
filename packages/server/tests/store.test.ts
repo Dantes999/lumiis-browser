@@ -29,6 +29,7 @@ const sampleSave = (name: string): CharacterSave => {
 
   return {
     name,
+    equipment: { weapon: 'iron_sword', armor: 'padded_armor' },
     level: 5,
     exp: 20,
     yang: 300,
@@ -91,6 +92,8 @@ describe('characters', () => {
     if (save === null) throw new Error('no character loaded');
 
     expect(save.name).toBe('Kain');
+    expect(save.equipment.weapon).toBe('iron_sword');
+    expect(save.equipment.armor).toBe('padded_armor');
     expect(save.level).toBe(5);
     expect(save.exp).toBe(20);
     expect(save.yang).toBe(300);

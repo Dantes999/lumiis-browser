@@ -24,7 +24,10 @@ export const MONSTER_TYPES = {
     yangMin: 6,
     yangMax: 14,
     /** What it leaves behind. */
-    drops: [{ key: 'wolf_fur', chance: 0.65, min: 1, max: 2 }],
+    drops: [
+      { key: 'wolf_fur', chance: 0.65, min: 1, max: 2 },
+      { key: 'iron_sword', chance: 0.05, min: 1, max: 1 },
+    ],
   },
   boar: {
     look: 'boar',
@@ -38,7 +41,11 @@ export const MONSTER_TYPES = {
     exp: 45,
     yangMin: 10,
     yangMax: 22,
-    drops: [{ key: 'boar_tusk', chance: 0.7, min: 1, max: 1 }],
+    drops: [
+      { key: 'boar_tusk', chance: 0.7, min: 1, max: 1 },
+      { key: 'padded_armor', chance: 0.08, min: 1, max: 1 },
+      { key: 'plate_armor', chance: 0.02, min: 1, max: 1 },
+    ],
   },
 } as const;
 

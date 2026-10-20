@@ -1,7 +1,7 @@
 // Client-side state. One mutable object: the network writes into it, the
 // simulation and the scene read from it.
 
-import type { CharacterSummary, Direction, InventorySlot } from '@lumiis/shared';
+import type { CharacterSummary, Direction, Equipment, InventorySlot } from '@lumiis/shared';
 
 export type ConnectionStatus = 'connecting' | 'online' | 'offline';
 
@@ -13,6 +13,8 @@ export type RemotePlayer = {
   y: number;
   dir: Direction;
   moving: boolean;
+  weapon: string | null;
+  armor: string | null;
   renderX: number;
   renderY: number;
 };
@@ -71,6 +73,7 @@ export type ViewState = {
   monsters: Map<number, MonsterState>;
   ground: Map<number, GroundItemState>;
   inventory: InventorySlot[];
+  equipment: Equipment;
   notice: string | null;
   /** Last login failure, shown in the login box. */
   authError: string | null;
@@ -107,6 +110,7 @@ export const view: ViewState = {
   monsters: new Map(),
   ground: new Map(),
   inventory: [],
+  equipment: { weapon: null, armor: null },
   notice: null,
   authError: null,
   characters: null,

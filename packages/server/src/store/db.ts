@@ -8,7 +8,14 @@ import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { promisify } from 'node:util';
 import type { DatabaseSync as Database } from 'node:sqlite';
-import { INVENTORY_SLOTS, isItemKey, type InventorySlot, type ItemKey } from '@lumiis/shared';
+import {
+  EMPTY_EQUIPMENT,
+  INVENTORY_SLOTS,
+  isItemKey,
+  type Equipment,
+  type InventorySlot,
+  type ItemKey,
+} from '@lumiis/shared';
 
 // node:sqlite is newer than the list of builtins Vite knows, so a static import
 // breaks the test runner. Loading it through require works in both worlds.
@@ -25,6 +32,7 @@ export type CharacterSummary = { id: number; name: string; level: number };
 
 export type CharacterSave = {
   name: string;
+  equipment: Equipment;
   level: number;
   exp: number;
   yang: number;
@@ -46,6 +54,8 @@ type AccountRow = { id: number; name: string; salt: string; hash: string };
 type CharacterRow = {
   id: number;
   name: string;
+  weapon: string | null;
+  armor: string | null;
   level: number;
   exp: number;
   yang: number;
@@ -79,6 +89,8 @@ CREATE TABLE IF NOT EXISTS characters (
   x REAL NOT NULL,
   y REAL NOT NULL,
   dir INTEGER NOT NULL,
+  weapon TEXT,
+  armor TEXT,
   updated_at INTEGER NOT NULL
 );
 
@@ -105,6 +117,20 @@ export class Store {
     this.db.exec('PRAGMA foreign_keys = ON');
     this.migrate();
     this.db.exec(SCHEMA);
+    this.ensureEquipmentColumns();
+  }
+
+  /** Saves from before equipment existed get the two new columns. */
+  private ensureEquipmentColumns(): void {
+    const columns = this.db.prepare("PRAGMA table_info('characters')").all() as unknown as Array<{
+      name: string;
+    }>;
+    if (!columns.some((column) => column.name === 'weapon')) {
+      this.db.exec('ALTER TABLE characters ADD COLUMN weapon TEXT');
+    }
+    if (!columns.some((column) => column.name === 'armor')) {
+      this.db.exec('ALTER TABLE characters ADD COLUMN armor TEXT');
+    }
   }
 
   /**
@@ -229,8 +255,8 @@ export class Store {
       const info = this.db
         .prepare(
           `INSERT INTO characters
-             (account_id, name, level, exp, yang, hp, map, x, y, dir, updated_at)
-           VALUES (?, ?, 1, 0, 0, 100, 'testmap', 0, 0, 0, ?)`,
+             (account_id, name, level, exp, yang, hp, map, x, y, dir, weapon, armor, updated_at)
+           VALUES (?, ?, 1, 0, 0, 100, 'testmap', 0, 0, 0, 'wooden_sword', NULL, ?)`,
         )
         .run(accountId, name, Date.now());
 
@@ -252,7 +278,7 @@ export class Store {
   loadCharacter(characterId: number): CharacterSave | null {
     const row = this.db
       .prepare(
-        'SELECT id, name, level, exp, yang, hp, map, x, y, dir FROM characters WHERE id = ?',
+        'SELECT id, name, level, exp, yang, hp, map, x, y, dir, weapon, armor FROM characters WHERE id = ?',
       )
       .get(characterId) as unknown as CharacterRow | undefined;
 
@@ -270,8 +296,14 @@ export class Store {
       inventory[slot] = { key: item.item_key as ItemKey, count: Math.max(1, Number(item.count)) };
     }
 
+    const equipment: Equipment = {
+      weapon: isItemKey(row.weapon) ? row.weapon : null,
+      armor: isItemKey(row.armor) ? row.armor : null,
+    };
+
     return {
       name: row.name,
+      equipment,
       level: Number(row.level),
       exp: Number(row.exp),
       yang: Number(row.yang),
@@ -288,7 +320,8 @@ export class Store {
   saveCharacter(characterId: number, save: CharacterSave): void {
     const writeCharacter = this.db.prepare(`
       UPDATE characters SET
-        level = ?, exp = ?, yang = ?, hp = ?, map = ?, x = ?, y = ?, dir = ?, updated_at = ?
+        level = ?, exp = ?, yang = ?, hp = ?, map = ?, x = ?, y = ?, dir = ?,
+        weapon = ?, armor = ?, updated_at = ?
       WHERE id = ?
     `);
     const clearItems = this.db.prepare('DELETE FROM character_items WHERE character_id = ?');
@@ -307,6 +340,8 @@ export class Store {
         save.x,
         save.y,
         save.dir,
+        save.equipment.weapon,
+        save.equipment.armor,
         Date.now(),
         characterId,
       );

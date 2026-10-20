@@ -9,9 +9,12 @@ import {
   PLAYER_MAX_HP,
   PLAYER_RESPAWN_HP_SHARE,
   PLAYER_RESPAWN_TICKS,
+  INVENTORY_SLOTS,
   TILE,
   expForNextLevel,
   spawnPosition,
+  type InventorySlot,
+  type ItemKey,
   type MapData,
 } from '@lumiis/shared';
 import { World, type Player } from '../src/game/world.js';
@@ -167,6 +170,8 @@ describe('world', () => {
         level: 1,
         exp: 0,
         yang: 0,
+        weapon: null,
+        armor: null,
       },
     ]);
   });
@@ -575,5 +580,84 @@ describe('loot', () => {
     expect(used).toHaveLength(1);
     expect(used[0]?.key).toBe('wolf_fur');
     expect(used[0]?.count).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('equipment', () => {
+  const inventoryWith = (...entries: Array<[number, ItemKey]>): InventorySlot[] => {
+    const inventory = new Array<InventorySlot>(INVENTORY_SLOTS).fill(null);
+    for (const [slot, key] of entries) inventory[slot] = { key, count: 1 };
+    return inventory;
+  };
+
+  const hero = (inventory: InventorySlot[]) => {
+    const world = new World(boxedWolf());
+    const player = world.addPlayer({
+      accountId: 0,
+      characterId: 0,
+      name: 'Kain',
+      inventory,
+    });
+    return { world, player };
+  };
+
+  it('wears a weapon from the bag and hits harder', () => {
+    const { world, player } = hero(inventoryWith([0, 'wooden_sword']));
+
+    expect(world.equip(player.id, 0).ok).toBe(true);
+    expect(player.equipment.weapon).toBe('wooden_sword');
+    expect(player.inventory[0]).toBeNull();
+
+    const monster = world.getMonster(1);
+    if (monster === undefined) throw new Error('no monster');
+    const before = monster.hp;
+
+    const result = world.attack(player.id, 1);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.damage).toBe(PLAYER_DAMAGE + 4);
+    expect(monster.hp).toBe(before - (PLAYER_DAMAGE + 4));
+  });
+
+  it('raises health with armour and softens bites', () => {
+    const { world, player } = hero(inventoryWith([0, 'padded_armor']));
+
+    expect(world.equip(player.id, 0).ok).toBe(true);
+    expect(player.maxHp).toBe(PLAYER_MAX_HP + 10);
+
+    world.step(); // the wolf notices
+    world.step(); // and bites
+
+    // 8 damage minus 3 defence. Armour raises the ceiling, it does not heal.
+    expect(player.hp).toBe(PLAYER_MAX_HP - 5);
+  });
+
+  it('puts the worn piece back into the bag when swapping', () => {
+    const { world, player } = hero(inventoryWith([0, 'wooden_sword'], [1, 'iron_sword']));
+
+    world.equip(player.id, 0);
+    expect(world.equip(player.id, 1).ok).toBe(true);
+
+    expect(player.equipment.weapon).toBe('iron_sword');
+    expect(player.inventory[1]).toBeNull();
+    expect(player.inventory.find((slot) => slot?.key === 'wooden_sword')).toBeDefined();
+  });
+
+  it('takes a piece off again', () => {
+    const { world, player } = hero(inventoryWith([0, 'wooden_sword']));
+    world.equip(player.id, 0);
+
+    expect(world.unequip(player.id, 'weapon').ok).toBe(true);
+    expect(player.equipment.weapon).toBeNull();
+    expect(player.inventory.some((slot) => slot?.key === 'wooden_sword')).toBe(true);
+  });
+
+  it('refuses to wear things that are not equipment', () => {
+    const { world, player } = hero(inventoryWith([0, 'wolf_fur']));
+    expect(world.equip(player.id, 0).ok).toBe(false);
+  });
+
+  it('refuses to take off what is not worn', () => {
+    const { world, player } = hero(inventoryWith());
+    expect(world.unequip(player.id, 'weapon').ok).toBe(false);
   });
 });

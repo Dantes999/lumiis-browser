@@ -34,7 +34,7 @@ export type Gateway = {
   /** Sends the current world state to everyone who is logged in. */
   broadcastSnapshot(): void;
   /** Sends one player's inventory; used after a pickup. */
-  sendInventory(playerId: number, slots: InventorySlot[]): void;
+  sendInventory(playerId: number): void;
   /** Writes every logged in character to the store. */
   saveAll(): void;
   /** Connected sockets, including those that have not logged in yet. */
@@ -86,7 +86,8 @@ export function attachGateway(httpServer: HttpServer, world: World, store: Store
 
   const sendInventory = (session: Session, playerId: number): void => {
     const slots = world.inventoryOf(playerId);
-    if (slots !== null) send(session, { t: 'inventory', slots });
+    const equipment = world.equipmentOf(playerId);
+    if (slots !== null && equipment !== null) send(session, { t: 'inventory', slots, equipment });
   };
 
   const MAX_LOGIN_ATTEMPTS = 6;
@@ -126,6 +127,7 @@ export function attachGateway(httpServer: HttpServer, world: World, store: Store
       exp: save.exp,
       yang: save.yang,
       inventory: save.inventory,
+      equipment: save.equipment,
     });
 
     session.player = player;
@@ -255,6 +257,24 @@ export function attachGateway(httpServer: HttpServer, world: World, store: Store
           }
           break;
         }
+        case 'equip': {
+          if (session.player === null) {
+            send(session, { t: 'notice', text: 'Log in first.' });
+            break;
+          }
+          const result = world.equip(session.player.id, parsed.message.slot);
+          if (!result.ok) send(session, { t: 'notice', text: result.reason });
+          break;
+        }
+        case 'unequip': {
+          if (session.player === null) {
+            send(session, { t: 'notice', text: 'Log in first.' });
+            break;
+          }
+          const result = world.unequip(session.player.id, parsed.message.piece);
+          if (!result.ok) send(session, { t: 'notice', text: result.reason });
+          break;
+        }
         case 'pickup': {
           if (session.player === null) {
             send(session, { t: 'notice', text: 'Log in first.' });
@@ -314,8 +334,9 @@ export function attachGateway(httpServer: HttpServer, world: World, store: Store
       return sessions.size;
     },
 
-    sendInventory(playerId: number, slots: InventorySlot[]): void {
-      sendToPlayer(playerId, { t: 'inventory', slots });
+    sendInventory(playerId: number): void {
+      const session = [...sessions].find((entry) => entry.player?.id === playerId);
+      if (session !== undefined) sendInventory(session, playerId);
     },
 
     saveAll(): void {

@@ -1,10 +1,14 @@
-// Player artwork: three sprite layers composed on top of each other.
+// Player artwork: sprite layers composed on top of each other.
 //
 // The asset pack documents the format: 48x48 cells, nine fixed columns and rows
 // that are named in the folder's JSON. Rows are looked up by name, never by a
 // hard-coded number, so swapping in another class or a new armour keeps working.
+//
+// Layer order, back to front: weapon behind, body (armour), head, hair, weapon
+// in front. The weapon comes in two halves because the hand holds it.
 
 import Phaser from 'phaser';
+import { ITEM_KEYS, itemDef, type ItemKey } from '@lumiis/shared';
 import type { Direction } from '@lumiis/shared';
 
 /** Column order inside every sheet: stand, step 1, step 2, breathe, attack 1-3, hit, dead. */
@@ -17,89 +21,151 @@ export const FOOT_Y = 44;
 /** Views exist three times; left is the right view mirrored. */
 export type View = 0 | 1 | 2; // down, right, up
 
+const VIEW_NAMES = ['unten', 'rechts', 'oben'] as const;
+
 const VIEW_OF_DIR: View[] = [0, 0, 1, 2, 2, 2, 1, 0];
 const FLIP_OF_DIR: boolean[] = [false, true, true, true, false, true, false, true];
 
 export const viewOf = (dir: Direction): View => VIEW_OF_DIR[dir] ?? 0;
 export const flipOf = (dir: Direction): boolean => FLIP_OF_DIR[dir] ?? false;
 
-export type SpriteRows = {
-  /** Row index per view, for each layer. */
-  body: number[];
-  head: number[];
-  hair: number[];
+/** Row tables read from the asset pack. */
+export type ArtTables = {
+  /** Row names of one class, e.g. `koerper/schwert/unten`. */
+  armor: string[];
+  head: string[];
+  hair: string[];
+  /** Weapon rows: `hinten/unten`, `vorne/unten`, and so on. */
+  weapon: string[];
 };
 
-const rowsForView = (rows: string[], names: string[]): number[] =>
-  names.map((name) => {
-    const index = rows.indexOf(name);
-    return index === -1 ? 0 : index;
-  });
+const rowIndex = (rows: string[], name: string): number => {
+  const index = rows.indexOf(name);
+  return index === -1 ? 0 : index;
+};
+
+const rowsFor = (rows: string[], names: readonly string[]): number[] =>
+  names.map((name) => rowIndex(rows, name));
 
 /** Reads the row tables that ship next to the images. */
-export function readRows(scene: Phaser.Scene): SpriteRows {
+export function readTables(scene: Phaser.Scene): ArtTables {
   const armor = scene.cache.json.get('rows_armor') as { zeilen: Record<string, string[]> };
   const head = scene.cache.json.get('rows_head') as { zeilen: string[] };
   const hair = scene.cache.json.get('rows_hair') as { zeilen: string[] };
-
-  const armorRows = armor.zeilen['warrior'] ?? [];
+  const weapon = scene.cache.json.get('rows_weapon') as { zeilen: string[] };
 
   return {
-    body: rowsForView(armorRows, ['koerper/schwert/unten', 'koerper/schwert/rechts', 'koerper/schwert/oben']),
-    head: rowsForView(head.zeilen, ['kopf/unten', 'kopf/rechts', 'kopf/oben']),
-    hair: rowsForView(hair.zeilen, ['oben/unten', 'oben/rechts', 'oben/oben']),
+    armor: armor.zeilen['warrior'] ?? [],
+    head: head.zeilen,
+    hair: hair.zeilen,
+    weapon: weapon.zeilen,
   };
+}
+
+/** Every texture key the scene has to load for the current item table. */
+export function spriteSheets(): Array<{ key: string; path: string }> {
+  const sheets = [
+    { key: 'body', path: '/assets/ruestungen/krieger_m/00_ohne_ruestung.png' },
+    { key: 'head', path: '/assets/modelle/spieler/krieger_m.png' },
+    { key: 'hair', path: '/assets/haare/krieger_m_1.png' },
+  ];
+
+  for (const key of ITEM_KEYS) {
+    const def = itemDef(key);
+    if (def.armorFile !== undefined) {
+      sheets.push({
+        key: `armor_${def.armorFile}`,
+        path: `/assets/ruestungen/krieger_m/${def.armorFile}.png`,
+      });
+    }
+    if (def.weaponArt !== undefined && def.stage !== undefined) {
+      sheets.push({
+        key: `weapon_${def.weaponArt}_${def.stage}`,
+        path: `/assets/waffen/${def.weaponArt}/${String(def.stage).padStart(2, '0')}.png`,
+      });
+    }
+  }
+
+  return sheets;
 }
 
 export const frameFor = (row: number, column: number): number => row * COLUMNS + column;
 
-/** One player on screen: a container with the three layers, anchored at the feet. */
+export type Look = {
+  weapon: ItemKey | null;
+  armor: ItemKey | null;
+};
+
+/** One player on screen: five layers, anchored at the feet. */
 export class PlayerView {
   readonly container: Phaser.GameObjects.Container;
-  private readonly layers: Phaser.GameObjects.Image[];
-  x = 0;
-  y = 0;
+  private readonly weaponBack: Phaser.GameObjects.Image;
+  private readonly body: Phaser.GameObjects.Image;
+  private readonly head: Phaser.GameObjects.Image;
+  private readonly hair: Phaser.GameObjects.Image;
+  private readonly weaponFront: Phaser.GameObjects.Image;
 
-  constructor(scene: Phaser.Scene, rows: SpriteRows) {
-    const body = scene.add.image(0, 0, 'body');
-    const head = scene.add.image(0, 0, 'head');
-    const hair = scene.add.image(0, 0, 'hair');
-    this.layers = [body, head, hair];
+  private lookSignature = '';
+  private bodyRows: number[] = [0, 0, 0];
+  private backRows: number[] = [0, 0, 0];
+  private frontRows: number[] = [0, 0, 0];
+  private hasWeapon = false;
+  private headRows: number[] = [0, 0, 0];
+  private hairRows: number[] = [0, 0, 0];
 
-    const rowSets = [rows.body, rows.head, rows.hair];
-    for (const [index, layer] of this.layers.entries()) {
-      const rowSet = rowSets[index] ?? [];
-      layer.setOrigin(FOOT_X / CELL, FOOT_Y / CELL);
-      const firstRow = rowSet[0] ?? 0;
-      layer.setFrame(frameFor(firstRow, 0));
-    }
+  constructor(scene: Phaser.Scene, tables: ArtTables) {
+    const origin = { x: FOOT_X / CELL, y: FOOT_Y / CELL };
 
-    this.container = scene.add.container(0, 0, this.layers);
+    this.weaponBack = scene.add.image(0, 0, 'body').setOrigin(origin.x, origin.y);
+    this.body = scene.add.image(0, 0, 'body').setOrigin(origin.x, origin.y);
+    this.head = scene.add.image(0, 0, 'head').setOrigin(origin.x, origin.y);
+    this.hair = scene.add.image(0, 0, 'hair').setOrigin(origin.x, origin.y);
+    this.weaponFront = scene.add.image(0, 0, 'body').setOrigin(origin.x, origin.y);
+
+    this.weaponBack.setVisible(false);
+    this.weaponFront.setVisible(false);
+
+    this.headRows = rowsFor(tables.head, VIEW_NAMES.map((view) => `kopf/${view}`));
+    this.hairRows = rowsFor(tables.hair, VIEW_NAMES.map((view) => `oben/${view}`));
+
+    this.container = scene.add.container(0, 0, [
+      this.weaponBack,
+      this.body,
+      this.head,
+      this.hair,
+      this.weaponFront,
+    ]);
+
+    this.applyLook(tables, { weapon: null, armor: null }, true);
   }
 
   setPosition(x: number, y: number): void {
-    this.x = x;
-    this.y = y;
     this.container.setPosition(x, y);
     // Lower on screen means in front, so depth follows the feet.
     this.container.setDepth(Math.round(y));
   }
 
-  setPose(rows: SpriteRows, dir: Direction, column: number): void {    const view = viewOf(dir);
-    const flip = flipOf(dir);
-    const rowSets = [rows.body, rows.head, rows.hair];
+  setLook(tables: ArtTables, look: Look): void {
+    this.applyLook(tables, look, false);
+  }
 
-    for (const [index, layer] of this.layers.entries()) {
-      const rowSet = rowSets[index] ?? [];
-      const row = rowSet[view] ?? 0;
-      layer.setFrame(frameFor(row, column));
-      layer.setFlipX(flip);
+  setPose(dir: Direction, column: number): void {
+    const view = viewOf(dir);
+    const flip = flipOf(dir);
+
+    this.body.setFrame(frameFor(this.bodyRows[view] ?? 0, column)).setFlipX(flip);
+    this.head.setFrame(frameFor(this.headRows[view] ?? 0, column)).setFlipX(flip);
+    this.hair.setFrame(frameFor(this.hairRows[view] ?? 0, column)).setFlipX(flip);
+
+    if (this.hasWeapon) {
+      this.weaponBack.setFrame(frameFor(this.backRows[view] ?? 0, column)).setFlipX(flip);
+      this.weaponFront.setFrame(frameFor(this.frontRows[view] ?? 0, column)).setFlipX(flip);
     }
   }
 
   /** Red flash while a monster is biting. */
   setTint(color: number | null): void {
-    for (const layer of this.layers) {
+    for (const layer of [this.weaponBack, this.body, this.head, this.hair, this.weaponFront]) {
       if (color === null) layer.clearTint();
       else layer.setTint(color);
     }
@@ -107,5 +173,42 @@ export class PlayerView {
 
   destroy(): void {
     this.container.destroy(true);
+  }
+
+  private applyLook(tables: ArtTables, look: Look, force: boolean): void {
+    const signature = `${look.weapon ?? '-'}|${look.armor ?? '-'}`;
+    if (!force && signature === this.lookSignature) return;
+    this.lookSignature = signature;
+
+    const armorDef = look.armor === null ? null : itemDef(look.armor);
+    const weaponDef = look.weapon === null ? null : itemDef(look.weapon);
+
+    this.body.setTexture(armorDef?.armorFile ? `armor_${armorDef.armorFile}` : 'body');
+
+    // The pose of the arms depends on what is held.
+    const art = weaponDef?.weaponArt ?? 'faust';
+    this.bodyRows = rowsFor(
+      tables.armor,
+      VIEW_NAMES.map((view) => `koerper/${art}/${view}`),
+    );
+
+    if (weaponDef?.weaponArt !== undefined && weaponDef.stage !== undefined) {
+      const key = `weapon_${weaponDef.weaponArt}_${weaponDef.stage}`;
+      this.weaponBack.setTexture(key).setVisible(true);
+      this.weaponFront.setTexture(key).setVisible(true);
+      this.hasWeapon = true;
+      this.backRows = rowsFor(
+        tables.weapon,
+        VIEW_NAMES.map((view) => `hinten/${view}`),
+      );
+      this.frontRows = rowsFor(
+        tables.weapon,
+        VIEW_NAMES.map((view) => `vorne/${view}`),
+      );
+    } else {
+      this.hasWeapon = false;
+      this.weaponBack.setVisible(false);
+      this.weaponFront.setVisible(false);
+    }
   }
 }

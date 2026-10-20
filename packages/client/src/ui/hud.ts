@@ -1,7 +1,7 @@
 // Plain DOM for the interface. Phaser draws the world; HTML draws the rest,
 // because that is what scales from desktop to phone without extra work.
 
-import { expForNextLevel } from '@lumiis/shared';
+import { PLAYER_DAMAGE, expForNextLevel, itemDef } from '@lumiis/shared';
 import { playerCount, type ViewState } from '../state';
 
 const mustFind = (id: string): HTMLElement => {
@@ -28,6 +28,8 @@ export function createHud(): Hud {
   const exp = mustFind('exp');
   const expFill = mustFind('exp-fill');
   const yang = mustFind('yang');
+  const attack = mustFind('attack');
+  const defence = mustFind('defence');
 
   return {
     render(state: ViewState): void {
@@ -46,6 +48,11 @@ export function createHud(): Hud {
 
       level.textContent = String(state.self.level);
       yang.textContent = String(state.self.yang);
+
+      const weapon = state.equipment.weapon === null ? null : itemDef(state.equipment.weapon);
+      const armor = state.equipment.armor === null ? null : itemDef(state.equipment.armor);
+      attack.textContent = String(PLAYER_DAMAGE + (weapon?.attack ?? 0));
+      defence.textContent = String(armor?.defense ?? 0);
 
       const hpShare = shareOf(state.self.hp, state.self.maxHp);
       hp.textContent = `${Math.max(0, Math.round(state.self.hp))} / ${state.self.maxHp}`;

@@ -108,6 +108,14 @@ export class Connection {
     this.send({ t: 'pickup', target });
   }
 
+  equip(slot: number): void {
+    this.send({ t: 'equip', slot });
+  }
+
+  unequip(piece: 'weapon' | 'armor'): void {
+    this.send({ t: 'unequip', piece });
+  }
+
   setPickupSettings(autoPickup: boolean, autoPickupTypes: string[]): void {
     this.send({ t: 'settings', autoPickup, autoPickupTypes });
   }
@@ -163,6 +171,7 @@ export class Connection {
         break;
       case 'inventory':
         view.inventory = message.slots;
+        view.equipment = message.equipment;
         break;
       case 'pong':
         view.pingMs = Math.max(0, Math.round(performance.now() - message.at));
@@ -214,6 +223,8 @@ export class Connection {
           y: player.y,
           dir: player.dir as typeof view.self.dir,
           moving: player.moving,
+          weapon: player.weapon,
+          armor: player.armor,
           renderX: player.x,
           renderY: player.y,
         });
@@ -223,6 +234,8 @@ export class Connection {
         existing.y = player.y;
         existing.dir = player.dir as typeof view.self.dir;
         existing.moving = player.moving;
+        existing.weapon = player.weapon;
+        existing.armor = player.armor;
       }
     }
 

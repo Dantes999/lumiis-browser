@@ -72,7 +72,7 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
     world.step();
 
     for (const update of world.drainInventoryUpdates()) {
-      gateway.sendInventory(update.playerId, update.slots);
+      gateway.sendInventory(update.playerId);
     }
 
     if (world.tick % SNAPSHOT_EVERY_TICKS === 0) gateway.broadcastSnapshot();

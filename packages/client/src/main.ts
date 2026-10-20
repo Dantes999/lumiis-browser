@@ -96,10 +96,13 @@ initInput({
 });
 
 const hud = createHud();
-const bag = createBag();
+const bag = createBag(
+  (slot) => connection.equip(slot),
+  (piece) => connection.unequip(piece),
+);
 window.setInterval(() => {
   hud.render(view);
-  bag.render(view.inventory);
+  bag.render(view.inventory, view.equipment);
   tickPickup();
 
   if (view.characters !== null) {

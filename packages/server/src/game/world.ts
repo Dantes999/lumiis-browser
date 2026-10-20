@@ -25,7 +25,9 @@ import {
   dirFromInput,
   expForNextLevel,
   canStand,
+  EMPTY_EQUIPMENT,
   isItemKey,
+  itemDef,
   moveWithCollision,
   spawnPosition,
   withinAttackRange,
@@ -33,6 +35,7 @@ import {
 import type { CharacterSave } from '../store/db.js';
 import type {
   Direction,
+  Equipment,
   GroundItemSnapshot,
   InventorySlot,
   ItemKey,
@@ -68,6 +71,7 @@ export type PlayerSeed = {
   exp?: number;
   yang?: number;
   inventory?: InventorySlot[];
+  equipment?: Equipment;
 };
 
 export type Player = {
@@ -96,6 +100,7 @@ export type Player = {
   /** Picks up drops on its own, limited to autoPickupTypes when that is set. */
   autoPickup: boolean;
   autoPickupTypes: Set<ItemKey>;
+  equipment: Equipment;
 };
 
 /** An item lying on the ground, waiting to be picked up. */
@@ -211,7 +216,9 @@ export class World {
         : new Array<InventorySlot>(INVENTORY_SLOTS).fill(null),
       autoPickup: false,
       autoPickupTypes: new Set<ItemKey>(),
+      equipment: seed.equipment ?? { ...EMPTY_EQUIPMENT },
     };
+    this.recalcStats(player);
 
     // A fresh or moved character may stand somewhere that is not walkable.
     if (!canStand(this.map, player.x, player.y)) {
@@ -237,6 +244,7 @@ export class World {
 
     return {
       name: player.name,
+      equipment: { ...player.equipment },
       level: player.level,
       exp: player.exp,
       yang: player.yang,
@@ -299,9 +307,10 @@ export class World {
       return { ok: false, reason: 'Out of reach.' };
     }
 
+    const damage = this.attackOf(player);
     player.lastAttackTick = this.tickCount;
-    monster.hp -= PLAYER_DAMAGE;
-    monster.damageBy.set(playerId, (monster.damageBy.get(playerId) ?? 0) + PLAYER_DAMAGE);
+    monster.hp -= damage;
+    monster.damageBy.set(playerId, (monster.damageBy.get(playerId) ?? 0) + damage);
 
     if (monster.hp <= 0) {
       monster.hp = 0;
@@ -311,10 +320,10 @@ export class World {
       const rewards = this.rewardKill(monster, player);
       monster.damageBy.clear();
       this.dropLoot(monster, player);
-      return { ok: true, damage: PLAYER_DAMAGE, killed: true, rewards };
+      return { ok: true, damage, killed: true, rewards };
     }
 
-    return { ok: true, damage: PLAYER_DAMAGE, killed: false };
+    return { ok: true, damage, killed: false };
   }
 
   /** One simulation step: players, monsters, deaths and respawns. */
@@ -350,6 +359,73 @@ export class World {
     this.collectGroundItems();
   }
 
+  /** Weapon, armour and health bonus follow what is equipped. */
+  private recalcStats(player: Player): void {
+    const armor = player.equipment.armor === null ? null : itemDef(player.equipment.armor);
+    player.maxHp = PLAYER_MAX_HP + (armor?.maxHp ?? 0);
+    player.hp = Math.min(player.hp, player.maxHp);
+  }
+
+  private attackOf(player: Player): number {
+    const weapon = player.equipment.weapon === null ? null : itemDef(player.equipment.weapon);
+    return PLAYER_DAMAGE + (weapon?.attack ?? 0);
+  }
+
+  private defenseOf(player: Player): number {
+    const armor = player.equipment.armor === null ? null : itemDef(player.equipment.armor);
+    return armor?.defense ?? 0;
+  }
+
+  equipmentOf(playerId: number): Equipment | null {
+    const player = this.playersById.get(playerId);
+    return player === undefined ? null : { ...player.equipment };
+  }
+
+  /** Wears the item from a bag slot, trading places with what was worn. */
+  equip(playerId: number, slotIndex: number): { ok: true } | { ok: false; reason: string } {
+    const player = this.playersById.get(playerId);
+    if (player === undefined || player.deadUntil > 0) return { ok: false, reason: 'Not now.' };
+
+    const item = player.inventory[slotIndex] ?? null;
+    if (item === null) return { ok: false, reason: 'That slot is empty.' };
+
+    const def = itemDef(item.key);
+    if (def.slot === undefined) return { ok: false, reason: 'You cannot wear that.' };
+
+    const previous = player.equipment[def.slot];
+    if (previous !== null) {
+      const free = player.inventory.findIndex(
+        (entry, index) => entry === null && index !== slotIndex,
+      );
+      if (free === -1) return { ok: false, reason: 'Your inventory is full.' };
+      player.inventory[free] = { key: previous, count: 1 };
+    }
+
+    player.inventory[slotIndex] = item.count > 1 ? { key: item.key, count: item.count - 1 } : null;
+    player.equipment[def.slot] = item.key;
+    this.recalcStats(player);
+    this.inventoryUpdates.add(player.id);
+    return { ok: true };
+  }
+
+  unequip(playerId: number, piece: 'weapon' | 'armor'): { ok: true } | { ok: false; reason: string } {
+    const player = this.playersById.get(playerId);
+    if (player === undefined || player.deadUntil > 0) return { ok: false, reason: 'Not now.' };
+
+    const key = player.equipment[piece];
+    if (key === null) return { ok: false, reason: 'Nothing is worn there.' };
+
+    const free = player.inventory.findIndex((entry) => entry === null);
+    if (free === -1) return { ok: false, reason: 'Your inventory is full.' };
+
+    player.equipment[piece] = null;
+    player.inventory[free] = { key, count: 1 };
+    this.recalcStats(player);
+    this.inventoryUpdates.add(player.id);
+    return { ok: true };
+  }
+
+  /** Everything a client needs to draw the world right now. */
   snapshot(): {
     players: PlayerSnapshot[];
     monsters: MonsterSnapshot[];
@@ -369,6 +445,8 @@ export class World {
         level: player.level,
         exp: player.exp,
         yang: player.yang,
+        weapon: player.equipment.weapon,
+        armor: player.equipment.armor,
       });
     }
 
@@ -428,7 +506,8 @@ export class World {
   private hurtPlayer(player: Player, damage: number): void {
     if (player.deadUntil > 0) return;
 
-    player.hp = Math.max(0, player.hp - damage);
+    const taken = Math.max(1, damage - this.defenseOf(player));
+    player.hp = Math.max(0, player.hp - taken);
     if (player.hp > 0) return;
 
     player.deadUntil = this.tickCount + PLAYER_RESPAWN_TICKS;

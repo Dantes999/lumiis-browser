@@ -79,12 +79,24 @@
         <span class="hud-label">Yang</span>
         <span id="yang" class="hud-value">0</span>
       </div>
+      <div class="hud-row">
+        <span class="hud-label">Attack</span>
+        <span id="attack" class="hud-value">0</span>
+      </div>
+      <div class="hud-row">
+        <span class="hud-label">Defence</span>
+        <span id="defence" class="hud-value">0</span>
+      </div>
       <button id="bag-toggle" class="hud-button" type="button">Bag</button>
       <button id="settings-toggle" class="hud-button" type="button">Settings</button>
     </div>
 
     <div id="bag" class="panel hidden">
       <div class="panel-title">Inventory</div>
+      <div class="equipment">
+        <button id="equip-weapon" class="slot equip" type="button" title="Weapon"></button>
+        <button id="equip-armor" class="slot equip" type="button" title="Armor"></button>
+      </div>
       <div id="bag-grid" class="bag-grid"></div>
     </div>
 

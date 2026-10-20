@@ -127,6 +127,22 @@ body {
   margin-bottom: 6px;
 }
 
+.equipment {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.slot.equip {
+  background: #1a222b;
+  border-style: dashed;
+}
+
+.slot.equip.filled {
+  border-style: solid;
+  border-color: var(--accent);
+}
+
 .bag-grid {
   display: grid;
   grid-template-columns: repeat(5, 40px);
@@ -135,6 +151,8 @@ body {
 
 .slot {
   position: relative;
+  padding: 0;
+  font: inherit;
   width: 40px;
   height: 40px;
   display: flex;

@@ -10,7 +10,8 @@ import {
   NAME_PATTERN,
   PROTOCOL_VERSION,
 } from './constants.js';
-import { isItemKey, type InventorySlot } from './items.js';
+import { isItemKey, type Equipment, type InventorySlot } from './items.js';
+import { INVENTORY_SLOTS } from './items.js';
 
 export type PlayerSnapshot = {
   id: number;
@@ -24,6 +25,8 @@ export type PlayerSnapshot = {
   level: number;
   exp: number;
   yang: number;
+  weapon: string | null;
+  armor: string | null;
 };
 
 export type MonsterSnapshot = {
@@ -53,6 +56,8 @@ export type ClientMessage =
   | { t: 'input'; dx: number; dy: number }
   | { t: 'attack'; target: number }
   | { t: 'pickup'; target: number }
+  | { t: 'equip'; slot: number }
+  | { t: 'unequip'; piece: 'weapon' | 'armor' }
   | { t: 'settings'; autoPickup: boolean; autoPickupTypes: string[] }
   | { t: 'ping'; at: number };
 
@@ -66,7 +71,7 @@ export type ServerMessage =
       monsters: MonsterSnapshot[];
       ground: GroundItemSnapshot[];
     }
-  | { t: 'inventory'; slots: (InventorySlot | null)[] }
+  | { t: 'inventory'; slots: (InventorySlot | null)[]; equipment: Equipment }
   | { t: 'characters'; list: CharacterSummary[]; max: number }
   | { t: 'authError'; reason: string }
   | { t: 'pong'; at: number }
@@ -133,6 +138,21 @@ export function parseClientMessage(input: unknown): ParsedMessage {
         return fail('attack needs a monster id');
       }
       return { ok: true, message: { t: 'attack', target } };
+    }
+
+    case 'equip': {
+      const slot = message.slot;
+      if (typeof slot !== 'number' || !Number.isInteger(slot) || slot < 0) {
+        return fail('equip needs an inventory slot');
+      }
+      if (slot >= INVENTORY_SLOTS) return fail('equip slot out of range');
+      return { ok: true, message: { t: 'equip', slot } };
+    }
+
+    case 'unequip': {
+      const piece = message.piece;
+      if (piece !== 'weapon' && piece !== 'armor') return fail('unequip needs a piece');
+      return { ok: true, message: { t: 'unequip', piece } };
     }
 
     case 'pickup': {

@@ -4,6 +4,7 @@
 import Phaser from 'phaser';
 import {
   ITEMS,
+  isItemKey,
   MONSTER_KEYS,
   MONSTER_TYPES,
   TILE_SIZE,
@@ -13,7 +14,7 @@ import {
   type ItemKey,
   type MapData,
 } from '@lumiis/shared';
-import { PlayerView, readRows, type SpriteRows } from '../art';
+import { PlayerView, readTables, spriteSheets, type ArtTables } from '../art';
 import { MOB_CELL_H, MOB_CELL_W, MonsterView } from '../mobart';
 import { renderedSelfPosition, stepLocal } from '../sim';
 import { view } from '../state';
@@ -26,7 +27,7 @@ const STEP_FRAME_MS = 180;
 const OTHERS_TAU_MS = 60;
 
 export class WorldScene extends Phaser.Scene {
-  private rows: SpriteRows | null = null;
+  private tables: ArtTables | null = null;
   private readonly views = new Map<number, PlayerView>();
   private readonly monsterViews = new Map<number, MonsterView>();
   private readonly groundViews = new Map<number, Phaser.GameObjects.Container>();
@@ -44,12 +45,11 @@ export class WorldScene extends Phaser.Scene {
     this.load.json('rows_armor', '/assets/ruestungen/ruestungen.json');
     this.load.json('rows_head', '/assets/modelle/spieler/spieler.json');
     this.load.json('rows_hair', '/assets/haare/haare.json');
+    this.load.json('rows_weapon', '/assets/waffen/waffen.json');
 
-    // Every sheet uses the same 48x48 grid; only the row tables differ.
+    // Every player sheet uses the same 48x48 grid; only the row tables differ.
     const grid = { frameWidth: 48, frameHeight: 48 };
-    this.load.spritesheet('body', '/assets/ruestungen/krieger_m/00_ohne_ruestung.png', grid);
-    this.load.spritesheet('head', '/assets/modelle/spieler/krieger_m.png', grid);
-    this.load.spritesheet('hair', '/assets/haare/krieger_m_1.png', grid);
+    for (const sheet of spriteSheets()) this.load.spritesheet(sheet.key, sheet.path, grid);
 
     // One sheet per monster type, 40x32 cells, four views of five frames.
     for (const key of MONSTER_KEYS) {
@@ -62,7 +62,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.rows = readRows(this);
+    this.tables = readTables(this);
     this.cameras.main.setBackgroundColor('#0b0f13');
     this.buildWorld();
   }
@@ -175,8 +175,8 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private renderPlayers(deltaMs: number): void {
-    const rows = this.rows;
-    if (rows === null) return;
+    const tables = this.tables;
+    if (tables === null) return;
 
     const column = Math.floor(this.time.now / STEP_FRAME_MS) % 2 === 0 ? 1 : 2;
     const seen = new Set<number>();
@@ -188,9 +188,13 @@ export class WorldScene extends Phaser.Scene {
       player.renderX += (player.x - player.renderX) * share;
       player.renderY += (player.y - player.renderY) * share;
 
-      const playerView = this.viewFor(player.id, rows);
+      const playerView = this.viewFor(player.id, tables);
       playerView.setPosition(player.renderX, player.renderY);
-      playerView.setPose(rows, player.dir, player.moving ? column : 0);
+      playerView.setLook(tables, {
+        weapon: isItemKey(player.weapon) ? player.weapon : null,
+        armor: isItemKey(player.armor) ? player.armor : null,
+      });
+      playerView.setPose(player.dir, player.moving ? column : 0);
     }
 
     const selfId = view.selfId;
@@ -198,9 +202,10 @@ export class WorldScene extends Phaser.Scene {
       seen.add(selfId);
       const self = view.self;
       const drawn = renderedSelfPosition();
-      const selfView = this.viewFor(selfId, rows);
+      const selfView = this.viewFor(selfId, tables);
       selfView.setPosition(drawn.x, drawn.y);
-      selfView.setPose(rows, self.dir, self.moving ? column : 0);
+      selfView.setLook(tables, view.equipment);
+      selfView.setPose(self.dir, self.moving ? column : 0);
 
       // A hit is shown as a short red flash on the figure.
       if (self.hp < this.lastSelfHp) this.flashUntil = this.time.now + 140;
@@ -222,11 +227,11 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  private viewFor(id: number, rows: SpriteRows): PlayerView {
+  private viewFor(id: number, tables: ArtTables): PlayerView {
     const existing = this.views.get(id);
     if (existing !== undefined) return existing;
 
-    const created = new PlayerView(this, rows);
+    const created = new PlayerView(this, tables);
     this.views.set(id, created);
     return created;
   }
