@@ -79,10 +79,9 @@ const begin = (target: MonsterState | null, fallback: Direction): boolean => {
   return true;
 };
 
-/** Space bar: swing at the closest monster in reach, otherwise straight ahead. */
+/** Space bar: swing straight ahead, wherever the body is facing. */
 export function swingForward(): void {
-  const profile = swingFor(view.equipment.weapon);
-  begin(nearest(view.self.x, view.self.y, profile.range), view.self.dir);
+  begin(null, view.self.dir);
 }
 
 /** Whether the attack key is being held down. */

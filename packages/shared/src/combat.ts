@@ -30,8 +30,8 @@ export const SWINGS: Record<SwingArt, SwingProfile> = {
   zweihand: { art: 'zweihand', ticks: 16, hitAt: 9, range: 54 },
 };
 
-/** Half the opening angle of the swing: 60 degrees to each side. */
-export const SWING_ARC = Math.PI / 3;
+/** Half the opening angle of the swing: a full slash from left to right. */
+export const SWING_ARC = Math.PI / 2;
 
 /** The swing a weapon of this item produces. */
 export function swingFor(weapon: ItemKey | null): SwingProfile {

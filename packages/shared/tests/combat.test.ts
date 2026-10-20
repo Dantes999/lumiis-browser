@@ -54,10 +54,11 @@ describe('the arc of a swing', () => {
     expect(inSwingArc(origin, 6 as Direction, at(30, -edge), 44)).toBe(true);
   });
 
-  it('misses what stands beside or behind the body', () => {
-    expect(inSwingArc(origin, 6 as Direction, at(30, 90), 44)).toBe(false);
+  it('hits what stands beside the body and misses what stands behind', () => {
+    expect(inSwingArc(origin, 6 as Direction, at(30, 85), 44)).toBe(true);
+    expect(inSwingArc(origin, 6 as Direction, at(30, -85), 44)).toBe(true);
+    expect(inSwingArc(origin, 6 as Direction, at(30, 100), 44)).toBe(false);
     expect(inSwingArc(origin, 6 as Direction, at(30, 180), 44)).toBe(false);
-    expect(inSwingArc(origin, 6 as Direction, at(30, -120), 44)).toBe(false);
   });
 
   it('misses anything beyond the reach of the weapon', () => {

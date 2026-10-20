@@ -16,7 +16,7 @@ const BLADE_HEIGHT = 18;
 /** How far the streak reaches at least, so a short weapon is still visible. */
 const MIN_REACH = 30;
 /** How much of the arc is drawn behind the blade, in radians. */
-const TAIL = Math.PI / 2.4;
+const TAIL = Math.PI / 3;
 /** The streak starts after the wind-up and is gone before the arm is back. */
 const SWEEP_FROM = 0.2;
 const SWEEP_TO = 0.85;
