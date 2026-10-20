@@ -767,7 +767,7 @@ describe('swings', () => {
     for (let tick = 0; tick < profile.hitAt; tick += 1) world.step();
   };
 
-  it('a one-handed sword only hits the closest of three', () => {
+  it('a one-handed sword hits everything inside its arc', () => {
     const { world, player } = arena(
       [
         [9, 8],
@@ -783,10 +783,10 @@ describe('swings', () => {
       .snapshot()
       .monsters.filter((monster) => monster.hp < monster.maxHp)
       .map((monster) => monster.id);
-    expect(hurt).toHaveLength(1);
+    expect(hurt).toHaveLength(3);
   });
 
-  it('a two-handed sword sweeps up to three monsters at once', () => {
+  it('a two-handed sword hits everything inside its arc too', () => {
     const { world, player } = arena(
       [
         [9, 8],
@@ -800,6 +800,36 @@ describe('swings', () => {
 
     const hurt = world.snapshot().monsters.filter((monster) => monster.hp < monster.maxHp);
     expect(hurt).toHaveLength(3);
+  });
+
+  it('does not hit a monster standing behind the back', () => {
+    const wolf = MONSTER_TYPES.wolf as { speed: number; chaseSpeed: number; aggro: number };
+    const { speed, chaseSpeed, aggro } = wolf;
+    wolf.speed = 0;
+    wolf.chaseSpeed = 0;
+    wolf.aggro = 0;
+
+    try {
+      const { world, player } = arena(
+        [
+          [9, 8],
+          [7, 8],
+        ],
+        'wooden_sword',
+      );
+      player.dir = 6;
+
+      expect(world.attack(player.id).ok).toBe(true);
+      for (let tick = 0; tick < SWING_TICKS; tick += 1) world.step();
+
+      const byId = new Map(world.snapshot().monsters.map((monster) => [monster.id, monster.hp]));
+      expect(byId.get(1)).toBeLessThan(MONSTER_TYPES.wolf.maxHp);
+      expect(byId.get(2)).toBe(MONSTER_TYPES.wolf.maxHp);
+    } finally {
+      wolf.speed = speed;
+      wolf.chaseSpeed = chaseSpeed;
+      wolf.aggro = aggro;
+    }
   });
 
   it('a two-handed sword reaches further than a one-handed one', () => {

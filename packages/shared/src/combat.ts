@@ -18,18 +18,16 @@ export type SwingProfile = {
   hitAt: number;
   /** Reach in pixels, measured at the feet. */
   range: number;
-  /** How many monsters one swing can catch. */
-  maxTargets: number;
 };
 
 /**
- * One-handed weapons are quick and hit a single target; a two-handed sword is
- * slower, reaches further and can catch several.
+ * One-handed weapons are quick; a two-handed sword is slower and reaches
+ * further. Every swing hits everything that stands inside its arc.
  */
 export const SWINGS: Record<SwingArt, SwingProfile> = {
-  fist: { art: 'fist', ticks: 10, hitAt: 5, range: 34, maxTargets: 1 },
-  schwert: { art: 'schwert', ticks: 12, hitAt: 6, range: 44, maxTargets: 1 },
-  zweihand: { art: 'zweihand', ticks: 16, hitAt: 9, range: 54, maxTargets: 3 },
+  fist: { art: 'fist', ticks: 10, hitAt: 5, range: 34 },
+  schwert: { art: 'schwert', ticks: 12, hitAt: 6, range: 44 },
+  zweihand: { art: 'zweihand', ticks: 16, hitAt: 9, range: 54 },
 };
 
 /** Half the opening angle of the swing: 60 degrees to each side. */

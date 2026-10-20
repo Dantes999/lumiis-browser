@@ -24,12 +24,11 @@ describe('swing profiles', () => {
     expect(SWINGS.schwert.range).toBeGreaterThan(SWINGS.fist.range);
   });
 
-  it('a two-handed sword is slower, reaches further and catches more', () => {
+  it('a two-handed sword is slower and reaches further', () => {
     const two = swingFor('great_sword');
     expect(two.art).toBe('zweihand');
     expect(two.ticks).toBeGreaterThan(SWINGS.schwert.ticks);
     expect(two.range).toBeGreaterThan(SWINGS.schwert.range);
-    expect(two.maxTargets).toBeGreaterThan(SWINGS.schwert.maxTargets);
   });
 
   it('lands the blow after the wind-up, not at the button press', () => {

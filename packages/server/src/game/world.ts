@@ -124,7 +124,6 @@ export type SwingState = {
   hitAt: number;
   endsAt: number;
   range: number;
-  maxTargets: number;
   resolved: boolean;
 };
 
@@ -369,7 +368,6 @@ export class World {
       hitAt: this.tickCount + profile.hitAt,
       endsAt: this.tickCount + profile.ticks,
       range: profile.range,
-      maxTargets: profile.maxTargets,
       resolved: false,
     };
 
@@ -470,24 +468,14 @@ export class World {
     }
   }
 
-  /** Everything standing in the arc gets hit, closest first. */
+  /** Everything standing in the arc gets hit. */
   private landSwing(player: Player, swing: SwingState): void {
-    const caught: Array<{ monster: Monster; distance: number }> = [];
+    const damage = this.attackOf(player);
 
     for (const monster of this.monstersById.values()) {
       if (monster.respawnAt > 0) continue;
       if (!inSwingArc(player, swing.dir, monster, swing.range)) continue;
-      caught.push({
-        monster,
-        distance: Math.hypot(monster.x - player.x, monster.y - player.y),
-      });
-    }
 
-    caught.sort((a, b) => a.distance - b.distance);
-
-    const damage = this.attackOf(player);
-    for (const entry of caught.slice(0, swing.maxTargets)) {
-      const monster = entry.monster;
       monster.hp -= damage;
       monster.damageBy.set(player.id, (monster.damageBy.get(player.id) ?? 0) + damage);
 
