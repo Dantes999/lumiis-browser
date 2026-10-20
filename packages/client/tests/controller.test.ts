@@ -1,12 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  initController,
-  isWalking,
-  resend,
-  setManualInput,
-  step,
-  walkAlong,
-} from '../src/controller';
+import { initController, resend, setManualInput } from '../src/controller';
 import { view } from '../src/state';
 
 let sent: Array<[number, number]>;
@@ -59,46 +52,10 @@ describe('movement intents', () => {
     setManualInput(1, 0);
     expect(sent).toHaveLength(1);
   });
-});
 
-describe('click to walk', () => {
-  it('starts walking towards the first waypoint', () => {
-    walkAlong([{ x: 140, y: 100 }]);
-    expect(isWalking()).toBe(true);
-    expect(sent).toEqual([[1, 0]]);
-  });
-
-  it('moves on to the next waypoint when one is reached', () => {
-    walkAlong([
-      { x: 140, y: 100 },
-      { x: 140, y: 140 },
-    ]);
-
-    step(100, 100);
-    expect(sent).toEqual([[1, 0]]);
-
-    // Standing on the first waypoint: the next one is straight south.
-    step(140, 100);
-    expect(sent[sent.length - 1]).toEqual([0, 1]);
-    expect(isWalking()).toBe(true);
-  });
-
-  it('stops when the last waypoint is reached', () => {
-    walkAlong([{ x: 140, y: 100 }]);
-
-    step(140, 100);
-
-    expect(isWalking()).toBe(false);
-    expect(sent[sent.length - 1]).toEqual([0, 0]);
-    expect(view.self.moving).toBe(false);
-  });
-
-  it('is cancelled by real input', () => {
-    walkAlong([{ x: 140, y: 100 }, { x: 200, y: 100 }]);
-    setManualInput(-1, 0);
-
-    expect(isWalking()).toBe(false);
-    expect(sent[sent.length - 1]).toEqual([-1, 0]);
+  it('walks diagonally when two keys are held', () => {
+    setManualInput(1, -1);
+    expect(view.self.dir).toBe(5); // north-east
   });
 
   it('sends the current intent again on request', () => {

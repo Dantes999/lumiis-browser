@@ -9,7 +9,6 @@ import type {
   PlayerSnapshot,
   ServerMessage,
 } from '@lumiis/shared';
-import { cancelWalk } from './controller';
 import { applyServerPosition } from './sim';
 import { view } from './state';
 
@@ -206,7 +205,6 @@ export class Connection {
     for (const player of players) {
       if (player.id === view.selfId) {
         applyServerPosition(player.x, player.y);
-        if (player.hp <= 0 && view.self.hp > 0) cancelWalk();
         view.self.hp = player.hp;
         view.self.maxHp = player.maxHp;
         view.self.level = player.level;

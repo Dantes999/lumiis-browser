@@ -2,16 +2,14 @@
 // No game rules live here — this file only wires parts together.
 
 import Phaser from 'phaser';
-import { findPath } from '@lumiis/shared';
 import { WorldScene } from './scene/world-scene';
 import { Connection } from './net';
 import { initInput } from './input';
 import { attackAt, attackNearestInRange, setAttackSender } from './combat';
 import { initAudio, resumeAudio } from './audio';
-import { initController, walkAlong } from './controller';
+import { initController } from './controller';
 import { itemNear, orderPickup, pickupNearestInRange, setPickupSender, tickPickup } from './loot';
 import { view } from './state';
-import { getWorldMap } from './world-map';
 import { createHud } from './ui/hud';
 import { createBag } from './ui/bag';
 import { createCharacterScreen } from './ui/characters';
@@ -82,20 +80,9 @@ initInput({
     // A tap on a monster within reach is a hit.
     if (attackAt(point.x, point.y)) return;
 
-    const map = getWorldMap();
-    if (map === null) return;
-
-    // A tap on an item is an order: walk there and take it.
+    // A tap on an item is an order to take it.
     const item = itemNear(point.x, point.y);
-    if (item !== null) {
-      orderPickup(item.id);
-      const path = findPath(map, { x: view.self.x, y: view.self.y }, { x: item.x, y: item.y });
-      if (path !== null) walkAlong(path);
-      return;
-    }
-
-    const path = findPath(map, { x: view.self.x, y: view.self.y }, point);
-    if (path !== null) walkAlong(path);
+    if (item !== null) orderPickup(item.id);
   },
 });
 

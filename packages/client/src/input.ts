@@ -217,18 +217,24 @@ export function initInput(options: InputOptions): void {
     // when the target really is a node.
     const target = event.target;
     if (hud !== null && target instanceof Node && hud.contains(target)) return;
-    if (event.pointerType === 'mouse' && event.button !== 0) return;
 
-    stickPointer = event.pointerId;
-    stickOriginX = event.clientX;
-    stickOriginY = event.clientY;
-    stickVector = [0, 0];
+    const isMouse = event.pointerType === 'mouse';
+    if (isMouse && event.button !== 0) return;
+
+    // A click is a tap, never a movement stick: otherwise a mouse that is held
+    // down (or a lost release) would keep the keyboard locked out.
     tapCandidate = {
       id: event.pointerId,
       x: event.clientX,
       y: event.clientY,
       at: performance.now(),
     };
+    if (isMouse) return;
+
+    stickPointer = event.pointerId;
+    stickOriginX = event.clientX;
+    stickOriginY = event.clientY;
+    stickVector = [0, 0];
 
     base.hidden = false;
     base.style.left = `${stickOriginX}px`;
