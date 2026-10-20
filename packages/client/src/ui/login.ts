@@ -1,6 +1,12 @@
 // The login box: name and password, then either log in or create the account.
 // It stays in front until the server welcomes us.
 
+import {
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+  NAME_PATTERN,
+} from '@lumiis/shared';
+
 const mustFind = (id: string): HTMLElement => {
   const element = document.getElementById(id);
   if (element === null) throw new Error(`missing element #${id}`);
@@ -32,13 +38,29 @@ export function createLogin(
 
   let shownError = '';
 
+  const fail = (text: string): void => {
+    error.textContent = text;
+    shownError = text;
+  };
+
   const submit = (mode: LoginMode): void => {
     const name = nameInput.value.trim();
     const password = passwordInput.value;
 
     if (name === '' || password === '') {
-      error.textContent = 'Name and password are required.';
-      shownError = error.textContent;
+      fail('Name and password are required.');
+      return;
+    }
+    if (!NAME_PATTERN.test(name)) {
+      fail('The name needs 3 to 16 letters, digits or underscore.');
+      return;
+    }
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      fail(`The password needs at least ${MIN_PASSWORD_LENGTH} characters.`);
+      return;
+    }
+    if (password.length > MAX_PASSWORD_LENGTH) {
+      fail(`The password may have at most ${MAX_PASSWORD_LENGTH} characters.`);
       return;
     }
 

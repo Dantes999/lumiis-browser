@@ -73,6 +73,7 @@ describe('accounts', () => {
     expect(unknown.ok).toBe(false);
     expect(wrong.ok).toBe(false);
     if (!unknown.ok && !wrong.ok) expect(unknown.reason).toBe(wrong.reason);
+    if (!unknown.ok) expect(unknown.reason).toContain('Create account');
   });
 });
 

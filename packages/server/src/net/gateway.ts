@@ -220,8 +220,20 @@ export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store
         return;
       }
 
-      const parsed = parseClientMessage(decode(data.toString()));
+      const decoded = decode(data.toString());
+      const parsed = parseClientMessage(decoded);
+
       if (!parsed.ok) {
+        // A rejected login is a mistake, not an attack: answer and stay open so
+        // the player can correct it in the same window.
+        const looksLikeLogin =
+          typeof decoded === 'object' && decoded !== null && (decoded as { t?: unknown }).t === 'login';
+
+        if (looksLikeLogin) {
+          send(session, { t: 'authError', reason: parsed.reason });
+          return;
+        }
+
         send(session, { t: 'notice', text: parsed.reason });
         refuse(socket, 1002, parsed.reason);
         return;

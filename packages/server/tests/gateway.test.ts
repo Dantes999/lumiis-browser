@@ -143,6 +143,25 @@ describe('gateway', () => {
     socket.close();
   });
 
+  it('answers a rejected login instead of closing the socket', async () => {
+    const port = await startServer();
+    const socket = await openSocket(port);
+
+    socket.send(JSON.stringify({ t: 'login', name: 'Kain', password: 'test', mode: 'login' }));
+    const answer = (await nextMessage(socket)) as Record<string, unknown>;
+
+    expect(answer['t']).toBe('authError');
+    expect(String(answer['reason'])).toContain('6');
+    expect(socket.readyState).toBe(WebSocket.OPEN);
+
+    // And the same socket can try again.
+    socket.send(JSON.stringify({ t: 'login', name: 'Kain', password: 'secret123', mode: 'register' }));
+    const characters = (await nextOfType(socket, 'characters')) as Record<string, unknown>;
+    expect(characters['t']).toBe('characters');
+
+    socket.close();
+  });
+
   it('rejects movement input that is not a whole step', async () => {
     const port = await startServer();
     const socket = await openSocket(port);

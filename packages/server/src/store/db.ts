@@ -220,14 +220,14 @@ export class Store {
     if (row === undefined) {
       // Spend the same time as a real check, so a missing account is not faster.
       await hashPassword(password, 'no-such-account');
-      return { ok: false, reason: 'Wrong name or password.' };
+      return { ok: false, reason: 'Wrong name or password. New here? Use Create account.' };
     }
 
     const hash = await hashPassword(password, row.salt);
     const expected = Buffer.from(row.hash, 'hex');
 
     if (hash.length !== expected.length || !timingSafeEqual(hash, expected)) {
-      return { ok: false, reason: 'Wrong name or password.' };
+      return { ok: false, reason: 'Wrong name or password. New here? Use Create account.' };
     }
 
     this.db.prepare('UPDATE accounts SET last_login_at = ? WHERE id = ?').run(Date.now(), row.id);

@@ -119,15 +119,17 @@ export function parseClientMessage(input: unknown): ParsedMessage {
       const password = message.password;
       const mode = message.mode;
 
-      if (typeof name !== 'string' || !NAME_PATTERN.test(name)) return fail('invalid name');
+      if (typeof name !== 'string' || !NAME_PATTERN.test(name)) {
+        return fail('The name needs 3 to 16 letters, digits or underscore.');
+      }
       if (
         typeof password !== 'string' ||
         password.length < MIN_PASSWORD_LENGTH ||
         password.length > MAX_PASSWORD_LENGTH
       ) {
-        return fail('invalid password');
+        return fail(`The password needs ${MIN_PASSWORD_LENGTH} to ${MAX_PASSWORD_LENGTH} characters.`);
       }
-      if (mode !== 'login' && mode !== 'register') return fail('invalid login mode');
+      if (mode !== 'login' && mode !== 'register') return fail('That is not a login mode.');
 
       return { ok: true, message: { t: 'login', name, password, mode } };
     }
