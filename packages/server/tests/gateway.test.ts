@@ -36,7 +36,12 @@ const closedWith = (socket: WebSocket, timeoutMs = 2000): Promise<number> =>
   });
 
 const startServer = async (): Promise<number> => {
-  server = await createGameServer({ port: 0, host: '127.0.0.1', staticDir: '/nonexistent' });
+  server = await createGameServer({
+    port: 0,
+    host: '127.0.0.1',
+    staticDir: '/nonexistent',
+    dataFile: ':memory:',
+  });
   server.loop.start();
   return server.port;
 };
@@ -46,7 +51,7 @@ describe('gateway', () => {
     const port = await startServer();
     const socket = await openSocket(port);
 
-    socket.send(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, name: 'Kain' }));
+    socket.send(JSON.stringify({ t: 'login', name: 'Kain', password: 'secret123', mode: 'register' }));
     const welcome = (await nextMessage(socket)) as Record<string, unknown>;
 
     expect(welcome['t']).toBe('welcome');
@@ -61,7 +66,7 @@ describe('gateway', () => {
     const port = await startServer();
     const socket = await openSocket(port);
 
-    socket.send(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, name: 'Kain' }));
+    socket.send(JSON.stringify({ t: 'login', name: 'Kain', password: 'secret123', mode: 'register' }));
     await nextMessage(socket);
 
     const snapshot = (await nextMessage(socket)) as Record<string, unknown>;
@@ -75,7 +80,7 @@ describe('gateway', () => {
     const port = await startServer();
     const socket = await openSocket(port);
 
-    socket.send(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, name: 'Kain' }));
+    socket.send(JSON.stringify({ t: 'login', name: 'Kain', password: 'secret123', mode: 'register' }));
     await nextMessage(socket);
 
     socket.send(JSON.stringify({ t: 'ping', at: 4242 }));
@@ -101,7 +106,7 @@ describe('gateway', () => {
     const port = await startServer();
     const socket = await openSocket(port);
 
-    socket.send(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, name: 'Kain' }));
+    socket.send(JSON.stringify({ t: 'login', name: 'Kain', password: 'secret123', mode: 'register' }));
     const welcome = (await nextMessage(socket)) as { id: number };
 
     const ownPosition = async (): Promise<number | null> => {
@@ -130,7 +135,7 @@ describe('gateway', () => {
     const port = await startServer();
     const socket = await openSocket(port);
 
-    socket.send(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, name: 'Kain' }));
+    socket.send(JSON.stringify({ t: 'login', name: 'Kain', password: 'secret123', mode: 'register' }));
     await nextMessage(socket);
 
     socket.send(JSON.stringify({ t: 'input', dx: 2, dy: 0 }));
@@ -149,7 +154,7 @@ describe('gateway', () => {
     const port = await startServer();
     const socket = await openSocket(port);
 
-    socket.send(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, name: 'Kain' }));
+    socket.send(JSON.stringify({ t: 'login', name: 'Kain', password: 'secret123', mode: 'register' }));
     await nextMessage(socket);
     expect(server?.world.playerCount).toBe(1);
 

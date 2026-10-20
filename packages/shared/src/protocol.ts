@@ -4,7 +4,12 @@
 // world (no positions, no damage, no inventory). The server validates every
 // message here and decides what actually happens.
 
-import { NAME_PATTERN, PROTOCOL_VERSION } from './constants.js';
+import {
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+  NAME_PATTERN,
+  PROTOCOL_VERSION,
+} from './constants.js';
 import { isItemKey, type InventorySlot } from './items.js';
 
 export type PlayerSnapshot = {
@@ -42,7 +47,7 @@ export type GroundItemSnapshot = {
 
 /** Messages the client may send. */
 export type ClientMessage =
-  | { t: 'hello'; v: number; name: string }
+  | { t: 'login'; name: string; password: string; mode: 'login' | 'register' }
   | { t: 'input'; dx: number; dy: number }
   | { t: 'attack'; target: number }
   | { t: 'pickup'; target: number }
@@ -60,6 +65,7 @@ export type ServerMessage =
       ground: GroundItemSnapshot[];
     }
   | { t: 'inventory'; slots: (InventorySlot | null)[] }
+  | { t: 'authError'; reason: string }
   | { t: 'pong'; at: number }
   | { t: 'notice'; text: string };
 
@@ -88,14 +94,22 @@ export function parseClientMessage(input: unknown): ParsedMessage {
   const message = input as Record<string, unknown>;
 
   switch (message.t) {
-    case 'hello': {
-      if (message.v !== PROTOCOL_VERSION) {
-        return fail(`unsupported protocol version: ${String(message.v)}`);
+    case 'login': {
+      const name = message.name;
+      const password = message.password;
+      const mode = message.mode;
+
+      if (typeof name !== 'string' || !NAME_PATTERN.test(name)) return fail('invalid name');
+      if (
+        typeof password !== 'string' ||
+        password.length < MIN_PASSWORD_LENGTH ||
+        password.length > MAX_PASSWORD_LENGTH
+      ) {
+        return fail('invalid password');
       }
-      if (typeof message.name !== 'string' || !NAME_PATTERN.test(message.name)) {
-        return fail('invalid name');
-      }
-      return { ok: true, message: { t: 'hello', v: PROTOCOL_VERSION, name: message.name } };
+      if (mode !== 'login' && mode !== 'register') return fail('invalid login mode');
+
+      return { ok: true, message: { t: 'login', name, password, mode } };
     }
 
     case 'input': {

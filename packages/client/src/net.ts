@@ -1,7 +1,7 @@
 // WebSocket client. Its only jobs are: keep the socket alive, translate frames
 // into state, and never invent game facts.
 
-import { PROTOCOL_VERSION, decode, encode } from '@lumiis/shared';
+import { decode, encode } from '@lumiis/shared';
 import type {
   ClientMessage,
   GroundItemSnapshot,
@@ -16,15 +16,16 @@ import { view } from './state';
 const PING_INTERVAL_MS = 2000;
 const MAX_RECONNECT_DELAY_MS = 10000;
 
+type Credentials = { name: string; password: string; mode: 'login' | 'register' };
+
 export class Connection {
   private socket: WebSocket | null = null;
+  private credentials: Credentials | null = null;
   private pingTimer: number | null = null;
   private reconnectTimer: number | null = null;
   private reconnectDelayMs = 1000;
   private closedByUser = false;
   private onWelcome: (() => void) | null = null;
-
-  constructor(private readonly name: string) {}
 
   private get url(): string {
     const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -41,7 +42,7 @@ export class Connection {
 
     socket.addEventListener('open', () => {
       this.reconnectDelayMs = 1000;
-      this.send({ t: 'hello', v: PROTOCOL_VERSION, name: this.name });
+      this.sendLogin();
       this.startPinging();
     });
 
@@ -71,6 +72,20 @@ export class Connection {
     if (this.reconnectTimer !== null) window.clearTimeout(this.reconnectTimer);
     this.reconnectTimer = null;
     this.socket?.close();
+  }
+
+  /** Sends a login attempt, connecting first if needed. */
+  submit(name: string, password: string, mode: 'login' | 'register'): void {
+    this.credentials = { name, password, mode };
+    view.authError = null;
+
+    if (this.socket === null) this.connect();
+    else if (this.socket.readyState === WebSocket.OPEN) this.sendLogin();
+  }
+
+  private sendLogin(): void {
+    if (this.credentials === null) return;
+    this.send({ t: 'login', ...this.credentials });
   }
 
   setInput(dx: number, dy: number): void {
@@ -130,6 +145,8 @@ export class Connection {
         view.status = 'online';
         view.selfId = message.id;
         view.tick = message.tick;
+        // A reconnect must log in, not try to register the same name again.
+        if (this.credentials !== null) this.credentials.mode = 'login';
         this.onWelcome?.();
         break;
       case 'snapshot':
@@ -145,6 +162,9 @@ export class Connection {
       case 'notice':
         view.notice = message.text;
         view.noticeUntil = performance.now() + 3000;
+        break;
+      case 'authError':
+        view.authError = message.reason;
         break;
     }
   }

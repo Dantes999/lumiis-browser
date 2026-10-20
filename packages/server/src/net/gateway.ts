@@ -15,22 +15,27 @@ import {
   encode,
   parseClientMessage,
 } from '@lumiis/shared';
-import type { InventorySlot } from '@lumiis/shared';
+import type { Direction, InventorySlot } from '@lumiis/shared';
 import type { World, Player } from '../game/world.js';
+import type { Store } from '../store/db.js';
 
 type Session = {
   socket: WebSocket;
   player: Player | null;
   tokens: number;
   tokensAt: number;
+  /** Failed logins on this connection, to slow down guessing. */
+  loginAttempts: number;
 };
 
 export type Gateway = {
-  /** Sends the current world state to everyone who finished the handshake. */
+  /** Sends the current world state to everyone who is logged in. */
   broadcastSnapshot(): void;
   /** Sends one player's inventory; used after a pickup. */
   sendInventory(playerId: number, slots: InventorySlot[]): void;
-  /** Connected sockets, including those that have not said hello yet. */
+  /** Writes every logged in character to the store. */
+  saveAll(): void;
+  /** Connected sockets, including those that have not logged in yet. */
   readonly connectionCount: number;
   close(): Promise<void>;
 };
@@ -39,7 +44,7 @@ const refuse = (socket: WebSocket, code: number, reason: string): void => {
   socket.close(code, reason);
 };
 
-export function attachGateway(httpServer: HttpServer, world: World): Gateway {
+export function attachGateway(httpServer: HttpServer, world: World, store: Store): Gateway {
   const wss = new WebSocketServer({
     server: httpServer,
     path: '/ws',
@@ -82,12 +87,62 @@ export function attachGateway(httpServer: HttpServer, world: World): Gateway {
     if (slots !== null) send(session, { t: 'inventory', slots });
   };
 
-  const handleHello = (session: Session, name: string): void => {
+  const MAX_LOGIN_ATTEMPTS = 6;
+
+  const savePlayer = (player: Player): void => {
+    const state = world.saveOf(player.id);
+    if (state !== null) store.saveCharacter(player.accountId, state);
+  };
+
+  /**
+   * Login and registration share one path. Hashing is asynchronous, so the game
+   * loop keeps running while a password is checked.
+   */
+  const handleLogin = async (
+    session: Session,
+    message: { name: string; password: string; mode: 'login' | 'register' },
+  ): Promise<void> => {
     if (session.player !== null) {
-      send(session, { t: 'notice', text: 'Already logged in.' });
+      send(session, { t: 'authError', reason: 'Already logged in.' });
       return;
     }
-    const player = world.addPlayer(name);
+    if (session.loginAttempts >= MAX_LOGIN_ATTEMPTS) {
+      send(session, { t: 'authError', reason: 'Too many attempts. Reconnect and try again.' });
+      return;
+    }
+    session.loginAttempts += 1;
+
+    const result =
+      message.mode === 'register'
+        ? await store.register(message.name, message.password)
+        : await store.login(message.name, message.password);
+
+    if (session.socket.readyState !== WebSocket.OPEN) return;
+
+    if (!result.ok) {
+      send(session, { t: 'authError', reason: result.reason });
+      return;
+    }
+    if (session.player !== null) return;
+
+    const save = result.save;
+    const player = world.addPlayer({
+      accountId: result.accountId,
+      name: result.name,
+      ...(save === null
+        ? {}
+        : {
+            x: save.x,
+            y: save.y,
+            dir: save.dir as Direction,
+            hp: save.hp,
+            level: save.level,
+            exp: save.exp,
+            yang: save.yang,
+            inventory: save.inventory,
+          }),
+    });
+
     session.player = player;
     send(session, {
       t: 'welcome',
@@ -105,6 +160,7 @@ export function attachGateway(httpServer: HttpServer, world: World): Gateway {
       player: null,
       tokens: MAX_MESSAGES_PER_SECOND,
       tokensAt: performance.now(),
+      loginAttempts: 0,
     };
     sessions.add(session);
 
@@ -127,8 +183,8 @@ export function attachGateway(httpServer: HttpServer, world: World): Gateway {
       }
 
       switch (parsed.message.t) {
-        case 'hello':
-          handleHello(session, parsed.message.name);
+        case 'login':
+          void handleLogin(session, parsed.message);
           break;
         case 'input':
           if (session.player === null) {
@@ -184,7 +240,10 @@ export function attachGateway(httpServer: HttpServer, world: World): Gateway {
 
     socket.on('close', () => {
       sessions.delete(session);
-      if (session.player !== null) world.removePlayer(session.player.id);
+      const player = session.player;
+      if (player === null) return;
+      savePlayer(player);
+      world.removePlayer(player.id);
     });
 
     socket.on('error', () => {
@@ -216,6 +275,12 @@ export function attachGateway(httpServer: HttpServer, world: World): Gateway {
 
     sendInventory(playerId: number, slots: InventorySlot[]): void {
       sendToPlayer(playerId, { t: 'inventory', slots });
+    },
+
+    saveAll(): void {
+      for (const session of sessions) {
+        if (session.player !== null) savePlayer(session.player);
+      }
     },
 
     close(): Promise<void> {

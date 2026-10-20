@@ -72,6 +72,8 @@ export type ViewState = {
   ground: Map<number, GroundItemState>;
   inventory: InventorySlot[];
   notice: string | null;
+  /** Last login failure, shown in the login box. */
+  authError: string | null;
   /** When the current notice stops being shown, in performance.now() ms. */
   noticeUntil: number;
   /** Camera zoom; 1 shows the world at native size. */
@@ -103,6 +105,7 @@ export const view: ViewState = {
   ground: new Map(),
   inventory: [],
   notice: null,
+  authError: null,
   noticeUntil: 0,
   zoom: 1,
 };

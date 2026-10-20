@@ -29,6 +29,7 @@ import {
   spawnPosition,
   withinAttackRange,
 } from '@lumiis/shared';
+import type { CharacterSave } from '../store/db.js';
 import type {
   Direction,
   GroundItemSnapshot,
@@ -54,8 +55,23 @@ const BLOCKED_PAUSE_TICKS = 5;
 /** A chasing monster that cannot get closer for this long loses interest. */
 const STUCK_LIMIT_TICKS = 40;
 
+export type PlayerSeed = {
+  accountId: number;
+  name: string;
+  x?: number;
+  y?: number;
+  dir?: Direction;
+  hp?: number;
+  level?: number;
+  exp?: number;
+  yang?: number;
+  inventory?: InventorySlot[];
+};
+
 export type Player = {
   id: number;
+  /** Row in the accounts table; the character is saved under it. */
+  accountId: number;
   name: string;
   /** Position in world pixels, measured at the feet. */
   x: number;
@@ -168,28 +184,59 @@ export class World {
     return this.monstersById.get(id);
   }
 
-  addPlayer(name: string): Player {
+  addPlayer(seed: PlayerSeed): Player {
     const spawn = spawnPosition(this.map);
     const player: Player = {
       id: this.nextPlayerId++,
-      name,
-      x: spawn.x,
-      y: spawn.y,
-      dir: 0,
+      accountId: seed.accountId,
+      name: seed.name,
+      x: seed.x ?? spawn.x,
+      y: seed.y ?? spawn.y,
+      dir: seed.dir ?? 0,
       moving: false,
-      hp: PLAYER_MAX_HP,
+      hp: seed.hp ?? PLAYER_MAX_HP,
       maxHp: PLAYER_MAX_HP,
       deadUntil: 0,
       lastAttackTick: -ATTACK_COOLDOWN_TICKS,
-      level: 1,
-      exp: 0,
-      yang: 0,
-      inventory: new Array<InventorySlot>(INVENTORY_SLOTS).fill(null),
+      level: seed.level ?? 1,
+      exp: seed.exp ?? 0,
+      yang: seed.yang ?? 0,
+      inventory: seed.inventory
+        ? [...seed.inventory]
+        : new Array<InventorySlot>(INVENTORY_SLOTS).fill(null),
       autoPickup: false,
       autoPickupTypes: new Set<ItemKey>(),
     };
+
+    // A character that was stored dead comes back on his feet at the spawn.
+    if (player.hp <= 0) {
+      player.hp = Math.max(1, Math.round(player.maxHp * PLAYER_RESPAWN_HP_SHARE));
+      player.x = spawn.x;
+      player.y = spawn.y;
+    }
+
     this.playersById.set(player.id, player);
     return player;
+  }
+
+  /** Everything the store needs to remember about one character. */
+  saveOf(playerId: number): CharacterSave | null {
+    const player = this.playersById.get(playerId);
+    if (player === undefined) return null;
+
+    return {
+      level: player.level,
+      exp: player.exp,
+      yang: player.yang,
+      hp: player.deadUntil > 0 ? 0 : player.hp,
+      map: this.map.id,
+      x: player.x,
+      y: player.y,
+      dir: player.dir,
+      inventory: player.inventory.map((slot) =>
+        slot === null ? null : { key: slot.key, count: slot.count },
+      ),
+    };
   }
 
   removePlayer(id: number): boolean {

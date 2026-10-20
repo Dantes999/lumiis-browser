@@ -4,12 +4,14 @@
 // happen; the rules live in the world and its systems.
 
 import { createServer } from 'node:http';
+import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { SNAPSHOT_EVERY_TICKS, TICK_MS, TICK_RATE } from '@lumiis/shared';
 import { World } from './game/world.js';
 import { FixedStepLoop } from './game/loop.js';
 import { loadMap } from './game/map.js';
+import { Store } from './store/db.js';
 import { attachGateway, type Gateway } from './net/gateway.js';
 import { createStaticHandler } from './http/static.js';
 
@@ -18,6 +20,8 @@ export type GameServerOptions = {
   host?: string;
   staticDir?: string;
   mapPath?: string;
+  /** SQLite file for accounts and characters; ':memory:' in tests. */
+  dataFile?: string;
 };
 
 export type GameServer = {
@@ -25,6 +29,7 @@ export type GameServer = {
   readonly world: World;
   readonly loop: FixedStepLoop;
   readonly gateway: Gateway;
+  readonly store: Store;
   close(): Promise<void>;
 };
 
@@ -32,12 +37,20 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 const defaultStaticDir = (): string => resolve(here, '../../client/dist');
 const defaultMapPath = (): string => resolve(here, '../../shared/maps/testmap.json');
+const defaultDataFile = (): string => resolve(here, '../../../data/lumiis.db');
+
+/** How often every logged in character is written to disk. */
+const SAVE_EVERY_SECONDS = 30;
 
 export async function createGameServer(options: GameServerOptions = {}): Promise<GameServer> {
   const port = options.port ?? Number(process.env['PORT'] ?? 3000);
   const host = options.host ?? process.env['HOST'] ?? '0.0.0.0';
   const staticDir = options.staticDir ?? defaultStaticDir();
   const mapPath = options.mapPath ?? defaultMapPath();
+  const dataFile = options.dataFile ?? defaultDataFile();
+
+  if (dataFile !== ':memory:') mkdirSync(dirname(dataFile), { recursive: true });
+  const store = new Store(dataFile);
 
   const map = loadMap(mapPath);
   // The map is served from the same file the server loaded, so server and
@@ -53,7 +66,7 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
   });
 
   const world = new World(map);
-  const gateway = attachGateway(httpServer, world);
+  const gateway = attachGateway(httpServer, world, store);
 
   const loop = new FixedStepLoop(TICK_MS, () => {
     world.step();
@@ -63,6 +76,7 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
     }
 
     if (world.tick % SNAPSHOT_EVERY_TICKS === 0) gateway.broadcastSnapshot();
+    if (world.tick % (TICK_RATE * SAVE_EVERY_SECONDS) === 0) gateway.saveAll();
   });
 
   await new Promise<void>((resolve, reject) => {
@@ -81,10 +95,13 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
     world,
     loop,
     gateway,
+    store,
     async close(): Promise<void> {
       loop.stop();
+      gateway.saveAll();
       await gateway.close();
       await new Promise<void>((resolve) => httpServer.close(() => resolve()));
+      store.close();
     },
   };
 }

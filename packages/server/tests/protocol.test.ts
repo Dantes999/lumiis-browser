@@ -1,21 +1,39 @@
 import { describe, expect, it } from 'vitest';
-import { PROTOCOL_VERSION, parseClientMessage } from '@lumiis/shared';
+import { parseClientMessage } from '@lumiis/shared';
 
 describe('protocol', () => {
-  it('accepts a hello with a valid name and version', () => {
-    const result = parseClientMessage({ t: 'hello', v: PROTOCOL_VERSION, name: 'Kain' });
-    expect(result).toEqual({ ok: true, message: { t: 'hello', v: PROTOCOL_VERSION, name: 'Kain' } });
-  });
-
-  it('rejects a hello from a different protocol version', () => {
-    const result = parseClientMessage({ t: 'hello', v: PROTOCOL_VERSION + 1, name: 'Kain' });
-    expect(result.ok).toBe(false);
+  it('accepts a login with a valid name and password', () => {
+    expect(
+      parseClientMessage({ t: 'login', name: 'Kain', password: 'secret123', mode: 'login' }),
+    ).toEqual({
+      ok: true,
+      message: { t: 'login', name: 'Kain', password: 'secret123', mode: 'login' },
+    });
+    expect(
+      parseClientMessage({ t: 'login', name: 'Kain', password: 'secret123', mode: 'register' }).ok,
+    ).toBe(true);
   });
 
   it('rejects names that break the name rule', () => {
     for (const name of ['ab', 'a'.repeat(17), 'bad name', 'kain!', '', 42]) {
-      expect(parseClientMessage({ t: 'hello', v: PROTOCOL_VERSION, name }).ok).toBe(false);
+      expect(parseClientMessage({ t: 'login', name, password: 'secret123', mode: 'login' }).ok).toBe(
+        false,
+      );
     }
+  });
+
+  it('rejects passwords that are too short, too long or missing', () => {
+    for (const password of ['12345', 'x'.repeat(65), '', null, 42]) {
+      expect(parseClientMessage({ t: 'login', name: 'Kain', password, mode: 'login' }).ok).toBe(
+        false,
+      );
+    }
+  });
+
+  it('rejects an unknown login mode', () => {
+    expect(
+      parseClientMessage({ t: 'login', name: 'Kain', password: 'secret123', mode: 'admin' }).ok,
+    ).toBe(false);
   });
 
   it('accepts a ping with a numeric timestamp', () => {

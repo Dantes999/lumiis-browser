@@ -77,22 +77,22 @@ describe('world', () => {
 
   it('spawns every player on the spawn tile of the map', () => {
     const world = new World(grassMap());
-    const player = world.addPlayer('Kain');
+    const player = world.addPlayer({ accountId: 0, name: 'Kain' });
     expect(player.x).toBe(spawn.x);
     expect(player.y).toBe(spawn.y);
   });
 
   it('gives every player a unique id', () => {
     const world = new World(grassMap());
-    const first = world.addPlayer('Kain');
-    const second = world.addPlayer('Lyra');
+    const first = world.addPlayer({ accountId: 0, name: 'Kain' });
+    const second = world.addPlayer({ accountId: 0, name: 'Lyra' });
     expect(first.id).not.toBe(second.id);
     expect(world.playerCount).toBe(2);
   });
 
   it('removes players and forgets them in the snapshot', () => {
     const world = new World(grassMap());
-    const player = world.addPlayer('Kain');
+    const player = world.addPlayer({ accountId: 0, name: 'Kain' });
     expect(world.removePlayer(player.id)).toBe(true);
     expect(world.removePlayer(player.id)).toBe(false);
     expect(world.snapshot().players).toEqual([]);
@@ -107,7 +107,7 @@ describe('world', () => {
 
   it('moves a player in the pressed direction', () => {
     const world = new World(grassMap());
-    const player = world.addPlayer('Kain');
+    const player = world.addPlayer({ accountId: 0, name: 'Kain' });
     world.setInput(player.id, 1, 0);
     world.step();
 
@@ -118,7 +118,7 @@ describe('world', () => {
 
   it('stops a player when the input is zero', () => {
     const world = new World(grassMap());
-    const player = world.addPlayer('Kain');
+    const player = world.addPlayer({ accountId: 0, name: 'Kain' });
     world.setInput(player.id, 1, 0);
     world.step();
     const afterWalk = player.x;
@@ -136,7 +136,7 @@ describe('world', () => {
     map.tiles[8 * 16 + 9] = TILE.WATER;
 
     const world = new World(map);
-    const player = world.addPlayer('Kain');
+    const player = world.addPlayer({ accountId: 0, name: 'Kain' });
     world.setInput(player.id, 1, 0);
 
     for (let step = 0; step < 40; step += 1) world.step();
@@ -153,7 +153,7 @@ describe('world', () => {
 
   it('snapshots only the values a client needs', () => {
     const world = new World(grassMap());
-    world.addPlayer('Kain');
+    world.addPlayer({ accountId: 0, name: 'Kain' });
     expect(world.snapshot().players).toEqual([
       {
         id: 1,
@@ -185,7 +185,7 @@ describe('monsters', () => {
 
   it('damages a monster in reach', () => {
     const world = new World(withWolf());
-    const player = world.addPlayer('Kain');
+    const player = world.addPlayer({ accountId: 0, name: 'Kain' });
 
     expect(world.attack(player.id, 1)).toEqual({
       ok: true,
@@ -197,7 +197,7 @@ describe('monsters', () => {
 
   it('refuses a second hit before the cooldown is over', () => {
     const world = new World(boxedWolf());
-    const player = world.addPlayer('Kain');
+    const player = world.addPlayer({ accountId: 0, name: 'Kain' });
 
     expect(world.attack(player.id, 1).ok).toBe(true);
     expect(world.attack(player.id, 1).ok).toBe(false);
@@ -208,21 +208,21 @@ describe('monsters', () => {
 
   it('refuses a hit on a monster that is far away', () => {
     const world = new World(withWolf(13, 13));
-    const player = world.addPlayer('Kain');
+    const player = world.addPlayer({ accountId: 0, name: 'Kain' });
 
     expect(world.attack(player.id, 1).ok).toBe(false);
   });
 
   it('refuses a hit on a monster that does not exist', () => {
     const world = new World(withWolf());
-    const player = world.addPlayer('Kain');
+    const player = world.addPlayer({ accountId: 0, name: 'Kain' });
 
     expect(world.attack(player.id, 999).ok).toBe(false);
   });
 
   it('kills a monster and brings it back with full health', () => {
     const world = new World(boxedWolf());
-    const player = world.addPlayer('Kain');
+    const player = world.addPlayer({ accountId: 0, name: 'Kain' });
 
     const hits = Math.ceil(MONSTER_TYPES.wolf.maxHp / PLAYER_DAMAGE);
     let killed = false;
@@ -273,7 +273,7 @@ describe('monsters fighting back', () => {
 
   it('notices a player nearby and closes in', () => {
     const world = new World(withWolfAt(12, 8));
-    const player = world.addPlayer('Kain');
+    const player = world.addPlayer({ accountId: 0, name: 'Kain' });
 
     const before = distanceTo(world, player.id, 1);
     for (let tick = 0; tick < 10; tick += 1) world.step();
@@ -284,7 +284,7 @@ describe('monsters fighting back', () => {
 
   it('ignores a player that is out of sight', () => {
     const world = new World(withWolfAt(15, 15));
-    const player = world.addPlayer('Kain');
+    const player = world.addPlayer({ accountId: 0, name: 'Kain' });
 
     for (let tick = 0; tick < 10; tick += 1) world.step();
     expect(world.getMonster(1)?.targetId).toBeNull();
@@ -293,7 +293,7 @@ describe('monsters fighting back', () => {
 
   it('bites a player that stands next to it', () => {
     const world = new World(boxedWolf());
-    const player = world.addPlayer('Kain');
+    const player = world.addPlayer({ accountId: 0, name: 'Kain' });
 
     world.step(); // notice the player
     world.step(); // bite
@@ -303,7 +303,7 @@ describe('monsters fighting back', () => {
 
   it('does not bite more often than its cooldown allows', () => {
     const world = new World(boxedWolf());
-    const player = world.addPlayer('Kain');
+    const player = world.addPlayer({ accountId: 0, name: 'Kain' });
 
     world.step();
     world.step();
@@ -315,7 +315,7 @@ describe('monsters fighting back', () => {
 
   it('kills a player who just stands there, then revives him at the spawn', () => {
     const world = new World(boxedWolf());
-    const player = world.addPlayer('Kain');
+    const player = world.addPlayer({ accountId: 0, name: 'Kain' });
     const spawn = spawnPosition(world.map);
 
     let ticks = 0;
@@ -346,7 +346,7 @@ describe('monsters fighting back', () => {
 describe('experience and yang', () => {
   it('gives experience and yang for a kill', () => {
     const world = new World(boxedWolf());
-    const player = world.addPlayer('Kain');
+    const player = world.addPlayer({ accountId: 0, name: 'Kain' });
 
     expect(killOne(world, player.id)).toBe(true);
 
@@ -357,7 +357,7 @@ describe('experience and yang', () => {
 
   it('gives nothing for a hit that does not kill', () => {
     const world = new World(boxedWolf());
-    const player = world.addPlayer('Kain');
+    const player = world.addPlayer({ accountId: 0, name: 'Kain' });
 
     const result = world.attack(player.id, 1);
     expect(result.ok).toBe(true);
@@ -371,7 +371,7 @@ describe('experience and yang', () => {
 
   it('levels up when the experience is enough and heals on the way', () => {
     const world = new World(boxedWolf());
-    const player = world.addPlayer('Kain');
+    const player = world.addPlayer({ accountId: 0, name: 'Kain' });
 
     const needed = expForNextLevel(1);
     const kills = Math.ceil(needed / MONSTER_TYPES.wolf.exp);
@@ -400,7 +400,7 @@ describe('experience and yang', () => {
 
   it('never goes past the maximum level', () => {
     const world = new World(boxedWolf());
-    const player = world.addPlayer('Kain');
+    const player = world.addPlayer({ accountId: 0, name: 'Kain' });
     player.level = MAX_LEVEL;
     player.exp = expForNextLevel(MAX_LEVEL - 1);
 
@@ -410,8 +410,8 @@ describe('experience and yang', () => {
 
   it('splits the reward by damage instead of giving it to the last hit', () => {
     const world = new World(boxedWolf());
-    const first = world.addPlayer('First');
-    const second = world.addPlayer('Second');
+    const first = world.addPlayer({ accountId: 0, name: 'First' });
+    const second = world.addPlayer({ accountId: 0, name: 'Second' });
 
     let killed = false;
     for (let tick = 0; tick < 400 && !killed; tick += 1) {
@@ -430,8 +430,8 @@ describe('experience and yang', () => {
 
   it('gives the whole reward to whoever is left when a contributor logs out', () => {
     const world = new World(boxedWolf());
-    const stay = world.addPlayer('Stay');
-    const leave = world.addPlayer('Leave');
+    const stay = world.addPlayer({ accountId: 0, name: 'Stay' });
+    const leave = world.addPlayer({ accountId: 0, name: 'Leave' });
 
     world.attack(stay.id, 1);
     world.step();
@@ -449,8 +449,8 @@ describe('experience and yang', () => {
 
   it('starts the split from scratch when a monster comes back', () => {
     const world = new World(boxedWolf());
-    const first = world.addPlayer('First');
-    const second = world.addPlayer('Second');
+    const first = world.addPlayer({ accountId: 0, name: 'First' });
+    const second = world.addPlayer({ accountId: 0, name: 'Second' });
 
     // Together: second only gets part of the experience.
     world.attack(first.id, 1);
@@ -497,7 +497,7 @@ describe('loot', () => {
 
   it('leaves drops where they fall until the player asks for them', () => {
     const world = new World(withWolf(9, 8));
-    const player = world.addPlayer('Kain');
+    const player = world.addPlayer({ accountId: 0, name: 'Kain' });
 
     const item = killForDrop(world, player.id);
     expect(item).toBeDefined();
@@ -518,8 +518,8 @@ describe('loot', () => {
 
   it('refuses an item that is out of reach or still reserved', () => {
     const world = new World(withWolf(9, 8));
-    const killer = world.addPlayer('Killer');
-    const stranger = world.addPlayer('Stranger');
+    const killer = world.addPlayer({ accountId: 0, name: 'Killer' });
+    const stranger = world.addPlayer({ accountId: 0, name: 'Stranger' });
 
     const item = killForDrop(world, killer.id);
     expect(item).toBeDefined();
@@ -540,7 +540,7 @@ describe('loot', () => {
 
   it('auto pickup only takes the types that were chosen', () => {
     const world = new World(withWolf(9, 8));
-    const player = world.addPlayer('Kain');
+    const player = world.addPlayer({ accountId: 0, name: 'Kain' });
     world.setPickupSettings(player.id, true, ['boar_tusk']);
 
     const item = killForDrop(world, player.id);
@@ -560,7 +560,7 @@ describe('loot', () => {
 
   it('stacks the same item into one slot', () => {
     const world = new World(withWolf(9, 8));
-    const player = world.addPlayer('Kain');
+    const player = world.addPlayer({ accountId: 0, name: 'Kain' });
 
     let collected = 0;
     for (let attempt = 0; attempt < 40 && collected < 3; attempt += 1) {

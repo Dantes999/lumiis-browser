@@ -13,16 +13,10 @@ import { view } from './state';
 import { getWorldMap } from './world-map';
 import { createHud } from './ui/hud';
 import { createBag } from './ui/bag';
+import { createLogin } from './ui/login';
 import { createSettings } from './ui/settings';
 
 const HUD_REFRESH_MS = 100;
-const NAME_PATTERN = /[^A-Za-z0-9_]/g;
-
-const playerName = (): string => {
-  const fromUrl = new URLSearchParams(location.search).get('name');
-  const base = fromUrl ?? `Player${Math.floor(1000 + Math.random() * 9000)}`;
-  return base.replace(NAME_PATTERN, '').slice(0, 16) || 'Player';
-};
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -40,7 +34,7 @@ const game = new Phaser.Game({
   scene: [WorldScene],
 });
 
-const connection = new Connection(playerName());
+const connection = new Connection();
 setAttackSender((target) => connection.attack(target));
 setPickupSender((itemId) => connection.pickup(itemId));
 initController((dx, dy) => connection.setInput(dx, dy));
@@ -48,7 +42,13 @@ initController((dx, dy) => connection.setInput(dx, dy));
 const settings = createSettings((value) => {
   connection.setPickupSettings(value.autoPickup, value.types);
 });
+
+const login = createLogin((name, password, mode) => {
+  connection.submit(name, password, mode);
+});
+
 connection.setWelcomeHandler(() => {
+  login.hide();
   const value = settings.current();
   connection.setPickupSettings(value.autoPickup, value.types);
 });
@@ -86,14 +86,13 @@ initInput({
   },
 });
 
-connection.connect();
-
 const hud = createHud();
 const bag = createBag();
 window.setInterval(() => {
   hud.render(view);
   bag.render(view.inventory);
   tickPickup();
+  if (view.authError !== null) login.showError(view.authError);
 }, HUD_REFRESH_MS);
 
 // Handy for poking at the state from the console during development.

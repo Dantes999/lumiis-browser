@@ -188,6 +188,80 @@ body {
   box-shadow: inset 0 0 0 1px rgb(0 0 0 / 45%);
 }
 
+/* Login */
+#login {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(8 11 14 / 88%);
+  z-index: 10;
+}
+
+#login.hidden {
+  display: none;
+}
+
+.login-box {
+  display: grid;
+  gap: 6px;
+  width: min(320px, 86vw);
+  padding: 18px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.login-box h1 {
+  margin: 0 0 6px;
+  font-size: 20px;
+  letter-spacing: 2px;
+  color: var(--accent);
+  text-align: center;
+}
+
+.login-box label {
+  color: var(--muted);
+}
+
+.login-box input {
+  font: inherit;
+  padding: 7px 8px;
+  color: var(--text);
+  background: #10171e;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.login-error {
+  min-height: 18px;
+  color: #e08a8a;
+  font-size: 12px;
+}
+
+.login-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.login-actions button {
+  flex: 1;
+  font: inherit;
+  padding: 8px;
+  color: #0b1116;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.login-actions button.secondary {
+  color: var(--text);
+  background: transparent;
+  border-color: var(--line);
+}
+
 /* Touch joystick: appears where the finger lands, never captures the HUD. */
 #stick {
   position: fixed;

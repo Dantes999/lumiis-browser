@@ -26,8 +26,12 @@ export const MIN_NAME_LENGTH = 3;
 export const MAX_NAME_LENGTH = 16;
 export const NAME_PATTERN = /^[A-Za-z0-9_]{3,16}$/;
 
+/** Password rules. Long enough to matter, short enough to type on a phone. */
+export const MIN_PASSWORD_LENGTH = 6;
+export const MAX_PASSWORD_LENGTH = 64;
+
 /** Bumped whenever the message shapes below change in an incompatible way. */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 /** World size of the first test map in tiles. Real maps replace this later. */
 export const TILE_SIZE = 32;
