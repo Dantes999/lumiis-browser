@@ -88,6 +88,16 @@ export type Monster = {
   stuckTicks: number;
   wanderDir: Direction | null;
   wanderUntil: number;
+  /** Damage each player dealt to this monster since it last appeared. */
+  damageBy: Map<number, number>;
+};
+
+/** What one player earned from a kill. */
+export type KillReward = {
+  playerId: number;
+  exp: number;
+  yang: number;
+  levelUps: number;
 };
 
 export type AttackResult =
@@ -95,8 +105,8 @@ export type AttackResult =
       ok: true;
       damage: number;
       killed: boolean;
-      /** Only present when the hit killed the monster. */
-      reward?: { exp: number; yang: number; levelUps: number };
+      /** Only present when the hit killed the monster; one entry per contributor. */
+      rewards?: KillReward[];
     }
   | { ok: false; reason: string };
 
@@ -201,14 +211,16 @@ export class World {
 
     player.lastAttackTick = this.tickCount;
     monster.hp -= PLAYER_DAMAGE;
+    monster.damageBy.set(playerId, (monster.damageBy.get(playerId) ?? 0) + PLAYER_DAMAGE);
 
     if (monster.hp <= 0) {
       monster.hp = 0;
       monster.respawnAt = this.tickCount + MONSTER_RESPAWN_TICKS;
       monster.wanderDir = null;
       monster.targetId = null;
-      const reward = this.rewardKill(player, monster.key);
-      return { ok: true, damage: PLAYER_DAMAGE, killed: true, reward };
+      const rewards = this.rewardKill(monster, player);
+      monster.damageBy.clear();
+      return { ok: true, damage: PLAYER_DAMAGE, killed: true, rewards };
     }
 
     return { ok: true, damage: PLAYER_DAMAGE, killed: false };
@@ -303,16 +315,61 @@ export class World {
     player.lastAttackTick = this.tickCount - ATTACK_COOLDOWN_TICKS;
   }
 
-  /** Experience and Yang for a kill, including any level ups it causes. */
-  private rewardKill(
-    player: Player,
-    key: MonsterKey,
-  ): { exp: number; yang: number; levelUps: number } {
-    const type = MONSTER_TYPES[key];
-    const yang = type.yangMin + Math.floor(this.random() * (type.yangMax - type.yangMin + 1));
+  /**
+   * Experience and Yang for a kill, split by damage dealt.
+   *
+   * Paying only the last hit would let a passer-by steal a fight he did not
+   * fight, so every player who touched the monster gets his share.
+   */
+  private rewardKill(monster: Monster, killer: Player): KillReward[] {
+    const type = MONSTER_TYPES[monster.key];
+    const yangTotal =
+      type.yangMin + Math.floor(this.random() * (type.yangMax - type.yangMin + 1));
 
+    // Contributors who are still in the world; someone who logged out is gone.
+    const shares: Array<{ player: Player; damage: number }> = [];
+    for (const [playerId, damage] of monster.damageBy) {
+      const player = this.playersById.get(playerId);
+      if (player !== undefined && damage > 0) shares.push({ player, damage });
+    }
+    if (shares.length === 0) shares.push({ player: killer, damage: 1 });
+
+    const totalDamage = shares.reduce((sum, share) => sum + share.damage, 0);
+
+    const rewards: KillReward[] = [];
+    let expPaid = 0;
+    let yangPaid = 0;
+
+    for (const share of shares) {
+      const portion = share.damage / totalDamage;
+      const exp = Math.floor(type.exp * portion);
+      const yang = Math.floor(yangTotal * portion);
+
+      expPaid += exp;
+      yangPaid += yang;
+      rewards.push(this.payKill(share.player, exp, yang));
+    }
+
+    // Rounding leftovers go to the one who landed the killing blow.
+    const killerReward = rewards.find((entry) => entry.playerId === killer.id);
+    if (killerReward !== undefined) {
+      const restExp = type.exp - expPaid;
+      const restYang = yangTotal - yangPaid;
+      if (restExp > 0 || restYang > 0) {
+        const topUp = this.payKill(killer, restExp, restYang);
+        killerReward.exp += topUp.exp;
+        killerReward.yang += topUp.yang;
+        killerReward.levelUps += topUp.levelUps;
+      }
+    }
+
+    return rewards;
+  }
+
+  /** Books experience and Yang and resolves any level ups. */
+  private payKill(player: Player, exp: number, yang: number): KillReward {
+    player.exp += exp;
     player.yang += yang;
-    player.exp += type.exp;
 
     let levelUps = 0;
     while (player.level < MAX_LEVEL && player.exp >= expForNextLevel(player.level)) {
@@ -324,7 +381,7 @@ export class World {
     // Levelling up puts the player back on his feet.
     if (levelUps > 0) player.hp = player.maxHp;
 
-    return { exp: type.exp, yang, levelUps };
+    return { playerId: player.id, exp, yang, levelUps };
   }
 
   // ----------------------------------------------------------------- monsters
@@ -356,6 +413,7 @@ export class World {
         stuckTicks: 0,
         wanderDir: null,
         wanderUntil: 0,
+        damageBy: new Map(),
       });
       this.nextMonsterId += 1;
     }
@@ -485,6 +543,7 @@ export class World {
     monster.wanderUntil = this.tickCount + 10;
     monster.targetId = null;
     monster.lastAttackTick = this.tickCount - MONSTER_ATTACK_COOLDOWN_TICKS;
+    monster.damageBy.clear();
   }
 
   private randomTicks(min: number, max: number): number {

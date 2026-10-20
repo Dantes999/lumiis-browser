@@ -362,7 +362,7 @@ describe('experience and yang', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.killed).toBe(false);
-      expect(result.reward).toBeUndefined();
+      expect(result.rewards).toBeUndefined();
     }
     expect(player.exp).toBe(0);
     expect(player.yang).toBe(0);
@@ -380,7 +380,8 @@ describe('experience and yang', () => {
       for (let tick = 0; tick < 800 && !levelled; tick += 1) {
         const result = world.attack(player.id, 1);
         if (result.ok && result.killed) {
-          if (result.reward !== undefined && result.reward.levelUps > 0) {
+          const levelUps = (result.rewards ?? []).some((entry) => entry.levelUps > 0);
+          if (levelUps) {
             // Checked immediately: before any further bite can happen.
             expect(player.hp).toBe(player.maxHp);
             levelled = true;
@@ -404,5 +405,67 @@ describe('experience and yang', () => {
 
     killOne(world, player.id);
     expect(player.level).toBe(MAX_LEVEL);
+  });
+
+  it('splits the reward by damage instead of giving it to the last hit', () => {
+    const world = new World(boxedWolf());
+    const first = world.addPlayer('First');
+    const second = world.addPlayer('Second');
+
+    let killed = false;
+    for (let tick = 0; tick < 400 && !killed; tick += 1) {
+      const attacker = tick % 2 === 0 ? first : second;
+      const result = world.attack(attacker.id, 1);
+      if (result.ok && result.killed) killed = true;
+      world.step();
+    }
+
+    expect(killed).toBe(true);
+    // Two hits each: the experience is shared, not stolen by the final blow.
+    expect(first.exp + second.exp).toBe(MONSTER_TYPES.wolf.exp);
+    expect(Math.abs(first.exp - second.exp)).toBeLessThanOrEqual(1);
+    expect(first.yang + second.yang).toBeGreaterThanOrEqual(MONSTER_TYPES.wolf.yangMin);
+  });
+
+  it('gives the whole reward to whoever is left when a contributor logs out', () => {
+    const world = new World(boxedWolf());
+    const stay = world.addPlayer('Stay');
+    const leave = world.addPlayer('Leave');
+
+    world.attack(stay.id, 1);
+    world.step();
+    world.attack(leave.id, 1);
+    world.removePlayer(leave.id);
+
+    for (let tick = 0; tick < 400; tick += 1) {
+      const result = world.attack(stay.id, 1);
+      if (result.ok && result.killed) break;
+      world.step();
+    }
+
+    expect(stay.exp).toBe(MONSTER_TYPES.wolf.exp);
+  });
+
+  it('starts the split from scratch when a monster comes back', () => {
+    const world = new World(boxedWolf());
+    const first = world.addPlayer('First');
+    const second = world.addPlayer('Second');
+
+    // Together: second only gets part of the experience.
+    world.attack(first.id, 1);
+    world.step();
+    for (let tick = 0; tick < 400; tick += 1) {
+      const result = world.attack(second.id, 1);
+      if (result.ok && result.killed) break;
+      world.step();
+    }
+    const sharedExp = second.exp;
+    expect(sharedExp).toBeLessThan(MONSTER_TYPES.wolf.exp);
+
+    for (let tick = 0; tick < MONSTER_RESPAWN_TICKS + 5; tick += 1) world.step();
+    expect(killOne(world, second.id)).toBe(true);
+
+    // Alone this time, so the full amount — the old damage is forgotten.
+    expect(second.exp - sharedExp).toBe(MONSTER_TYPES.wolf.exp);
   });
 });

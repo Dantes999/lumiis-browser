@@ -65,6 +65,15 @@ export function attachGateway(httpServer: HttpServer, world: World): Gateway {
     session.socket.send(encode(message));
   };
 
+  /** Finds the session of a player, so rewards can reach every contributor. */
+  const sendToPlayer = (playerId: number, message: Parameters<typeof encode>[0]): void => {
+    for (const session of sessions) {
+      if (session.player?.id !== playerId) continue;
+      send(session, message);
+      return;
+    }
+  };
+
   const handleHello = (session: Session, name: string): void => {
     if (session.player !== null) {
       send(session, { t: 'notice', text: 'Already logged in.' });
@@ -129,13 +138,15 @@ export function attachGateway(httpServer: HttpServer, world: World): Gateway {
             send(session, { t: 'notice', text: result.reason });
             break;
           }
-          if (result.killed && result.reward !== undefined) {
-            const level = world.getPlayer(session.player.id)?.level ?? 1;
-            const prefix = result.reward.levelUps > 0 ? `Level ${level}! ` : '';
-            send(session, {
-              t: 'notice',
-              text: `${prefix}+${result.reward.exp} EXP, +${result.reward.yang} Yang`,
-            });
+          if (result.killed && result.rewards !== undefined) {
+            for (const reward of result.rewards) {
+              const level = world.getPlayer(reward.playerId)?.level ?? 1;
+              const prefix = reward.levelUps > 0 ? `Level ${level}! ` : '';
+              sendToPlayer(reward.playerId, {
+                t: 'notice',
+                text: `${prefix}+${reward.exp} EXP, +${reward.yang} Yang`,
+              });
+            }
           }
           break;
         }
