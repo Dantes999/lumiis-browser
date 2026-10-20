@@ -19,7 +19,7 @@ export const MAX_CATCH_UP_TICKS = 5;
 export const MAX_MESSAGE_BYTES = 2048;
 
 /** Messages per second a single connection may send. */
-export const MAX_MESSAGES_PER_SECOND = 30;
+export const MAX_MESSAGES_PER_SECOND = 60;
 
 /** Name rules: 3 to 16 characters, letters, digits and underscore. */
 export const MIN_NAME_LENGTH = 3;

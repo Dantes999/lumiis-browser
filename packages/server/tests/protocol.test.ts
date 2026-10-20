@@ -25,6 +25,30 @@ describe('protocol', () => {
     });
   });
 
+  it('accepts movement input in whole steps', () => {
+    expect(parseClientMessage({ t: 'input', dx: -1, dy: 1 })).toEqual({
+      ok: true,
+      message: { t: 'input', dx: -1, dy: 1 },
+    });
+    expect(parseClientMessage({ t: 'input', dx: 0, dy: 0 })).toEqual({
+      ok: true,
+      message: { t: 'input', dx: 0, dy: 0 },
+    });
+  });
+
+  it('rejects input that is not a whole step', () => {
+    for (const bad of [
+      { t: 'input', dx: 2, dy: 0 },
+      { t: 'input', dx: 0.5, dy: 0 },
+      { t: 'input', dx: -2, dy: 0 },
+      { t: 'input', dx: '1', dy: 0 },
+      { t: 'input', dx: 1 },
+      { t: 'input' },
+    ]) {
+      expect(parseClientMessage(bad).ok).toBe(false);
+    }
+  });
+
   it('rejects a ping without a usable timestamp', () => {
     expect(parseClientMessage({ t: 'ping' }).ok).toBe(false);
     expect(parseClientMessage({ t: 'ping', at: Number.NaN }).ok).toBe(false);

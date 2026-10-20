@@ -1,0 +1,32 @@
+{
+ "frames": [
+  {
+   "@": [
+    0,
+    0,
+    40,
+    26
+   ]
+  },
+  {
+   "@": [
+    40,
+    0,
+    40,
+    26
+   ]
+  }
+ ],
+ "stFrames": null,
+ "ox": 16,
+ "oy": 24,
+ "w": 40,
+ "h": 26,
+ "height": 20,
+ "merchant": true,
+ "flames": null,
+ "art": "sura_ghost",
+ "obj": false,
+ "stColor": null,
+ "ghost": 0.7
+}

@@ -63,3 +63,28 @@ body {
   color: var(--accent);
   font-variant-numeric: tabular-nums;
 }
+
+/* Touch joystick: appears where the finger lands, never captures the HUD. */
+#stick {
+  position: fixed;
+  width: 112px;
+  height: 112px;
+  margin-left: -56px;
+  margin-top: -56px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  pointer-events: none;
+  z-index: 5;
+}
+
+#stick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
+  transform: translate(-50%, -50%);
+}

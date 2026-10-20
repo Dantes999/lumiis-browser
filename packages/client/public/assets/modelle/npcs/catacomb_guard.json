@@ -1,0 +1,37 @@
+{
+ "frames": [
+  {
+   "@": [
+    0,
+    0,
+    40,
+    26
+   ]
+  },
+  {
+   "@": [
+    40,
+    0,
+    40,
+    26
+   ]
+  }
+ ],
+ "stFrames": null,
+ "ox": 16,
+ "oy": 24,
+ "w": 40,
+ "h": 26,
+ "height": 24,
+ "merchant": true,
+ "flames": [
+  [
+   5,
+   -20
+  ]
+ ],
+ "art": "catacomb_guard",
+ "obj": false,
+ "stColor": null,
+ "ghost": null
+}

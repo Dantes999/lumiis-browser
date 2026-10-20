@@ -112,6 +112,13 @@ export function attachGateway(httpServer: HttpServer, world: World): Gateway {
         case 'hello':
           handleHello(session, parsed.message.name);
           break;
+        case 'input':
+          if (session.player === null) {
+            send(session, { t: 'notice', text: 'Say hello before moving.' });
+            break;
+          }
+          world.setInput(session.player.id, parsed.message.dx, parsed.message.dy);
+          break;
         case 'ping':
           send(session, { t: 'pong', at: parsed.message.at });
           break;

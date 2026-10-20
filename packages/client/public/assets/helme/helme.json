@@ -1,0 +1,348 @@
+{
+ "zelle": [
+  48,
+  48
+ ],
+ "spalten": [
+  "stehen",
+  "schritt_1",
+  "schritt_2",
+  "atmen",
+  "angriff_1",
+  "angriff_2",
+  "angriff_3",
+  "treffer",
+  "tot"
+ ],
+ "ansichten": [
+  "unten",
+  "rechts",
+  "oben"
+ ],
+ "zeilen": [
+  "hinten/unten",
+  "hinten/unten/reiten",
+  "hinten/rechts",
+  "hinten/rechts/reiten",
+  "hinten/oben",
+  "hinten/oben/reiten",
+  "vorne/unten",
+  "vorne/unten/reiten",
+  "vorne/rechts",
+  "vorne/rechts/reiten",
+  "vorne/oben",
+  "vorne/oben/reiten"
+ ],
+ "eintraege": [
+  {
+   "klasse": "warrior",
+   "geschlecht": "m",
+   "stufe": 1,
+   "name": "Traditioneller Helm",
+   "haar": "back",
+   "datei": "krieger_m/1_traditioneller_helm.png"
+  },
+  {
+   "klasse": "warrior",
+   "geschlecht": "m",
+   "stufe": 2,
+   "name": "Eisenhelm",
+   "haar": "back",
+   "datei": "krieger_m/2_eisenhelm.png"
+  },
+  {
+   "klasse": "warrior",
+   "geschlecht": "m",
+   "stufe": 3,
+   "name": "Geistermaskenschaller",
+   "haar": "none",
+   "datei": "krieger_m/3_geistermaskenschaller.png"
+  },
+  {
+   "klasse": "warrior",
+   "geschlecht": "m",
+   "stufe": 4,
+   "name": "Furchtmaske",
+   "haar": "none",
+   "datei": "krieger_m/4_furchtmaske.png"
+  },
+  {
+   "klasse": "warrior",
+   "geschlecht": "m",
+   "stufe": 5,
+   "name": "Kriegsmeisterhelm",
+   "haar": "back",
+   "datei": "krieger_m/5_kriegsmeisterhelm.png"
+  },
+  {
+   "klasse": "warrior",
+   "geschlecht": "w",
+   "stufe": 1,
+   "name": "Traditioneller Helm",
+   "haar": "back",
+   "datei": "krieger_w/1_traditioneller_helm.png"
+  },
+  {
+   "klasse": "warrior",
+   "geschlecht": "w",
+   "stufe": 2,
+   "name": "Eisenhelm",
+   "haar": "back",
+   "datei": "krieger_w/2_eisenhelm.png"
+  },
+  {
+   "klasse": "warrior",
+   "geschlecht": "w",
+   "stufe": 3,
+   "name": "Geistermaskenschaller",
+   "haar": "none",
+   "datei": "krieger_w/3_geistermaskenschaller.png"
+  },
+  {
+   "klasse": "warrior",
+   "geschlecht": "w",
+   "stufe": 4,
+   "name": "Furchtmaske",
+   "haar": "none",
+   "datei": "krieger_w/4_furchtmaske.png"
+  },
+  {
+   "klasse": "warrior",
+   "geschlecht": "w",
+   "stufe": 5,
+   "name": "Kriegsmeisterhelm",
+   "haar": "back",
+   "datei": "krieger_w/5_kriegsmeisterhelm.png"
+  },
+  {
+   "klasse": "ninja",
+   "geschlecht": "m",
+   "stufe": 1,
+   "haar": "none",
+   "datei": "ninja_m/1_undefined.png"
+  },
+  {
+   "klasse": "ninja",
+   "geschlecht": "m",
+   "stufe": 2,
+   "haar": "none",
+   "datei": "ninja_m/2_undefined.png"
+  },
+  {
+   "klasse": "ninja",
+   "geschlecht": "m",
+   "stufe": 3,
+   "haar": "none",
+   "datei": "ninja_m/3_undefined.png"
+  },
+  {
+   "klasse": "ninja",
+   "geschlecht": "m",
+   "stufe": 4,
+   "haar": "none",
+   "datei": "ninja_m/4_undefined.png"
+  },
+  {
+   "klasse": "ninja",
+   "geschlecht": "m",
+   "stufe": 5,
+   "haar": "none",
+   "datei": "ninja_m/5_undefined.png"
+  },
+  {
+   "klasse": "ninja",
+   "geschlecht": "w",
+   "stufe": 1,
+   "haar": "none",
+   "datei": "ninja_w/1_undefined.png"
+  },
+  {
+   "klasse": "ninja",
+   "geschlecht": "w",
+   "stufe": 2,
+   "haar": "none",
+   "datei": "ninja_w/2_undefined.png"
+  },
+  {
+   "klasse": "ninja",
+   "geschlecht": "w",
+   "stufe": 3,
+   "haar": "none",
+   "datei": "ninja_w/3_undefined.png"
+  },
+  {
+   "klasse": "ninja",
+   "geschlecht": "w",
+   "stufe": 4,
+   "haar": "none",
+   "datei": "ninja_w/4_undefined.png"
+  },
+  {
+   "klasse": "ninja",
+   "geschlecht": "w",
+   "stufe": 5,
+   "haar": "none",
+   "datei": "ninja_w/5_undefined.png"
+  },
+  {
+   "klasse": "sura",
+   "geschlecht": "m",
+   "stufe": 1,
+   "name": "Blutiger Helm",
+   "haar": "back",
+   "datei": "sura_m/1_blutiger_helm.png"
+  },
+  {
+   "klasse": "sura",
+   "geschlecht": "m",
+   "stufe": 2,
+   "name": "Verhöhnender Helm",
+   "haar": "back",
+   "datei": "sura_m/2_verhoehnender_helm.png"
+  },
+  {
+   "klasse": "sura",
+   "geschlecht": "m",
+   "stufe": 3,
+   "name": "Burghelm",
+   "haar": "back",
+   "datei": "sura_m/3_burghelm.png"
+  },
+  {
+   "klasse": "sura",
+   "geschlecht": "m",
+   "stufe": 4,
+   "name": "Gehörnter Helm",
+   "haar": "back",
+   "datei": "sura_m/4_gehoernter_helm.png"
+  },
+  {
+   "klasse": "sura",
+   "geschlecht": "m",
+   "stufe": 5,
+   "name": "Magischer Helm",
+   "haar": "back",
+   "datei": "sura_m/5_magischer_helm.png"
+  },
+  {
+   "klasse": "sura",
+   "geschlecht": "w",
+   "stufe": 1,
+   "name": "Blutiger Helm",
+   "haar": "back",
+   "datei": "sura_w/1_blutiger_helm.png"
+  },
+  {
+   "klasse": "sura",
+   "geschlecht": "w",
+   "stufe": 2,
+   "name": "Verhöhnender Helm",
+   "haar": "back",
+   "datei": "sura_w/2_verhoehnender_helm.png"
+  },
+  {
+   "klasse": "sura",
+   "geschlecht": "w",
+   "stufe": 3,
+   "name": "Burghelm",
+   "haar": "back",
+   "datei": "sura_w/3_burghelm.png"
+  },
+  {
+   "klasse": "sura",
+   "geschlecht": "w",
+   "stufe": 4,
+   "name": "Gehörnter Helm",
+   "haar": "back",
+   "datei": "sura_w/4_gehoernter_helm.png"
+  },
+  {
+   "klasse": "sura",
+   "geschlecht": "w",
+   "stufe": 5,
+   "name": "Magischer Helm",
+   "haar": "back",
+   "datei": "sura_w/5_magischer_helm.png"
+  },
+  {
+   "klasse": "shaman",
+   "geschlecht": "m",
+   "stufe": 1,
+   "name": "Mönchshut",
+   "haar": "all",
+   "datei": "schamane_m/1_moenchshut.png"
+  },
+  {
+   "klasse": "shaman",
+   "geschlecht": "m",
+   "stufe": 2,
+   "name": "Phönixhut",
+   "haar": "all",
+   "datei": "schamane_m/2_phoenixhut.png"
+  },
+  {
+   "klasse": "shaman",
+   "geschlecht": "m",
+   "stufe": 3,
+   "name": "Sonnenlichthut",
+   "haar": "all",
+   "datei": "schamane_m/3_sonnenlichthut.png"
+  },
+  {
+   "klasse": "shaman",
+   "geschlecht": "m",
+   "stufe": 4,
+   "name": "Kardinalshut",
+   "haar": "all",
+   "datei": "schamane_m/4_kardinalshut.png"
+  },
+  {
+   "klasse": "shaman",
+   "geschlecht": "m",
+   "stufe": 5,
+   "name": "Seelensplitterhut",
+   "haar": "all",
+   "datei": "schamane_m/5_seelensplitterhut.png"
+  },
+  {
+   "klasse": "shaman",
+   "geschlecht": "w",
+   "stufe": 1,
+   "name": "Mönchshut",
+   "haar": "all",
+   "datei": "schamane_w/1_moenchshut.png"
+  },
+  {
+   "klasse": "shaman",
+   "geschlecht": "w",
+   "stufe": 2,
+   "name": "Phönixhut",
+   "haar": "all",
+   "datei": "schamane_w/2_phoenixhut.png"
+  },
+  {
+   "klasse": "shaman",
+   "geschlecht": "w",
+   "stufe": 3,
+   "name": "Sonnenlichthut",
+   "haar": "all",
+   "datei": "schamane_w/3_sonnenlichthut.png"
+  },
+  {
+   "klasse": "shaman",
+   "geschlecht": "w",
+   "stufe": 4,
+   "name": "Kardinalshut",
+   "haar": "all",
+   "datei": "schamane_w/4_kardinalshut.png"
+  },
+  {
+   "klasse": "shaman",
+   "geschlecht": "w",
+   "stufe": 5,
+   "name": "Seelensplitterhut",
+   "haar": "all",
+   "datei": "schamane_w/5_seelensplitterhut.png"
+  }
+ ]
+}

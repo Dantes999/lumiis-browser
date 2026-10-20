@@ -1,0 +1,72 @@
+{
+ "zelle": [
+  48,
+  48
+ ],
+ "spalten": [
+  "stehen",
+  "schritt_1",
+  "schritt_2",
+  "atmen",
+  "angriff_1",
+  "angriff_2",
+  "angriff_3",
+  "treffer",
+  "tot"
+ ],
+ "ansichten": [
+  "unten",
+  "rechts",
+  "oben"
+ ],
+ "zeilen": [
+  "kopf/unten",
+  "kopf/unten/reiten",
+  "kopf/rechts",
+  "kopf/rechts/reiten",
+  "kopf/oben",
+  "kopf/oben/reiten"
+ ],
+ "eintraege": [
+  {
+   "klasse": "warrior",
+   "geschlecht": "m",
+   "datei": "krieger_m.png"
+  },
+  {
+   "klasse": "warrior",
+   "geschlecht": "w",
+   "datei": "krieger_w.png"
+  },
+  {
+   "klasse": "ninja",
+   "geschlecht": "m",
+   "datei": "ninja_m.png"
+  },
+  {
+   "klasse": "ninja",
+   "geschlecht": "w",
+   "datei": "ninja_w.png"
+  },
+  {
+   "klasse": "sura",
+   "geschlecht": "m",
+   "datei": "sura_m.png"
+  },
+  {
+   "klasse": "sura",
+   "geschlecht": "w",
+   "datei": "sura_w.png"
+  },
+  {
+   "klasse": "shaman",
+   "geschlecht": "m",
+   "datei": "schamane_m.png"
+  },
+  {
+   "klasse": "shaman",
+   "geschlecht": "w",
+   "datei": "schamane_w.png"
+  }
+ ]
+}

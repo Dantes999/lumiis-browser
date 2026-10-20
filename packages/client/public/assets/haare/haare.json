@@ -1,0 +1,152 @@
+{
+ "zelle": [
+  48,
+  48
+ ],
+ "spalten": [
+  "stehen",
+  "schritt_1",
+  "schritt_2",
+  "atmen",
+  "angriff_1",
+  "angriff_2",
+  "angriff_3",
+  "treffer",
+  "tot"
+ ],
+ "ansichten": [
+  "unten",
+  "rechts",
+  "oben"
+ ],
+ "zeilen": [
+  "hinten/unten",
+  "hinten/unten/reiten",
+  "hinten/rechts",
+  "hinten/rechts/reiten",
+  "hinten/oben",
+  "hinten/oben/reiten",
+  "ueber/unten",
+  "ueber/unten/reiten",
+  "ueber/rechts",
+  "ueber/rechts/reiten",
+  "ueber/oben",
+  "ueber/oben/reiten",
+  "oben/unten",
+  "oben/unten/reiten",
+  "oben/rechts",
+  "oben/rechts/reiten",
+  "oben/oben",
+  "oben/oben/reiten",
+  "gesicht/unten",
+  "gesicht/unten/reiten",
+  "gesicht/rechts",
+  "gesicht/rechts/reiten",
+  "gesicht/oben",
+  "gesicht/oben/reiten",
+  "gesicht_helm/unten",
+  "gesicht_helm/unten/reiten",
+  "gesicht_helm/rechts",
+  "gesicht_helm/rechts/reiten",
+  "gesicht_helm/oben",
+  "gesicht_helm/oben/reiten"
+ ],
+ "eintraege": [
+  {
+   "klasse": "warrior",
+   "geschlecht": "m",
+   "gestalt": 1,
+   "datei": "krieger_m_1.png"
+  },
+  {
+   "klasse": "warrior",
+   "geschlecht": "m",
+   "gestalt": 2,
+   "datei": "krieger_m_2.png"
+  },
+  {
+   "klasse": "warrior",
+   "geschlecht": "w",
+   "gestalt": 1,
+   "datei": "krieger_w_1.png"
+  },
+  {
+   "klasse": "warrior",
+   "geschlecht": "w",
+   "gestalt": 2,
+   "datei": "krieger_w_2.png"
+  },
+  {
+   "klasse": "ninja",
+   "geschlecht": "m",
+   "gestalt": 1,
+   "datei": "ninja_m_1.png"
+  },
+  {
+   "klasse": "ninja",
+   "geschlecht": "m",
+   "gestalt": 2,
+   "datei": "ninja_m_2.png"
+  },
+  {
+   "klasse": "ninja",
+   "geschlecht": "w",
+   "gestalt": 1,
+   "datei": "ninja_w_1.png"
+  },
+  {
+   "klasse": "ninja",
+   "geschlecht": "w",
+   "gestalt": 2,
+   "datei": "ninja_w_2.png"
+  },
+  {
+   "klasse": "sura",
+   "geschlecht": "m",
+   "gestalt": 1,
+   "datei": "sura_m_1.png"
+  },
+  {
+   "klasse": "sura",
+   "geschlecht": "m",
+   "gestalt": 2,
+   "datei": "sura_m_2.png"
+  },
+  {
+   "klasse": "sura",
+   "geschlecht": "w",
+   "gestalt": 1,
+   "datei": "sura_w_1.png"
+  },
+  {
+   "klasse": "sura",
+   "geschlecht": "w",
+   "gestalt": 2,
+   "datei": "sura_w_2.png"
+  },
+  {
+   "klasse": "shaman",
+   "geschlecht": "m",
+   "gestalt": 1,
+   "datei": "schamane_m_1.png"
+  },
+  {
+   "klasse": "shaman",
+   "geschlecht": "m",
+   "gestalt": 2,
+   "datei": "schamane_m_2.png"
+  },
+  {
+   "klasse": "shaman",
+   "geschlecht": "w",
+   "gestalt": 1,
+   "datei": "schamane_w_1.png"
+  },
+  {
+   "klasse": "shaman",
+   "geschlecht": "w",
+   "gestalt": 2,
+   "datei": "schamane_w_2.png"
+  }
+ ]
+}

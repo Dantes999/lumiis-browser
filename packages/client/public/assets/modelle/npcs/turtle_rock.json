@@ -1,0 +1,32 @@
+{
+ "frames": [
+  {
+   "@": [
+    0,
+    0,
+    56,
+    36
+   ]
+  },
+  {
+   "@": [
+    56,
+    0,
+    56,
+    36
+   ]
+  }
+ ],
+ "stFrames": null,
+ "ox": 28,
+ "oy": 34,
+ "w": 56,
+ "h": 36,
+ "height": 33,
+ "merchant": true,
+ "flames": null,
+ "art": "turtle_rock",
+ "obj": true,
+ "stColor": null,
+ "ghost": null
+}

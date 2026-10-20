@@ -1,0 +1,702 @@
+{
+ "zelle": [
+  48,
+  48
+ ],
+ "spalten": [
+  "stehen",
+  "schritt_1",
+  "schritt_2",
+  "atmen",
+  "angriff_1",
+  "angriff_2",
+  "angriff_3",
+  "treffer",
+  "tot"
+ ],
+ "ansichten": [
+  "unten",
+  "rechts",
+  "oben"
+ ],
+ "zeilen": [
+  "hinten/unten",
+  "vorne/unten",
+  "hinten/rechts",
+  "vorne/rechts",
+  "hinten/oben",
+  "vorne/oben"
+ ],
+ "arten": {
+  "fist": "faust",
+  "sword": "schwert",
+  "twohand": "zweihand",
+  "dagger": "dolch",
+  "bow": "bogen",
+  "fan": "faecher",
+  "bell": "glocke",
+  "moon": "sura_schwert"
+ },
+ "eintraege": [
+  {
+   "art": "sword",
+   "stufe": 0,
+   "datei": "schwert/00.png"
+  },
+  {
+   "art": "sword",
+   "stufe": 1,
+   "datei": "schwert/01.png"
+  },
+  {
+   "art": "sword",
+   "stufe": 2,
+   "datei": "schwert/02.png"
+  },
+  {
+   "art": "sword",
+   "stufe": 3,
+   "datei": "schwert/03.png"
+  },
+  {
+   "art": "sword",
+   "stufe": 4,
+   "datei": "schwert/04.png"
+  },
+  {
+   "art": "sword",
+   "stufe": 5,
+   "datei": "schwert/05.png"
+  },
+  {
+   "art": "sword",
+   "stufe": 6,
+   "datei": "schwert/06.png"
+  },
+  {
+   "art": "sword",
+   "stufe": 7,
+   "datei": "schwert/07.png"
+  },
+  {
+   "art": "sword",
+   "stufe": 8,
+   "datei": "schwert/08.png"
+  },
+  {
+   "art": "sword",
+   "stufe": 9,
+   "datei": "schwert/09.png"
+  },
+  {
+   "art": "sword",
+   "stufe": 10,
+   "datei": "schwert/10.png"
+  },
+  {
+   "art": "sword",
+   "stufe": 11,
+   "datei": "schwert/11.png"
+  },
+  {
+   "art": "sword",
+   "stufe": 12,
+   "datei": "schwert/12.png"
+  },
+  {
+   "art": "sword",
+   "stufe": 13,
+   "datei": "schwert/13.png"
+  },
+  {
+   "art": "sword",
+   "stufe": 14,
+   "datei": "schwert/14.png"
+  },
+  {
+   "art": "sword",
+   "stufe": 15,
+   "datei": "schwert/15.png"
+  },
+  {
+   "art": "sword",
+   "stufe": 16,
+   "datei": "schwert/16.png"
+  },
+  {
+   "art": "sword",
+   "stufe": 17,
+   "datei": "schwert/17.png"
+  },
+  {
+   "art": "sword",
+   "stufe": 18,
+   "datei": "schwert/18.png"
+  },
+  {
+   "art": "moon",
+   "stufe": 0,
+   "datei": "sura_schwert/00.png"
+  },
+  {
+   "art": "moon",
+   "stufe": 1,
+   "datei": "sura_schwert/01.png"
+  },
+  {
+   "art": "moon",
+   "stufe": 2,
+   "datei": "sura_schwert/02.png"
+  },
+  {
+   "art": "moon",
+   "stufe": 3,
+   "datei": "sura_schwert/03.png"
+  },
+  {
+   "art": "moon",
+   "stufe": 4,
+   "datei": "sura_schwert/04.png"
+  },
+  {
+   "art": "moon",
+   "stufe": 5,
+   "datei": "sura_schwert/05.png"
+  },
+  {
+   "art": "moon",
+   "stufe": 6,
+   "datei": "sura_schwert/06.png"
+  },
+  {
+   "art": "moon",
+   "stufe": 7,
+   "datei": "sura_schwert/07.png"
+  },
+  {
+   "art": "moon",
+   "stufe": 8,
+   "datei": "sura_schwert/08.png"
+  },
+  {
+   "art": "moon",
+   "stufe": 9,
+   "datei": "sura_schwert/09.png"
+  },
+  {
+   "art": "moon",
+   "stufe": 10,
+   "datei": "sura_schwert/10.png"
+  },
+  {
+   "art": "moon",
+   "stufe": 11,
+   "datei": "sura_schwert/11.png"
+  },
+  {
+   "art": "moon",
+   "stufe": 12,
+   "datei": "sura_schwert/12.png"
+  },
+  {
+   "art": "moon",
+   "stufe": 13,
+   "datei": "sura_schwert/13.png"
+  },
+  {
+   "art": "moon",
+   "stufe": 14,
+   "datei": "sura_schwert/14.png"
+  },
+  {
+   "art": "moon",
+   "stufe": 15,
+   "datei": "sura_schwert/15.png"
+  },
+  {
+   "art": "moon",
+   "stufe": 16,
+   "datei": "sura_schwert/16.png"
+  },
+  {
+   "art": "moon",
+   "stufe": 17,
+   "datei": "sura_schwert/17.png"
+  },
+  {
+   "art": "moon",
+   "stufe": 18,
+   "datei": "sura_schwert/18.png"
+  },
+  {
+   "art": "moon",
+   "stufe": 24,
+   "datei": "sura_schwert/24.png"
+  },
+  {
+   "art": "moon",
+   "stufe": 25,
+   "datei": "sura_schwert/25.png"
+  },
+  {
+   "art": "moon",
+   "stufe": 26,
+   "datei": "sura_schwert/26.png"
+  },
+  {
+   "art": "moon",
+   "stufe": 27,
+   "datei": "sura_schwert/27.png"
+  },
+  {
+   "art": "moon",
+   "stufe": 28,
+   "datei": "sura_schwert/28.png"
+  },
+  {
+   "art": "moon",
+   "stufe": 29,
+   "datei": "sura_schwert/29.png"
+  },
+  {
+   "art": "twohand",
+   "stufe": 0,
+   "datei": "zweihand/00.png"
+  },
+  {
+   "art": "twohand",
+   "stufe": 1,
+   "datei": "zweihand/01.png"
+  },
+  {
+   "art": "twohand",
+   "stufe": 2,
+   "datei": "zweihand/02.png"
+  },
+  {
+   "art": "twohand",
+   "stufe": 3,
+   "datei": "zweihand/03.png"
+  },
+  {
+   "art": "twohand",
+   "stufe": 4,
+   "datei": "zweihand/04.png"
+  },
+  {
+   "art": "twohand",
+   "stufe": 5,
+   "datei": "zweihand/05.png"
+  },
+  {
+   "art": "twohand",
+   "stufe": 6,
+   "datei": "zweihand/06.png"
+  },
+  {
+   "art": "twohand",
+   "stufe": 7,
+   "datei": "zweihand/07.png"
+  },
+  {
+   "art": "twohand",
+   "stufe": 8,
+   "datei": "zweihand/08.png"
+  },
+  {
+   "art": "twohand",
+   "stufe": 9,
+   "datei": "zweihand/09.png"
+  },
+  {
+   "art": "twohand",
+   "stufe": 10,
+   "datei": "zweihand/10.png"
+  },
+  {
+   "art": "twohand",
+   "stufe": 11,
+   "datei": "zweihand/11.png"
+  },
+  {
+   "art": "twohand",
+   "stufe": 12,
+   "datei": "zweihand/12.png"
+  },
+  {
+   "art": "twohand",
+   "stufe": 13,
+   "datei": "zweihand/13.png"
+  },
+  {
+   "art": "twohand",
+   "stufe": 14,
+   "datei": "zweihand/14.png"
+  },
+  {
+   "art": "twohand",
+   "stufe": 15,
+   "datei": "zweihand/15.png"
+  },
+  {
+   "art": "twohand",
+   "stufe": 16,
+   "datei": "zweihand/16.png"
+  },
+  {
+   "art": "twohand",
+   "stufe": 17,
+   "datei": "zweihand/17.png"
+  },
+  {
+   "art": "dagger",
+   "stufe": 0,
+   "datei": "dolch/00.png"
+  },
+  {
+   "art": "dagger",
+   "stufe": 1,
+   "datei": "dolch/01.png"
+  },
+  {
+   "art": "dagger",
+   "stufe": 2,
+   "datei": "dolch/02.png"
+  },
+  {
+   "art": "dagger",
+   "stufe": 3,
+   "datei": "dolch/03.png"
+  },
+  {
+   "art": "dagger",
+   "stufe": 4,
+   "datei": "dolch/04.png"
+  },
+  {
+   "art": "dagger",
+   "stufe": 5,
+   "datei": "dolch/05.png"
+  },
+  {
+   "art": "dagger",
+   "stufe": 6,
+   "datei": "dolch/06.png"
+  },
+  {
+   "art": "dagger",
+   "stufe": 7,
+   "datei": "dolch/07.png"
+  },
+  {
+   "art": "dagger",
+   "stufe": 8,
+   "datei": "dolch/08.png"
+  },
+  {
+   "art": "dagger",
+   "stufe": 9,
+   "datei": "dolch/09.png"
+  },
+  {
+   "art": "dagger",
+   "stufe": 10,
+   "datei": "dolch/10.png"
+  },
+  {
+   "art": "dagger",
+   "stufe": 11,
+   "datei": "dolch/11.png"
+  },
+  {
+   "art": "dagger",
+   "stufe": 12,
+   "datei": "dolch/12.png"
+  },
+  {
+   "art": "dagger",
+   "stufe": 13,
+   "datei": "dolch/13.png"
+  },
+  {
+   "art": "dagger",
+   "stufe": 14,
+   "datei": "dolch/14.png"
+  },
+  {
+   "art": "dagger",
+   "stufe": 15,
+   "datei": "dolch/15.png"
+  },
+  {
+   "art": "dagger",
+   "stufe": 16,
+   "datei": "dolch/16.png"
+  },
+  {
+   "art": "dagger",
+   "stufe": 17,
+   "datei": "dolch/17.png"
+  },
+  {
+   "art": "dagger",
+   "stufe": 18,
+   "datei": "dolch/18.png"
+  },
+  {
+   "art": "bow",
+   "stufe": 0,
+   "datei": "bogen/00.png"
+  },
+  {
+   "art": "bow",
+   "stufe": 1,
+   "datei": "bogen/01.png"
+  },
+  {
+   "art": "bow",
+   "stufe": 2,
+   "datei": "bogen/02.png"
+  },
+  {
+   "art": "bow",
+   "stufe": 3,
+   "datei": "bogen/03.png"
+  },
+  {
+   "art": "bow",
+   "stufe": 4,
+   "datei": "bogen/04.png"
+  },
+  {
+   "art": "bow",
+   "stufe": 5,
+   "datei": "bogen/05.png"
+  },
+  {
+   "art": "bow",
+   "stufe": 6,
+   "datei": "bogen/06.png"
+  },
+  {
+   "art": "bow",
+   "stufe": 7,
+   "datei": "bogen/07.png"
+  },
+  {
+   "art": "bow",
+   "stufe": 8,
+   "datei": "bogen/08.png"
+  },
+  {
+   "art": "bow",
+   "stufe": 9,
+   "datei": "bogen/09.png"
+  },
+  {
+   "art": "bow",
+   "stufe": 10,
+   "datei": "bogen/10.png"
+  },
+  {
+   "art": "bow",
+   "stufe": 11,
+   "datei": "bogen/11.png"
+  },
+  {
+   "art": "bow",
+   "stufe": 12,
+   "datei": "bogen/12.png"
+  },
+  {
+   "art": "bow",
+   "stufe": 13,
+   "datei": "bogen/13.png"
+  },
+  {
+   "art": "bow",
+   "stufe": 14,
+   "datei": "bogen/14.png"
+  },
+  {
+   "art": "bow",
+   "stufe": 15,
+   "datei": "bogen/15.png"
+  },
+  {
+   "art": "bow",
+   "stufe": 16,
+   "datei": "bogen/16.png"
+  },
+  {
+   "art": "bow",
+   "stufe": 17,
+   "datei": "bogen/17.png"
+  },
+  {
+   "art": "bow",
+   "stufe": 18,
+   "datei": "bogen/18.png"
+  },
+  {
+   "art": "fan",
+   "stufe": 0,
+   "datei": "faecher/00.png"
+  },
+  {
+   "art": "fan",
+   "stufe": 1,
+   "datei": "faecher/01.png"
+  },
+  {
+   "art": "fan",
+   "stufe": 2,
+   "datei": "faecher/02.png"
+  },
+  {
+   "art": "fan",
+   "stufe": 3,
+   "datei": "faecher/03.png"
+  },
+  {
+   "art": "fan",
+   "stufe": 4,
+   "datei": "faecher/04.png"
+  },
+  {
+   "art": "fan",
+   "stufe": 5,
+   "datei": "faecher/05.png"
+  },
+  {
+   "art": "fan",
+   "stufe": 6,
+   "datei": "faecher/06.png"
+  },
+  {
+   "art": "fan",
+   "stufe": 7,
+   "datei": "faecher/07.png"
+  },
+  {
+   "art": "fan",
+   "stufe": 8,
+   "datei": "faecher/08.png"
+  },
+  {
+   "art": "fan",
+   "stufe": 9,
+   "datei": "faecher/09.png"
+  },
+  {
+   "art": "fan",
+   "stufe": 10,
+   "datei": "faecher/10.png"
+  },
+  {
+   "art": "fan",
+   "stufe": 11,
+   "datei": "faecher/11.png"
+  },
+  {
+   "art": "fan",
+   "stufe": 12,
+   "datei": "faecher/12.png"
+  },
+  {
+   "art": "fan",
+   "stufe": 13,
+   "datei": "faecher/13.png"
+  },
+  {
+   "art": "fan",
+   "stufe": 14,
+   "datei": "faecher/14.png"
+  },
+  {
+   "art": "fan",
+   "stufe": 15,
+   "datei": "faecher/15.png"
+  },
+  {
+   "art": "fan",
+   "stufe": 16,
+   "datei": "faecher/16.png"
+  },
+  {
+   "art": "fan",
+   "stufe": 17,
+   "datei": "faecher/17.png"
+  },
+  {
+   "art": "bell",
+   "stufe": 0,
+   "datei": "glocke/00.png"
+  },
+  {
+   "art": "bell",
+   "stufe": 1,
+   "datei": "glocke/01.png"
+  },
+  {
+   "art": "bell",
+   "stufe": 2,
+   "datei": "glocke/02.png"
+  },
+  {
+   "art": "bell",
+   "stufe": 3,
+   "datei": "glocke/03.png"
+  },
+  {
+   "art": "bell",
+   "stufe": 4,
+   "datei": "glocke/04.png"
+  },
+  {
+   "art": "bell",
+   "stufe": 5,
+   "datei": "glocke/05.png"
+  },
+  {
+   "art": "bell",
+   "stufe": 6,
+   "datei": "glocke/06.png"
+  },
+  {
+   "art": "bell",
+   "stufe": 7,
+   "datei": "glocke/07.png"
+  },
+  {
+   "art": "bell",
+   "stufe": 8,
+   "datei": "glocke/08.png"
+  },
+  {
+   "art": "bell",
+   "stufe": 9,
+   "datei": "glocke/09.png"
+  },
+  {
+   "art": "bell",
+   "stufe": 10,
+   "datei": "glocke/10.png"
+  },
+  {
+   "art": "bell",
+   "stufe": 11,
+   "datei": "glocke/11.png"
+  },
+  {
+   "art": "bell",
+   "stufe": 12,
+   "datei": "glocke/12.png"
+  },
+  {
+   "art": "bell",
+   "stufe": 13,
+   "datei": "glocke/13.png"
+  }
+ ]
+}

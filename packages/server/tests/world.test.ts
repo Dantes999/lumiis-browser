@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { WORLD_PIXELS } from '@lumiis/shared';
 import { World } from '../src/game/world.js';
+
+const spawn = WORLD_PIXELS / 2;
 
 describe('world', () => {
   it('starts empty at tick zero', () => {
@@ -7,6 +10,13 @@ describe('world', () => {
     expect(world.tick).toBe(0);
     expect(world.playerCount).toBe(0);
     expect(world.snapshot()).toEqual([]);
+  });
+
+  it('spawns every player in the middle of the world', () => {
+    const world = new World();
+    const player = world.addPlayer('Kain');
+    expect(player.x).toBe(spawn);
+    expect(player.y).toBe(spawn);
   });
 
   it('gives every player a unique id', () => {
@@ -32,9 +42,42 @@ describe('world', () => {
     expect(world.tick).toBe(2);
   });
 
+  it('moves a player in the pressed direction', () => {
+    const world = new World();
+    const player = world.addPlayer('Kain');
+    world.setInput(player.id, 1, 0);
+    world.step();
+
+    expect(player.x).toBeGreaterThan(spawn);
+    expect(player.y).toBe(spawn);
+    expect(player.moving).toBe(true);
+  });
+
+  it('stops a player when the input is zero', () => {
+    const world = new World();
+    const player = world.addPlayer('Kain');
+    world.setInput(player.id, 1, 0);
+    world.step();
+    const afterWalk = player.x;
+
+    world.setInput(player.id, 0, 0);
+    world.step();
+
+    expect(player.x).toBe(afterWalk);
+    expect(player.moving).toBe(false);
+  });
+
+  it('ignores input for players that do not exist', () => {
+    const world = new World();
+    expect(() => world.setInput(999, 1, 0)).not.toThrow();
+    expect(world.playerCount).toBe(0);
+  });
+
   it('snapshots only the values a client needs', () => {
     const world = new World();
-    world.addPlayer('Kain', 3, 4);
-    expect(world.snapshot()).toEqual([{ id: 1, name: 'Kain', x: 3, y: 4 }]);
+    world.addPlayer('Kain');
+    expect(world.snapshot()).toEqual([
+      { id: 1, name: 'Kain', x: spawn, y: spawn, dir: 0, moving: false },
+    ]);
   });
 });

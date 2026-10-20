@@ -1,0 +1,536 @@
+{
+ "zelle": [
+  48,
+  48
+ ],
+ "spalten": [
+  "stehen",
+  "schritt_1",
+  "schritt_2",
+  "atmen",
+  "angriff_1",
+  "angriff_2",
+  "angriff_3",
+  "treffer",
+  "tot"
+ ],
+ "ansichten": [
+  "unten",
+  "rechts",
+  "oben"
+ ],
+ "zeilen": {
+  "haar": [
+   "hinten/unten",
+   "hinten/unten/reiten",
+   "hinten/rechts",
+   "hinten/rechts/reiten",
+   "hinten/oben",
+   "hinten/oben/reiten",
+   "ueber/unten",
+   "ueber/unten/reiten",
+   "ueber/rechts",
+   "ueber/rechts/reiten",
+   "ueber/oben",
+   "ueber/oben/reiten",
+   "oben/unten",
+   "oben/unten/reiten",
+   "oben/rechts",
+   "oben/rechts/reiten",
+   "oben/oben",
+   "oben/oben/reiten",
+   "gesicht/unten",
+   "gesicht/unten/reiten",
+   "gesicht/rechts",
+   "gesicht/rechts/reiten",
+   "gesicht/oben",
+   "gesicht/oben/reiten",
+   "gesicht_helm/unten",
+   "gesicht_helm/unten/reiten",
+   "gesicht_helm/rechts",
+   "gesicht_helm/rechts/reiten",
+   "gesicht_helm/oben",
+   "gesicht_helm/oben/reiten"
+  ],
+  "helm": [
+   "hinten/unten",
+   "hinten/unten/reiten",
+   "hinten/rechts",
+   "hinten/rechts/reiten",
+   "hinten/oben",
+   "hinten/oben/reiten",
+   "vorne/unten",
+   "vorne/unten/reiten",
+   "vorne/rechts",
+   "vorne/rechts/reiten",
+   "vorne/oben",
+   "vorne/oben/reiten"
+  ]
+ },
+ "eintraege": [
+  {
+   "frisur": "avalon_helm_red",
+   "nummer": 1,
+   "name": "Avalonierhelm (rot)",
+   "art": "helm",
+   "haar": "none",
+   "klasse": "warrior",
+   "geschlecht": "m",
+   "datei": "avalon_helm_red/krieger_m.png"
+  },
+  {
+   "frisur": "avalon_helm_silver",
+   "nummer": 2,
+   "name": "Avalonierhelm (silber)",
+   "art": "helm",
+   "haar": "none",
+   "klasse": "warrior",
+   "geschlecht": "m",
+   "datei": "avalon_helm_silver/krieger_m.png"
+  },
+  {
+   "frisur": "samurai_knot",
+   "nummer": 3,
+   "name": "Samurai-Knoten",
+   "art": "haar",
+   "klasse": "warrior",
+   "geschlecht": "m",
+   "datei": "samurai_knot/krieger_m.png"
+  },
+  {
+   "frisur": "pharao_crown_teal",
+   "nummer": 4,
+   "name": "Federkrone (türkis)",
+   "art": "helm",
+   "haar": "all",
+   "klasse": "warrior",
+   "geschlecht": "m",
+   "datei": "pharao_crown_teal/krieger_m.png"
+  },
+  {
+   "frisur": "pharao_crown_red",
+   "nummer": 5,
+   "name": "Federkrone (rot)",
+   "art": "helm",
+   "haar": "all",
+   "klasse": "warrior",
+   "geschlecht": "m",
+   "datei": "pharao_crown_red/krieger_m.png"
+  },
+  {
+   "frisur": "dragon_bun",
+   "nummer": 6,
+   "name": "Drachenknoten",
+   "art": "haar",
+   "klasse": "warrior",
+   "geschlecht": "m",
+   "datei": "dragon_bun/krieger_m.png"
+  },
+  {
+   "frisur": "avalon_helm_red",
+   "nummer": 1,
+   "name": "Avalonierhelm (rot)",
+   "art": "helm",
+   "haar": "none",
+   "klasse": "warrior",
+   "geschlecht": "w",
+   "datei": "avalon_helm_red/krieger_w.png"
+  },
+  {
+   "frisur": "avalon_helm_silver",
+   "nummer": 2,
+   "name": "Avalonierhelm (silber)",
+   "art": "helm",
+   "haar": "none",
+   "klasse": "warrior",
+   "geschlecht": "w",
+   "datei": "avalon_helm_silver/krieger_w.png"
+  },
+  {
+   "frisur": "samurai_knot",
+   "nummer": 3,
+   "name": "Samurai-Knoten",
+   "art": "haar",
+   "klasse": "warrior",
+   "geschlecht": "w",
+   "datei": "samurai_knot/krieger_w.png"
+  },
+  {
+   "frisur": "pharao_crown_teal",
+   "nummer": 4,
+   "name": "Federkrone (türkis)",
+   "art": "helm",
+   "haar": "all",
+   "klasse": "warrior",
+   "geschlecht": "w",
+   "datei": "pharao_crown_teal/krieger_w.png"
+  },
+  {
+   "frisur": "pharao_crown_red",
+   "nummer": 5,
+   "name": "Federkrone (rot)",
+   "art": "helm",
+   "haar": "all",
+   "klasse": "warrior",
+   "geschlecht": "w",
+   "datei": "pharao_crown_red/krieger_w.png"
+  },
+  {
+   "frisur": "dragon_bun",
+   "nummer": 6,
+   "name": "Drachenknoten",
+   "art": "haar",
+   "klasse": "warrior",
+   "geschlecht": "w",
+   "datei": "dragon_bun/krieger_w.png"
+  },
+  {
+   "frisur": "avalon_helm_red",
+   "nummer": 1,
+   "name": "Avalonierhelm (rot)",
+   "art": "helm",
+   "haar": "none",
+   "klasse": "ninja",
+   "geschlecht": "m",
+   "datei": "avalon_helm_red/ninja_m.png"
+  },
+  {
+   "frisur": "avalon_helm_silver",
+   "nummer": 2,
+   "name": "Avalonierhelm (silber)",
+   "art": "helm",
+   "haar": "none",
+   "klasse": "ninja",
+   "geschlecht": "m",
+   "datei": "avalon_helm_silver/ninja_m.png"
+  },
+  {
+   "frisur": "samurai_knot",
+   "nummer": 3,
+   "name": "Samurai-Knoten",
+   "art": "haar",
+   "klasse": "ninja",
+   "geschlecht": "m",
+   "datei": "samurai_knot/ninja_m.png"
+  },
+  {
+   "frisur": "pharao_crown_teal",
+   "nummer": 4,
+   "name": "Federkrone (türkis)",
+   "art": "helm",
+   "haar": "all",
+   "klasse": "ninja",
+   "geschlecht": "m",
+   "datei": "pharao_crown_teal/ninja_m.png"
+  },
+  {
+   "frisur": "pharao_crown_red",
+   "nummer": 5,
+   "name": "Federkrone (rot)",
+   "art": "helm",
+   "haar": "all",
+   "klasse": "ninja",
+   "geschlecht": "m",
+   "datei": "pharao_crown_red/ninja_m.png"
+  },
+  {
+   "frisur": "dragon_bun",
+   "nummer": 6,
+   "name": "Drachenknoten",
+   "art": "haar",
+   "klasse": "ninja",
+   "geschlecht": "m",
+   "datei": "dragon_bun/ninja_m.png"
+  },
+  {
+   "frisur": "avalon_helm_red",
+   "nummer": 1,
+   "name": "Avalonierhelm (rot)",
+   "art": "helm",
+   "haar": "none",
+   "klasse": "ninja",
+   "geschlecht": "w",
+   "datei": "avalon_helm_red/ninja_w.png"
+  },
+  {
+   "frisur": "avalon_helm_silver",
+   "nummer": 2,
+   "name": "Avalonierhelm (silber)",
+   "art": "helm",
+   "haar": "none",
+   "klasse": "ninja",
+   "geschlecht": "w",
+   "datei": "avalon_helm_silver/ninja_w.png"
+  },
+  {
+   "frisur": "samurai_knot",
+   "nummer": 3,
+   "name": "Samurai-Knoten",
+   "art": "haar",
+   "klasse": "ninja",
+   "geschlecht": "w",
+   "datei": "samurai_knot/ninja_w.png"
+  },
+  {
+   "frisur": "pharao_crown_teal",
+   "nummer": 4,
+   "name": "Federkrone (türkis)",
+   "art": "helm",
+   "haar": "all",
+   "klasse": "ninja",
+   "geschlecht": "w",
+   "datei": "pharao_crown_teal/ninja_w.png"
+  },
+  {
+   "frisur": "pharao_crown_red",
+   "nummer": 5,
+   "name": "Federkrone (rot)",
+   "art": "helm",
+   "haar": "all",
+   "klasse": "ninja",
+   "geschlecht": "w",
+   "datei": "pharao_crown_red/ninja_w.png"
+  },
+  {
+   "frisur": "dragon_bun",
+   "nummer": 6,
+   "name": "Drachenknoten",
+   "art": "haar",
+   "klasse": "ninja",
+   "geschlecht": "w",
+   "datei": "dragon_bun/ninja_w.png"
+  },
+  {
+   "frisur": "avalon_helm_red",
+   "nummer": 1,
+   "name": "Avalonierhelm (rot)",
+   "art": "helm",
+   "haar": "none",
+   "klasse": "sura",
+   "geschlecht": "m",
+   "datei": "avalon_helm_red/sura_m.png"
+  },
+  {
+   "frisur": "avalon_helm_silver",
+   "nummer": 2,
+   "name": "Avalonierhelm (silber)",
+   "art": "helm",
+   "haar": "none",
+   "klasse": "sura",
+   "geschlecht": "m",
+   "datei": "avalon_helm_silver/sura_m.png"
+  },
+  {
+   "frisur": "samurai_knot",
+   "nummer": 3,
+   "name": "Samurai-Knoten",
+   "art": "haar",
+   "klasse": "sura",
+   "geschlecht": "m",
+   "datei": "samurai_knot/sura_m.png"
+  },
+  {
+   "frisur": "pharao_crown_teal",
+   "nummer": 4,
+   "name": "Federkrone (türkis)",
+   "art": "helm",
+   "haar": "all",
+   "klasse": "sura",
+   "geschlecht": "m",
+   "datei": "pharao_crown_teal/sura_m.png"
+  },
+  {
+   "frisur": "pharao_crown_red",
+   "nummer": 5,
+   "name": "Federkrone (rot)",
+   "art": "helm",
+   "haar": "all",
+   "klasse": "sura",
+   "geschlecht": "m",
+   "datei": "pharao_crown_red/sura_m.png"
+  },
+  {
+   "frisur": "dragon_bun",
+   "nummer": 6,
+   "name": "Drachenknoten",
+   "art": "haar",
+   "klasse": "sura",
+   "geschlecht": "m",
+   "datei": "dragon_bun/sura_m.png"
+  },
+  {
+   "frisur": "avalon_helm_red",
+   "nummer": 1,
+   "name": "Avalonierhelm (rot)",
+   "art": "helm",
+   "haar": "none",
+   "klasse": "sura",
+   "geschlecht": "w",
+   "datei": "avalon_helm_red/sura_w.png"
+  },
+  {
+   "frisur": "avalon_helm_silver",
+   "nummer": 2,
+   "name": "Avalonierhelm (silber)",
+   "art": "helm",
+   "haar": "none",
+   "klasse": "sura",
+   "geschlecht": "w",
+   "datei": "avalon_helm_silver/sura_w.png"
+  },
+  {
+   "frisur": "samurai_knot",
+   "nummer": 3,
+   "name": "Samurai-Knoten",
+   "art": "haar",
+   "klasse": "sura",
+   "geschlecht": "w",
+   "datei": "samurai_knot/sura_w.png"
+  },
+  {
+   "frisur": "pharao_crown_teal",
+   "nummer": 4,
+   "name": "Federkrone (türkis)",
+   "art": "helm",
+   "haar": "all",
+   "klasse": "sura",
+   "geschlecht": "w",
+   "datei": "pharao_crown_teal/sura_w.png"
+  },
+  {
+   "frisur": "pharao_crown_red",
+   "nummer": 5,
+   "name": "Federkrone (rot)",
+   "art": "helm",
+   "haar": "all",
+   "klasse": "sura",
+   "geschlecht": "w",
+   "datei": "pharao_crown_red/sura_w.png"
+  },
+  {
+   "frisur": "dragon_bun",
+   "nummer": 6,
+   "name": "Drachenknoten",
+   "art": "haar",
+   "klasse": "sura",
+   "geschlecht": "w",
+   "datei": "dragon_bun/sura_w.png"
+  },
+  {
+   "frisur": "avalon_helm_red",
+   "nummer": 1,
+   "name": "Avalonierhelm (rot)",
+   "art": "helm",
+   "haar": "none",
+   "klasse": "shaman",
+   "geschlecht": "m",
+   "datei": "avalon_helm_red/schamane_m.png"
+  },
+  {
+   "frisur": "avalon_helm_silver",
+   "nummer": 2,
+   "name": "Avalonierhelm (silber)",
+   "art": "helm",
+   "haar": "none",
+   "klasse": "shaman",
+   "geschlecht": "m",
+   "datei": "avalon_helm_silver/schamane_m.png"
+  },
+  {
+   "frisur": "samurai_knot",
+   "nummer": 3,
+   "name": "Samurai-Knoten",
+   "art": "haar",
+   "klasse": "shaman",
+   "geschlecht": "m",
+   "datei": "samurai_knot/schamane_m.png"
+  },
+  {
+   "frisur": "pharao_crown_teal",
+   "nummer": 4,
+   "name": "Federkrone (türkis)",
+   "art": "helm",
+   "haar": "all",
+   "klasse": "shaman",
+   "geschlecht": "m",
+   "datei": "pharao_crown_teal/schamane_m.png"
+  },
+  {
+   "frisur": "pharao_crown_red",
+   "nummer": 5,
+   "name": "Federkrone (rot)",
+   "art": "helm",
+   "haar": "all",
+   "klasse": "shaman",
+   "geschlecht": "m",
+   "datei": "pharao_crown_red/schamane_m.png"
+  },
+  {
+   "frisur": "dragon_bun",
+   "nummer": 6,
+   "name": "Drachenknoten",
+   "art": "haar",
+   "klasse": "shaman",
+   "geschlecht": "m",
+   "datei": "dragon_bun/schamane_m.png"
+  },
+  {
+   "frisur": "avalon_helm_red",
+   "nummer": 1,
+   "name": "Avalonierhelm (rot)",
+   "art": "helm",
+   "haar": "none",
+   "klasse": "shaman",
+   "geschlecht": "w",
+   "datei": "avalon_helm_red/schamane_w.png"
+  },
+  {
+   "frisur": "avalon_helm_silver",
+   "nummer": 2,
+   "name": "Avalonierhelm (silber)",
+   "art": "helm",
+   "haar": "none",
+   "klasse": "shaman",
+   "geschlecht": "w",
+   "datei": "avalon_helm_silver/schamane_w.png"
+  },
+  {
+   "frisur": "samurai_knot",
+   "nummer": 3,
+   "name": "Samurai-Knoten",
+   "art": "haar",
+   "klasse": "shaman",
+   "geschlecht": "w",
+   "datei": "samurai_knot/schamane_w.png"
+  },
+  {
+   "frisur": "pharao_crown_teal",
+   "nummer": 4,
+   "name": "Federkrone (türkis)",
+   "art": "helm",
+   "haar": "all",
+   "klasse": "shaman",
+   "geschlecht": "w",
+   "datei": "pharao_crown_teal/schamane_w.png"
+  },
+  {
+   "frisur": "pharao_crown_red",
+   "nummer": 5,
+   "name": "Federkrone (rot)",
+   "art": "helm",
+   "haar": "all",
+   "klasse": "shaman",
+   "geschlecht": "w",
+   "datei": "pharao_crown_red/schamane_w.png"
+  },
+  {
+   "frisur": "dragon_bun",
+   "nummer": 6,
+   "name": "Drachenknoten",
+   "art": "haar",
+   "klasse": "shaman",
+   "geschlecht": "w",
+   "datei": "dragon_bun/schamane_w.png"
+  }
+ ]
+}

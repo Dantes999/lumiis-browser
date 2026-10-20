@@ -1,0 +1,41 @@
+{
+ "frames": [
+  {
+   "@": [
+    0,
+    0,
+    56,
+    44
+   ]
+  },
+  {
+   "@": [
+    56,
+    0,
+    56,
+    44
+   ]
+  }
+ ],
+ "stFrames": null,
+ "ox": 28,
+ "oy": 42,
+ "w": 56,
+ "h": 44,
+ "height": 44,
+ "merchant": true,
+ "flames": [
+  [
+   -14,
+   -21
+  ],
+  [
+   14,
+   -21
+  ]
+ ],
+ "art": "dark_shrine",
+ "obj": true,
+ "stColor": null,
+ "ghost": null
+}

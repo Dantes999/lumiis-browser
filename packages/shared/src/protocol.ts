@@ -11,11 +11,14 @@ export type PlayerSnapshot = {
   name: string;
   x: number;
   y: number;
+  dir: number;
+  moving: boolean;
 };
 
 /** Messages the client may send. */
 export type ClientMessage =
   | { t: 'hello'; v: number; name: string }
+  | { t: 'input'; dx: number; dy: number }
   | { t: 'ping'; at: number };
 
 /** Messages the server may send. */
@@ -33,6 +36,10 @@ const fail = (reason: string): ParsedMessage => ({ ok: false, reason });
 
 const isFiniteNumber = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value);
+
+/** Input components are whole numbers in -1..1. Anything else is not movement. */
+const isUnitStep = (value: unknown): value is number =>
+  value === -1 || value === 0 || value === 1;
 
 /**
  * Validates one decoded client message.
@@ -54,6 +61,16 @@ export function parseClientMessage(input: unknown): ParsedMessage {
         return fail('invalid name');
       }
       return { ok: true, message: { t: 'hello', v: PROTOCOL_VERSION, name: message.name } };
+    }
+
+    case 'input': {
+      const dx = message.dx;
+      const dy = message.dy;
+      if (!isUnitStep(dx) || !isUnitStep(dy)) {
+        return fail('input needs dx and dy in -1..1');
+      }
+      // (0, 0) is a valid input: it means "stop here".
+      return { ok: true, message: { t: 'input', dx, dy } };
     }
 
     case 'ping': {

@@ -1,0 +1,32 @@
+{
+ "frames": [
+  {
+   "@": [
+    0,
+    0,
+    40,
+    32
+   ]
+  },
+  {
+   "@": [
+    40,
+    0,
+    40,
+    32
+   ]
+  }
+ ],
+ "stFrames": null,
+ "ox": 16,
+ "oy": 30,
+ "w": 40,
+ "h": 32,
+ "height": 29,
+ "merchant": true,
+ "flames": null,
+ "art": "weathered_tablet",
+ "obj": true,
+ "stColor": null,
+ "ghost": null
+}

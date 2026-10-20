@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
-import { PROTOCOL_VERSION } from '@lumiis/shared';
+import { PROTOCOL_VERSION, WORLD_PIXELS } from '@lumiis/shared';
 import { createGameServer, type GameServer } from '../src/index.js';
 
 let server: GameServer | null = null;
@@ -94,6 +94,38 @@ describe('gateway', () => {
     const socket = await openSocket(port);
 
     socket.send(JSON.stringify({ t: 'teleport', x: 999, y: 999 }));
+    expect(await closedWith(socket)).toBe(1002);
+  });
+
+  it('moves the player the client is steering', async () => {
+    const port = await startServer();
+    const socket = await openSocket(port);
+
+    socket.send(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, name: 'Kain' }));
+    const welcome = (await nextMessage(socket)) as { id: number };
+    socket.send(JSON.stringify({ t: 'input', dx: 1, dy: 0 }));
+
+    let moved = false;
+    for (let attempt = 0; attempt < 20 && !moved; attempt += 1) {
+      const message = (await nextMessage(socket)) as Record<string, unknown>;
+      if (message['t'] !== 'snapshot') continue;
+      const players = message['players'] as Array<{ id: number; x: number }>;
+      const me = players.find((player) => player.id === welcome.id);
+      if (me !== undefined && me.x > WORLD_PIXELS / 2) moved = true;
+    }
+
+    expect(moved).toBe(true);
+    socket.close();
+  });
+
+  it('rejects movement input that is not a whole step', async () => {
+    const port = await startServer();
+    const socket = await openSocket(port);
+
+    socket.send(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, name: 'Kain' }));
+    await nextMessage(socket);
+
+    socket.send(JSON.stringify({ t: 'input', dx: 2, dy: 0 }));
     expect(await closedWith(socket)).toBe(1002);
   });
 

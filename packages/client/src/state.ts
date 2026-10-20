@@ -1,16 +1,43 @@
-// Everything the UI draws comes from here. One small mutable object instead of
-// a framework: the network writes into it, the scenes read from it.
+// Client-side state. One mutable object: the network writes into it, the
+// simulation and the scene read from it.
 
-import type { PlayerSnapshot } from '@lumiis/shared';
+import type { Direction } from '@lumiis/shared';
 
 export type ConnectionStatus = 'connecting' | 'online' | 'offline';
+
+/** Another player, as the server last reported them, plus render smoothing. */
+export type RemotePlayer = {
+  id: number;
+  name: string;
+  x: number;
+  y: number;
+  dir: Direction;
+  moving: boolean;
+  renderX: number;
+  renderY: number;
+};
+
+/**
+ * The local player. x/y are the predicted position; offsetX/offsetY is the
+ * difference to the last server snapshot, faded out over a few frames so a
+ * correction is never a visible jump.
+ */
+export type SelfState = {
+  x: number;
+  y: number;
+  dir: Direction;
+  moving: boolean;
+  offsetX: number;
+  offsetY: number;
+};
 
 export type ViewState = {
   status: ConnectionStatus;
   tick: number;
   pingMs: number | null;
-  players: PlayerSnapshot[];
   selfId: number | null;
+  self: SelfState;
+  others: Map<number, RemotePlayer>;
   notice: string | null;
 };
 
@@ -18,7 +45,10 @@ export const view: ViewState = {
   status: 'connecting',
   tick: 0,
   pingMs: null,
-  players: [],
   selfId: null,
+  self: { x: 0, y: 0, dir: 0, moving: false, offsetX: 0, offsetY: 0 },
+  others: new Map(),
   notice: null,
 };
+
+export const playerCount = (): number => view.others.size + (view.selfId === null ? 0 : 1);

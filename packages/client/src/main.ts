@@ -4,6 +4,7 @@
 import Phaser from 'phaser';
 import { WorldScene } from './scene/world-scene';
 import { Connection } from './net';
+import { initInput } from './input';
 import { view } from './state';
 import { createHud } from './ui/hud';
 
@@ -16,10 +17,10 @@ const playerName = (): string => {
   return base.replace(NAME_PATTERN, '').slice(0, 16) || 'Player';
 };
 
-new Phaser.Game({
+const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game',
-  backgroundColor: '#101418',
+  backgroundColor: '#0b0f13',
   scale: {
     mode: Phaser.Scale.RESIZE,
     autoCenter: Phaser.Scale.CENTER_BOTH,
@@ -30,11 +31,12 @@ new Phaser.Game({
   scene: [WorldScene],
 });
 
+const connection = new Connection(playerName());
+initInput((dx, dy) => connection.setInput(dx, dy));
+connection.connect();
+
 const hud = createHud();
 window.setInterval(() => hud.render(view), HUD_REFRESH_MS);
 
-const connection = new Connection(playerName());
-connection.connect();
-
 // Handy for poking at the state from the console during development.
-Object.assign(window, { lumiis: { view, connection } });
+Object.assign(window, { lumiis: { view, connection, game } });
