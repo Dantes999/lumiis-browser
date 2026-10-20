@@ -6,4 +6,5 @@ export * from './constants.js';
 export * from './map.js';
 export * from './monsters.js';
 export * from './movement.js';
+export * from './pathfinding.js';
 export * from './protocol.js';

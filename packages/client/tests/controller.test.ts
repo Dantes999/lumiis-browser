@@ -1,0 +1,107 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  initController,
+  isWalking,
+  resend,
+  setManualInput,
+  step,
+  walkAlong,
+} from '../src/controller';
+import { view } from '../src/state';
+
+let sent: Array<[number, number]>;
+let send: ReturnType<typeof vi.fn>;
+
+beforeEach(() => {
+  sent = [];
+  send = vi.fn((dx: number, dy: number) => {
+    sent.push([dx, dy]);
+  });
+  initController(send);
+  view.self = {
+    x: 100,
+    y: 100,
+    prevX: 100,
+    prevY: 100,
+    dir: 0,
+    moving: false,
+    offsetX: 0,
+    offsetY: 0,
+  };
+});
+
+describe('movement intents', () => {
+  it('sends manual input immediately and turns the figure', () => {
+    setManualInput(1, 0);
+    expect(sent).toEqual([[1, 0]]);
+    expect(view.self.moving).toBe(true);
+    expect(view.self.dir).toBe(6); // east
+  });
+
+  it('sends a stop when the keys are released', () => {
+    setManualInput(1, 0);
+    setManualInput(0, 0);
+    expect(sent).toEqual([
+      [1, 0],
+      [0, 0],
+    ]);
+    expect(view.self.moving).toBe(false);
+  });
+
+  it('does not repeat an unchanged direction', () => {
+    setManualInput(1, 0);
+    setManualInput(1, 0);
+    setManualInput(1, 0);
+    expect(sent).toHaveLength(1);
+  });
+});
+
+describe('click to walk', () => {
+  it('starts walking towards the first waypoint', () => {
+    walkAlong([{ x: 140, y: 100 }]);
+    expect(isWalking()).toBe(true);
+    expect(sent).toEqual([[1, 0]]);
+  });
+
+  it('moves on to the next waypoint when one is reached', () => {
+    walkAlong([
+      { x: 140, y: 100 },
+      { x: 140, y: 140 },
+    ]);
+
+    step(100, 100);
+    expect(sent).toEqual([[1, 0]]);
+
+    // Standing on the first waypoint: the next one is straight south.
+    step(140, 100);
+    expect(sent[sent.length - 1]).toEqual([0, 1]);
+    expect(isWalking()).toBe(true);
+  });
+
+  it('stops when the last waypoint is reached', () => {
+    walkAlong([{ x: 140, y: 100 }]);
+
+    step(140, 100);
+
+    expect(isWalking()).toBe(false);
+    expect(sent[sent.length - 1]).toEqual([0, 0]);
+    expect(view.self.moving).toBe(false);
+  });
+
+  it('is cancelled by real input', () => {
+    walkAlong([{ x: 140, y: 100 }, { x: 200, y: 100 }]);
+    setManualInput(-1, 0);
+
+    expect(isWalking()).toBe(false);
+    expect(sent[sent.length - 1]).toEqual([-1, 0]);
+  });
+
+  it('sends the current intent again on request', () => {
+    setManualInput(0, -1);
+    resend();
+    expect(sent).toEqual([
+      [0, -1],
+      [0, -1],
+    ]);
+  });
+});

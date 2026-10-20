@@ -2,14 +2,13 @@
 // Everything here ends in either a movement intent (-1..1 per axis), a zoom
 // factor, or "hit that one". Nothing in this file knows where a player is.
 
-import { dirFromInput } from '@lumiis/shared';
 import { view } from './state';
+import { resend, setManualInput } from './controller';
 import { clampZoom, zoomByPinch, zoomByWheel } from './zoom';
 
 export type SendInput = (dx: number, dy: number) => void;
 
 export type InputOptions = {
-  sendInput: SendInput;
   /** Space bar: attack whatever is closest and in reach. */
   onAttack?: () => void;
   /** A short tap or click on the world, in screen pixels. */
@@ -40,10 +39,9 @@ const TAP_SLOP = 10;
 const TAP_MAX_MS = 350;
 
 export function initInput(options: InputOptions): void {
-  const { sendInput, onAttack, onTap } = options;
+  const { onAttack, onTap } = options;
 
   const pressed = new Set<string>();
-  let lastSent: readonly [number, number] = [0, 0];
 
   // Every pointer that is currently down, by id. Two of them mean a pinch.
   const pointers = new Map<number, Point>();
@@ -94,15 +92,7 @@ export function initInput(options: InputOptions): void {
 
   const commit = (): void => {
     const [dx, dy] = currentVector();
-    const dir = dirFromInput(dx, dy);
-
-    view.self.moving = dir !== null;
-    if (dir !== null) view.self.dir = dir;
-
-    if (dx !== lastSent[0] || dy !== lastSent[1]) {
-      lastSent = [dx, dy];
-      sendInput(dx, dy);
-    }
+    setManualInput(dx, dy);
   };
 
   const stopStick = (): void => {
@@ -113,7 +103,7 @@ export function initInput(options: InputOptions): void {
   };
 
   // A late, lost or post-reconnect message self-heals within half a second.
-  window.setInterval(() => sendInput(lastSent[0], lastSent[1]), RESEND_MS);
+  window.setInterval(() => resend(), RESEND_MS);
 
   window.addEventListener('keydown', (event) => {
     if (event.code === 'Space') {
@@ -238,6 +228,10 @@ export function initInput(options: InputOptions): void {
   });
 
   const releasePointer = (event: PointerEvent): void => {
+    // Stop the stick first: the tap below may start a walk, and that direction
+    // must survive instead of being overwritten by the "stop" of the release.
+    if (event.pointerId === stickPointer) stopStick();
+
     if (tapCandidate !== null && tapCandidate.id === event.pointerId) {
       const wobble = Math.hypot(event.clientX - tapCandidate.x, event.clientY - tapCandidate.y);
       const held = performance.now() - tapCandidate.at;
@@ -248,7 +242,6 @@ export function initInput(options: InputOptions): void {
     pointers.delete(event.pointerId);
 
     if (pinching && pointers.size < 2) pinching = false;
-    if (event.pointerId === stickPointer) stopStick();
     if (pointers.size === 0) ignoreStickUntilRelease = false;
   };
 

@@ -11,6 +11,7 @@
 
 import { TICK_MS, moveWithCollision } from '@lumiis/shared';
 import { view } from './state';
+import { step as stepController } from './controller';
 import { getWorldMap } from './world-map';
 
 const TICK_SECONDS = TICK_MS / 1000;
@@ -44,6 +45,9 @@ function stepOnce(): void {
   const self = view.self;
   self.prevX = self.x;
   self.prevY = self.y;
+
+  // Click-to-walk steers here; without a path this leaves the intent untouched.
+  stepController(self.x, self.y);
   if (!self.moving) return;
 
   // Without a map there is no ground, so there is nothing to predict.
