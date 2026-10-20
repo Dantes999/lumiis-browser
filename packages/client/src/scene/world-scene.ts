@@ -405,6 +405,7 @@ export class WorldScene extends Phaser.Scene {
         armor: isItemKey(player.armor) ? player.armor : null,
       });
       playerView.setPose(player.dir, this.poseColumn(player.dir, player));
+      playerView.setHealth(player.hp, player.maxHp, false);
 
       const weapon = isItemKey(player.weapon) ? player.weapon : null;
       const duration = swingMs(swingFor(weapon));
@@ -428,6 +429,7 @@ export class WorldScene extends Phaser.Scene {
       selfView.setPosition(drawn.x, drawn.y);
       selfView.setLook(tables, view.equipment);
       selfView.setPose(self.dir, this.selfColumn(column));
+      selfView.setHealth(self.hp, self.maxHp, true);
 
       const shown = attackPose();
       if (shown !== null) {

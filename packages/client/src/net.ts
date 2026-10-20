@@ -230,6 +230,8 @@ export class Connection {
           y: player.y,
           dir: player.dir as typeof view.self.dir,
           moving: player.moving,
+          hp: player.hp,
+          maxHp: player.maxHp,
           weapon: player.weapon,
           armor: player.armor,
           attackUntil: player.attacking === true ? swingEnd(player) : 0,
@@ -242,6 +244,8 @@ export class Connection {
         existing.y = player.y;
         existing.dir = player.dir as typeof view.self.dir;
         existing.moving = player.moving;
+        existing.hp = player.hp;
+        existing.maxHp = player.maxHp;
         existing.weapon = player.weapon;
         existing.armor = player.armor;
         if (player.attacking === true) existing.attackUntil = swingEnd(player);

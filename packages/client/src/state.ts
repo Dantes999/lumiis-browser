@@ -13,6 +13,8 @@ export type RemotePlayer = {
   y: number;
   dir: Direction;
   moving: boolean;
+  hp: number;
+  maxHp: number;
   weapon: string | null;
   armor: string | null;
   /** performance.now() when the shown swing ends; 0 when standing still. */

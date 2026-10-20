@@ -25,6 +25,7 @@ import {
   TICK_MS,
   TILE_SIZE,
   TILE,
+  DIR_VECTORS,
   dirFromInput,
   expForNextLevel,
   facingTowards,
@@ -1067,9 +1068,36 @@ export class World {
       return;
     }
 
-    monster.wanderDir = Math.floor(this.random() * 8) as Direction;
-    monster.dir = monster.wanderDir;
+    const dir = this.randomWalkableDirection(monster);
+    if (dir === null) {
+      // Boxed in on every side: stay put for a moment.
+      monster.wanderDir = null;
+      monster.wanderUntil = this.tickCount + this.randomTicks(PAUSE_MIN_TICKS, PAUSE_MAX_TICKS);
+      return;
+    }
+
+    monster.wanderDir = dir;
+    monster.dir = dir;
     monster.wanderUntil = this.tickCount + this.randomTicks(WANDER_MIN_TICKS, WANDER_MAX_TICKS);
+  }
+
+  /** A random direction whose next tile can be stood on, so monsters do not
+   * wander straight into rocks and hang there. */
+  private randomWalkableDirection(monster: Monster): Direction | null {
+    const tx = Math.floor(monster.x / TILE_SIZE);
+    const ty = Math.floor(monster.y / TILE_SIZE);
+    const options: Direction[] = [];
+
+    for (let dir = 0; dir < 8; dir += 1) {
+      const vector = DIR_VECTORS[dir];
+      if (vector === undefined) continue;
+      const cx = (tx + vector[0] + 0.5) * TILE_SIZE;
+      const cy = (ty + vector[1] + 0.5) * TILE_SIZE;
+      if (canStand(this.map, cx, cy)) options.push(dir as Direction);
+    }
+
+    if (options.length === 0) return null;
+    return options[Math.floor(this.random() * options.length)] ?? null;
   }
 
   private reviveMonster(monster: Monster): void {

@@ -13,6 +13,11 @@ import type { Direction } from '@lumiis/shared';
 
 /** Column order inside every sheet: stand, step 1, step 2, breathe, attack 1-3, hit, dead. */
 export const COLUMNS = 9;
+
+/** Health bar above a player's head. */
+const PLAYER_BAR_WIDTH = 30;
+const PLAYER_BAR_HEIGHT = 4;
+const PLAYER_BAR_Y = -50;
 export const CELL = 48;
 /** Foot position inside a cell. The sprite is anchored here, not at its centre. */
 export const FOOT_X = 24;
@@ -104,8 +109,11 @@ export class PlayerView {
   private readonly head: Phaser.GameObjects.Image;
   private readonly hair: Phaser.GameObjects.Image;
   private readonly weaponFront: Phaser.GameObjects.Image;
+  private readonly bar: Phaser.GameObjects.Graphics;
 
   private lookSignature = '';
+  private shownHp = -1;
+  private shownMaxHp = -1;
   private bodyRows: number[] = [0, 0, 0];
   private backRows: number[] = [0, 0, 0];
   private frontRows: number[] = [0, 0, 0];
@@ -128,12 +136,15 @@ export class PlayerView {
     this.headRows = rowsFor(tables.head, VIEW_NAMES.map((view) => `kopf/${view}`));
     this.hairRows = rowsFor(tables.hair, VIEW_NAMES.map((view) => `oben/${view}`));
 
+    this.bar = scene.add.graphics();
+
     this.container = scene.add.container(0, 0, [
       this.weaponBack,
       this.body,
       this.head,
       this.hair,
       this.weaponFront,
+      this.bar,
     ]);
 
     this.applyLook(tables, { weapon: null, armor: null }, true);
@@ -142,6 +153,31 @@ export class PlayerView {
   /** A slight forward/backward tilt of the whole figure while swinging. */
   setLean(radians: number): void {
     this.container.setRotation(radians);
+  }
+
+  /** The health bar above the head. `always` shows it even at full health. */
+  setHealth(hp: number, maxHp: number, always = false): void {
+    if (!always && (hp >= maxHp || maxHp <= 0)) {
+      if (this.shownHp !== -1) this.bar.clear();
+      this.shownHp = -1;
+      this.shownMaxHp = -1;
+      return;
+    }
+    if (hp === this.shownHp && maxHp === this.shownMaxHp) return;
+    this.shownHp = hp;
+    this.shownMaxHp = maxHp;
+
+    this.bar.clear();
+    const left = -PLAYER_BAR_WIDTH / 2;
+    const y = PLAYER_BAR_Y;
+    this.bar.fillStyle(0x000000, 0.55);
+    this.bar.fillRect(left - 1, y - 1, PLAYER_BAR_WIDTH + 2, PLAYER_BAR_HEIGHT + 2);
+    this.bar.fillStyle(0x3a1414, 1);
+    this.bar.fillRect(left, y, PLAYER_BAR_WIDTH, PLAYER_BAR_HEIGHT);
+
+    const filled = Math.max(1, Math.round((PLAYER_BAR_WIDTH * hp) / maxHp));
+    this.bar.fillStyle(0xe0473a, 1);
+    this.bar.fillRect(left, y, filled, PLAYER_BAR_HEIGHT);
   }
 
   setPosition(x: number, y: number): void {
