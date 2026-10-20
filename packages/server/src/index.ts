@@ -13,6 +13,7 @@ import { FixedStepLoop } from './game/loop.js';
 import { loadMap } from './game/map.js';
 import { Store } from './store/db.js';
 import { attachGateway, type Gateway } from './net/gateway.js';
+import { handleMapSave } from './http/mapsave.js';
 import { createStaticHandler } from './http/static.js';
 
 export type GameServerOptions = {
@@ -62,6 +63,12 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
 
   const httpServer = createServer((req, res) => {
     const path = req.url ?? '/';
+
+    if (req.method === 'PUT' && path.startsWith('/maps/')) {
+      void handleMapSave(req, res, sharedRoot);
+      return;
+    }
+
     void (path.startsWith('/maps/') ? serveShared : serveClient)(req, res);
   });
 

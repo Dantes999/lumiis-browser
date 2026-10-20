@@ -1,0 +1,129 @@
+body.editor {
+  overflow: auto;
+  touch-action: auto;
+  user-select: none;
+}
+
+.editor-layout {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.board-wrap {
+  padding: 6px;
+  background: #0b0f13;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+#board {
+  display: block;
+  image-rendering: pixelated;
+  cursor: crosshair;
+}
+
+.editor-side {
+  display: grid;
+  gap: 10px;
+  width: 260px;
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.editor-side h1 {
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: 1px;
+  color: var(--accent);
+}
+
+.editor-row {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+}
+
+.editor-row strong {
+  color: var(--text);
+}
+
+.editor-tools {
+  display: flex;
+  gap: 4px;
+}
+
+.editor-tools button,
+.editor-actions button {
+  flex: 1;
+  font: inherit;
+  padding: 7px 6px;
+  color: var(--text);
+  background: #18212a;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.editor-tools button.active {
+  color: #0b1116;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.editor-actions #save {
+  color: #0b1116;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.editor-actions button.secondary {
+  background: transparent;
+}
+
+.editor-label {
+  color: var(--muted);
+}
+
+.palette {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+}
+
+.palette button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 6px;
+  color: var(--text);
+  background: #18212a;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.palette button.active {
+  border-color: var(--accent);
+}
+
+.palette .swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 50%);
+}
+
+.editor-status {
+  min-height: 36px;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: pre-wrap;
+}

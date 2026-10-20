@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lumiis map editor</title>
+    <link rel="stylesheet" href="/src/style.css" />
+    <link rel="stylesheet" href="/src/editor/editor.css" />
+  </head>
+  <body class="editor">
+    <main class="editor-layout">
+      <div class="board-wrap">
+        <canvas id="board" width="768" height="768"></canvas>
+      </div>
+
+      <aside class="editor-side">
+        <h1>Map editor</h1>
+
+        <div class="editor-row">
+          <span>Map</span>
+          <strong id="map-name">…</strong>
+        </div>
+
+        <div class="editor-tools">
+          <button type="button" data-tool="paint" class="active">Paint</button>
+          <button type="button" data-tool="spawn">Player spawn</button>
+          <button type="button" data-tool="mob">Monster</button>
+        </div>
+
+        <div class="editor-label">Tiles</div>
+        <div id="palette" class="palette"></div>
+
+        <div class="editor-label">Monster</div>
+        <div id="mob-picker" class="palette"></div>
+
+        <div class="editor-actions">
+          <button id="save" type="button">Save</button>
+          <button id="reload" type="button" class="secondary">Reload</button>
+        </div>
+
+        <div id="status" class="editor-status"></div>
+      </aside>
+    </main>
+
+    <script type="module" src="/src/editor/main.ts"></script>
+  </body>
+</html>

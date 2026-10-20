@@ -40,6 +40,13 @@ npm run typecheck
 To try it on a phone in the same network, open `http://<your-ip>:3000`. The
 server binds to `0.0.0.0` by default; set `HOST` to narrow that.
 
+## Map editor
+
+Open <http://localhost:3000/editor.html> while the server runs. Paint tiles,
+set the player spawn, place monsters, press Save. The editor writes
+`packages/shared/maps/<id>.json`, which the server and the browser both load;
+restart the server to walk the new map.
+
 ## Structure
 
 ```
