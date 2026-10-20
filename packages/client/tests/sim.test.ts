@@ -19,6 +19,7 @@ const grassMap: MapData = {
   height: 16,
   spawn: { x: 2, y: 2 },
   tiles: new Array(16 * 16).fill(TILE.GRASS),
+  spawns: [],
 };
 
 const place = (x: number, y: number, dir = 6): void => {

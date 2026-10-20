@@ -16,7 +16,7 @@ import {
 const mapWith = (changes: Record<number, number> = {}, size = 8): MapData => {
   const tiles = new Array(size * size).fill(TILE.GRASS);
   for (const [index, tile] of Object.entries(changes)) tiles[Number(index)] = tile;
-  return { id: 'test', width: size, height: size, spawn: { x: 1, y: 1 }, tiles };
+  return { id: 'test', width: size, height: size, spawn: { x: 1, y: 1 }, tiles, spawns: [] };
 };
 
 const at = (x: number, y: number, size = 8): number => y * size + x;
@@ -57,6 +57,29 @@ describe('map validation', () => {
 
   it('rejects an id that is not a key', () => {
     expect(validateMap({ ...valid, id: 'Sohan 2' }).ok).toBe(false);
+  });
+
+  it('accepts monster spawns and defaults them to an empty list', () => {
+    const withSpawn = validateMap({
+      ...valid,
+      spawns: [{ kind: 'mob', key: 'wolf', tx: 1, ty: 1 }],
+    });
+    expect(withSpawn.ok).toBe(true);
+    if (withSpawn.ok) expect(withSpawn.map.spawns).toHaveLength(1);
+
+    const without = validateMap(valid);
+    if (without.ok) expect(without.map.spawns).toEqual([]);
+  });
+
+  it('rejects spawns that name an unknown monster or sit outside the map', () => {
+    const unknown = validateMap({ ...valid, spawns: [{ kind: 'mob', key: 'dragon', tx: 0, ty: 0 }] });
+    expect(unknown.ok).toBe(false);
+
+    const outside = validateMap({ ...valid, spawns: [{ kind: 'mob', key: 'wolf', tx: 9, ty: 0 }] });
+    expect(outside.ok).toBe(false);
+
+    const wrongKind = validateMap({ ...valid, spawns: [{ kind: 'npc', key: 'wolf', tx: 0, ty: 0 }] });
+    expect(wrongKind.ok).toBe(false);
   });
 });
 

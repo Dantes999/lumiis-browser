@@ -110,11 +110,54 @@ for (let y = SPAWN.y - 2; y <= SPAWN.y + 2; y += 1) {
   for (let x = SPAWN.x - 2; x <= SPAWN.x + 2; x += 1) set(x, y, T.PATH);
 }
 
+// 7. Monsters, placed on free ground near chosen spots. The spiral finds the
+// nearest walkable tile, so a forest that grew over a spot does not hide a mob.
+const SOLID_TILES = new Set([T.WATER, T.TREE, T.ROCK, T.WALL, T.CACTUS, T.GATE]);
+
+const findFree = (x, y, maxRadius = 6) => {
+  for (let radius = 0; radius <= maxRadius; radius += 1) {
+    for (let dy = -radius; dy <= radius; dy += 1) {
+      for (let dx = -radius; dx <= radius; dx += 1) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (!inside(nx, ny)) continue;
+        if (!SOLID_TILES.has(get(nx, ny))) return { x: nx, y: ny };
+      }
+    }
+  }
+  return null;
+};
+
+const WANTED = [
+  ['wolf', 12, 26],
+  ['wolf', 18, 27],
+  ['wolf', 25, 22],
+  ['wolf', 42, 22],
+  ['wolf', 47, 28],
+  ['wolf', 52, 36],
+  ['wolf', 44, 40],
+  ['wolf', 30, 24],
+  ['boar', 20, 52],
+  ['boar', 24, 56],
+  ['boar', 14, 58],
+  ['boar', 38, 46],
+];
+
+const spawns = [];
+for (const [key, x, y] of WANTED) {
+  const spot = findFree(x, y);
+  if (spot !== null) spawns.push({ kind: 'mob', key, tx: spot.x, ty: spot.y });
+}
+
 // One row per line keeps the file diffable.
 const rows = [];
 for (let y = 0; y < HEIGHT; y += 1) {
   rows.push(`    ${tiles.slice(y * WIDTH, (y + 1) * WIDTH).join(',')}`);
 }
+
+const spawnLines = spawns
+  .map((s) => `    { "kind": "mob", "key": "${s.key}", "tx": ${s.tx}, "ty": ${s.ty} }`)
+  .join(',\n');
 
 const json = `{
   "id": "testmap",
@@ -123,6 +166,9 @@ const json = `{
   "spawn": { "x": ${SPAWN.x}, "y": ${SPAWN.y} },
   "tiles": [
 ${rows.join(',\n')}
+  ],
+  "spawns": [
+${spawnLines}
   ]
 }
 `;

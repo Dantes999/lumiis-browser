@@ -15,16 +15,28 @@ export type PlayerSnapshot = {
   moving: boolean;
 };
 
+export type MonsterSnapshot = {
+  id: number;
+  key: string;
+  x: number;
+  y: number;
+  dir: number;
+  hp: number;
+  maxHp: number;
+  moving: boolean;
+};
+
 /** Messages the client may send. */
 export type ClientMessage =
   | { t: 'hello'; v: number; name: string }
   | { t: 'input'; dx: number; dy: number }
+  | { t: 'attack'; target: number }
   | { t: 'ping'; at: number };
 
 /** Messages the server may send. */
 export type ServerMessage =
   | { t: 'welcome'; id: number; protocol: number; tickRate: number; tick: number }
-  | { t: 'snapshot'; tick: number; players: PlayerSnapshot[] }
+  | { t: 'snapshot'; tick: number; players: PlayerSnapshot[]; monsters: MonsterSnapshot[] }
   | { t: 'pong'; at: number }
   | { t: 'notice'; text: string };
 
@@ -71,6 +83,14 @@ export function parseClientMessage(input: unknown): ParsedMessage {
       }
       // (0, 0) is a valid input: it means "stop here".
       return { ok: true, message: { t: 'input', dx, dy } };
+    }
+
+    case 'attack': {
+      const target = message.target;
+      if (typeof target !== 'number' || !Number.isInteger(target) || target < 1) {
+        return fail('attack needs a monster id');
+      }
+      return { ok: true, message: { t: 'attack', target } };
     }
 
     case 'ping': {

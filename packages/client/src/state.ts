@@ -17,6 +17,20 @@ export type RemotePlayer = {
   renderY: number;
 };
 
+/** A monster as the server last reported it, plus render smoothing. */
+export type MonsterState = {
+  id: number;
+  key: string;
+  x: number;
+  y: number;
+  dir: Direction;
+  hp: number;
+  maxHp: number;
+  moving: boolean;
+  renderX: number;
+  renderY: number;
+};
+
 /**
  * The local player. x/y are the predicted position; prevX/prevY the position
  * before the last simulation step, which is what makes motion smooth between
@@ -40,6 +54,7 @@ export type ViewState = {
   selfId: number | null;
   self: SelfState;
   others: Map<number, RemotePlayer>;
+  monsters: Map<number, MonsterState>;
   notice: string | null;
   /** Camera zoom; 1 shows the world at native size. */
   zoom: number;
@@ -52,6 +67,7 @@ export const view: ViewState = {
   selfId: null,
   self: { x: 0, y: 0, prevX: 0, prevY: 0, dir: 0, moving: false, offsetX: 0, offsetY: 0 },
   others: new Map(),
+  monsters: new Map(),
   notice: null,
   zoom: 1,
 };

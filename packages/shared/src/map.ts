@@ -5,6 +5,7 @@
 import { TILE_SIZE } from './constants.js';
 import { WALK_SPEED, stepPosition } from './movement.js';
 import type { Direction } from './movement.js';
+import { isMonsterKey, type MonsterKey } from './monsters.js';
 
 /** Tile ids are the same as in the map editor, so its overlays stay readable. */
 export const TILE = {
@@ -36,6 +37,14 @@ export const SOLID: ReadonlySet<number> = new Set<number>([
   TILE.GATE,
 ]);
 
+export type MonsterSpawn = {
+  kind: 'mob';
+  key: MonsterKey;
+  /** Tile coordinates. */
+  tx: number;
+  ty: number;
+};
+
 export type MapData = {
   id: string;
   width: number;
@@ -44,6 +53,8 @@ export type MapData = {
   spawn: { x: number; y: number };
   /** Row-major tile ids, length width * height. */
   tiles: number[];
+  /** Where monsters start out. */
+  spawns: MonsterSpawn[];
 };
 
 export type MapCheck = { ok: true; map: MapData } | { ok: false; errors: string[] };
@@ -100,6 +111,42 @@ export function validateMap(input: unknown): MapCheck {
     }
   }
 
+  const rawSpawns = raw['spawns'];
+  const spawns: MonsterSpawn[] = [];
+
+  if (rawSpawns !== undefined) {
+    if (!Array.isArray(rawSpawns)) {
+      errors.push('spawns must be an array');
+    } else {
+      rawSpawns.forEach((entry, index) => {
+        if (typeof entry !== 'object' || entry === null) {
+          errors.push(`spawn ${index} is not an object`);
+          return;
+        }
+        const point = entry as Record<string, unknown>;
+        const key = point['key'];
+        const tx = point['tx'];
+        const ty = point['ty'];
+
+        if (point['kind'] !== 'mob') errors.push(`spawn ${index} must have kind "mob"`);
+        if (!isMonsterKey(key)) errors.push(`spawn ${index} names an unknown monster`);
+        if (!isInteger(tx) || !isInteger(ty)) {
+          errors.push(`spawn ${index} needs integer tx and ty`);
+        } else if (
+          isInteger(width) &&
+          isInteger(height) &&
+          (tx < 0 || ty < 0 || tx >= width || ty >= height)
+        ) {
+          errors.push(`spawn ${index} is outside the map`);
+        }
+
+        if (isMonsterKey(key) && isInteger(tx) && isInteger(ty)) {
+          spawns.push({ kind: 'mob', key, tx, ty });
+        }
+      });
+    }
+  }
+
   if (errors.length > 0) return { ok: false, errors };
 
   return {
@@ -110,6 +157,7 @@ export function validateMap(input: unknown): MapCheck {
       height: height as number,
       spawn: { x: (spawn as { x: number }).x, y: (spawn as { y: number }).y },
       tiles: tiles as number[],
+      spawns,
     },
   };
 }

@@ -1,12 +1,20 @@
-// Input: keyboard, a touch joystick and camera zoom.
-// Everything here ends in either a movement intent (-1..1 per axis) or a zoom
-// factor. Nothing in this file knows where a player is.
+// Input: keyboard, a touch joystick, camera zoom and attacks.
+// Everything here ends in either a movement intent (-1..1 per axis), a zoom
+// factor, or "hit that one". Nothing in this file knows where a player is.
 
 import { dirFromInput } from '@lumiis/shared';
 import { view } from './state';
 import { clampZoom, zoomByPinch, zoomByWheel } from './zoom';
 
 export type SendInput = (dx: number, dy: number) => void;
+
+export type InputOptions = {
+  sendInput: SendInput;
+  /** Space bar: attack whatever is closest and in reach. */
+  onAttack?: () => void;
+  /** A short tap or click on the world, in screen pixels. */
+  onTap?: (screenX: number, screenY: number) => void;
+};
 
 type Point = { x: number; y: number };
 
@@ -27,8 +35,13 @@ const RESEND_MS = 500;
 /** Two fingers closer than this cannot be told apart reliably. */
 const PINCH_MIN_DISTANCE = 24;
 const ZOOM_STORAGE_KEY = 'lumiis.zoom';
+/** A tap may wobble this much and still count as a tap, not a drag. */
+const TAP_SLOP = 10;
+const TAP_MAX_MS = 350;
 
-export function initInput(send: SendInput): void {
+export function initInput(options: InputOptions): void {
+  const { sendInput, onAttack, onTap } = options;
+
   const pressed = new Set<string>();
   let lastSent: readonly [number, number] = [0, 0];
 
@@ -43,6 +56,7 @@ export function initInput(send: SendInput): void {
   let pinching = false;
   /** After a pinch, the remaining finger must not start walking. */
   let ignoreStickUntilRelease = false;
+  let tapCandidate: { id: number; x: number; y: number; at: number } | null = null;
 
   const base = document.createElement('div');
   base.id = 'stick';
@@ -87,7 +101,7 @@ export function initInput(send: SendInput): void {
 
     if (dx !== lastSent[0] || dy !== lastSent[1]) {
       lastSent = [dx, dy];
-      send(dx, dy);
+      sendInput(dx, dy);
     }
   };
 
@@ -99,9 +113,14 @@ export function initInput(send: SendInput): void {
   };
 
   // A late, lost or post-reconnect message self-heals within half a second.
-  window.setInterval(() => send(lastSent[0], lastSent[1]), RESEND_MS);
+  window.setInterval(() => sendInput(lastSent[0], lastSent[1]), RESEND_MS);
 
   window.addEventListener('keydown', (event) => {
+    if (event.code === 'Space') {
+      event.preventDefault();
+      onAttack?.();
+      return;
+    }
     if (event.code in KEY_VECTORS) {
       event.preventDefault();
       pressed.add(event.code);
@@ -149,6 +168,7 @@ export function initInput(send: SendInput): void {
     // Second finger: stop walking and start pinching instead.
     if (pointers.size === 2) {
       if (stickPointer !== null) stopStick();
+      tapCandidate = null;
       ignoreStickUntilRelease = true;
 
       const pair = pointerPair();
@@ -171,6 +191,12 @@ export function initInput(send: SendInput): void {
     stickOriginX = event.clientX;
     stickOriginY = event.clientY;
     stickVector = [0, 0];
+    tapCandidate = {
+      id: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      at: performance.now(),
+    };
 
     base.hidden = false;
     base.style.left = `${stickOriginX}px`;
@@ -212,6 +238,13 @@ export function initInput(send: SendInput): void {
   });
 
   const releasePointer = (event: PointerEvent): void => {
+    if (tapCandidate !== null && tapCandidate.id === event.pointerId) {
+      const wobble = Math.hypot(event.clientX - tapCandidate.x, event.clientY - tapCandidate.y);
+      const held = performance.now() - tapCandidate.at;
+      tapCandidate = null;
+      if (wobble <= TAP_SLOP && held <= TAP_MAX_MS) onTap?.(event.clientX, event.clientY);
+    }
+
     pointers.delete(event.pointerId);
 
     if (pinching && pointers.size < 2) pinching = false;

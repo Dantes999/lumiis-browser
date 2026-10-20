@@ -119,6 +119,15 @@ export function attachGateway(httpServer: HttpServer, world: World): Gateway {
           }
           world.setInput(session.player.id, parsed.message.dx, parsed.message.dy);
           break;
+        case 'attack': {
+          if (session.player === null) {
+            send(session, { t: 'notice', text: 'Say hello before fighting.' });
+            break;
+          }
+          const result = world.attack(session.player.id, parsed.message.target);
+          if (!result.ok) send(session, { t: 'notice', text: result.reason });
+          break;
+        }
         case 'ping':
           send(session, { t: 'pong', at: parsed.message.at });
           break;
@@ -138,8 +147,13 @@ export function attachGateway(httpServer: HttpServer, world: World): Gateway {
 
   return {
     broadcastSnapshot(): void {
-      const players = world.snapshot();
-      const message = encode({ t: 'snapshot', tick: world.tick, players });
+      const snapshot = world.snapshot();
+      const message = encode({
+        t: 'snapshot',
+        tick: world.tick,
+        players: snapshot.players,
+        monsters: snapshot.monsters,
+      });
       for (const session of sessions) {
         if (session.player === null) continue;
         if (session.socket.readyState !== WebSocket.OPEN) continue;

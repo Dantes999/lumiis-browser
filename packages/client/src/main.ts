@@ -5,6 +5,7 @@ import Phaser from 'phaser';
 import { WorldScene } from './scene/world-scene';
 import { Connection } from './net';
 import { initInput } from './input';
+import { attackAt, attackNearestInRange, setAttackSender } from './combat';
 import { view } from './state';
 import { createHud } from './ui/hud';
 
@@ -34,7 +35,21 @@ const game = new Phaser.Game({
 });
 
 const connection = new Connection(playerName());
-initInput((dx, dy) => connection.setInput(dx, dy));
+setAttackSender((target) => connection.attack(target));
+
+initInput({
+  sendInput: (dx, dy) => connection.setInput(dx, dy),
+  onAttack: () => {
+    attackNearestInRange();
+  },
+  onTap: (screenX, screenY) => {
+    const scene = game.scene.getScene('world');
+    if (scene === null || !scene.sys.isActive()) return;
+    const point = scene.cameras.main.getWorldPoint(screenX, screenY);
+    attackAt(point.x, point.y);
+  },
+});
+
 connection.connect();
 
 const hud = createHud();

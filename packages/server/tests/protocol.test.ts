@@ -55,6 +55,25 @@ describe('protocol', () => {
     expect(parseClientMessage({ t: 'ping', at: '1' }).ok).toBe(false);
   });
 
+  it('accepts an attack on a monster id', () => {
+    expect(parseClientMessage({ t: 'attack', target: 7 })).toEqual({
+      ok: true,
+      message: { t: 'attack', target: 7 },
+    });
+  });
+
+  it('rejects an attack without a usable target', () => {
+    for (const bad of [
+      { t: 'attack' },
+      { t: 'attack', target: 0 },
+      { t: 'attack', target: -3 },
+      { t: 'attack', target: 1.5 },
+      { t: 'attack', target: '7' },
+    ]) {
+      expect(parseClientMessage(bad).ok).toBe(false);
+    }
+  });
+
   it('rejects unknown message types', () => {
     expect(parseClientMessage({ t: 'teleport', x: 1, y: 1 }).ok).toBe(false);
   });

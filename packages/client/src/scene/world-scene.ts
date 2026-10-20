@@ -3,6 +3,8 @@
 
 import Phaser from 'phaser';
 import {
+  MONSTER_KEYS,
+  MONSTER_TYPES,
   TILE_SIZE,
   mapPixelHeight,
   mapPixelWidth,
@@ -10,6 +12,7 @@ import {
   type MapData,
 } from '@lumiis/shared';
 import { PlayerView, readRows, type SpriteRows } from '../art';
+import { MOB_CELL_H, MOB_CELL_W, MonsterView } from '../mobart';
 import { renderedSelfPosition, stepLocal } from '../sim';
 import { view } from '../state';
 import { buildTilesetTexture } from '../tiles';
@@ -23,6 +26,7 @@ const OTHERS_TAU_MS = 60;
 export class WorldScene extends Phaser.Scene {
   private rows: SpriteRows | null = null;
   private readonly views = new Map<number, PlayerView>();
+  private readonly monsterViews = new Map<number, MonsterView>();
   private following = false;
   private appliedZoom = 0;
 
@@ -41,6 +45,15 @@ export class WorldScene extends Phaser.Scene {
     this.load.spritesheet('body', '/assets/ruestungen/krieger_m/00_ohne_ruestung.png', grid);
     this.load.spritesheet('head', '/assets/modelle/spieler/krieger_m.png', grid);
     this.load.spritesheet('hair', '/assets/haare/krieger_m_1.png', grid);
+
+    // One sheet per monster type, 40x32 cells, four views of five frames.
+    for (const key of MONSTER_KEYS) {
+      this.load.spritesheet(
+        `mob_${key}`,
+        `/assets/modelle/monster/${MONSTER_TYPES[key].look}.png`,
+        { frameWidth: MOB_CELL_W, frameHeight: MOB_CELL_H },
+      );
+    }
   }
 
   create(): void {
@@ -52,7 +65,36 @@ export class WorldScene extends Phaser.Scene {
   override update(_time: number, delta: number): void {
     this.applyZoom();
     stepLocal(delta);
+    this.renderMonsters(delta);
     this.renderPlayers(delta);
+  }
+
+  private renderMonsters(deltaMs: number): void {
+    const share = 1 - Math.exp(-deltaMs / OTHERS_TAU_MS);
+    const column = Math.floor(this.time.now / STEP_FRAME_MS) % 2 === 0 ? 1 : 2;
+    const seen = new Set<number>();
+
+    for (const monster of view.monsters.values()) {
+      seen.add(monster.id);
+      monster.renderX += (monster.x - monster.renderX) * share;
+      monster.renderY += (monster.y - monster.renderY) * share;
+
+      let monsterView = this.monsterViews.get(monster.id);
+      if (monsterView === undefined) {
+        monsterView = new MonsterView(this, `mob_${monster.key}`);
+        this.monsterViews.set(monster.id, monsterView);
+      }
+
+      monsterView.setPosition(monster.renderX, monster.renderY);
+      monsterView.setPose(monster.dir, monster.moving, column);
+      monsterView.setHealth(monster.hp, monster.maxHp);
+    }
+
+    for (const [id, monsterView] of this.monsterViews) {
+      if (seen.has(id)) continue;
+      monsterView.destroy();
+      this.monsterViews.delete(id);
+    }
   }
 
   private buildWorld(): void {
