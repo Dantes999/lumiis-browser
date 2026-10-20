@@ -3,6 +3,7 @@
 // ever be written once.
 
 export * from './constants.js';
+export * from './items.js';
 export * from './map.js';
 export * from './monsters.js';
 export * from './movement.js';

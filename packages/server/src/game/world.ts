@@ -4,12 +4,16 @@
 
 import {
   ATTACK_COOLDOWN_TICKS,
+  DROP_PROTECT_TICKS,
+  INVENTORY_SLOTS,
+  ITEMS,
   MAX_LEVEL,
   MONSTER_ATTACK_COOLDOWN_TICKS,
   MONSTER_ATTACK_RANGE,
   MONSTER_GIVE_UP_FACTOR,
   MONSTER_RESPAWN_TICKS,
   MONSTER_TYPES,
+  PICKUP_RANGE,
   PLAYER_DAMAGE,
   PLAYER_MAX_HP,
   PLAYER_REGEN_HP,
@@ -20,12 +24,16 @@ import {
   TILE_SIZE,
   dirFromInput,
   expForNextLevel,
+  isItemKey,
   moveWithCollision,
   spawnPosition,
   withinAttackRange,
 } from '@lumiis/shared';
 import type {
   Direction,
+  GroundItemSnapshot,
+  InventorySlot,
+  ItemKey,
   MapData,
   MonsterKey,
   MonsterSnapshot,
@@ -64,6 +72,19 @@ export type Player = {
   /** Experience towards the next level, not total experience. */
   exp: number;
   yang: number;
+  inventory: InventorySlot[];
+};
+
+/** An item lying on the ground, waiting to be picked up. */
+export type GroundItem = {
+  id: number;
+  key: ItemKey;
+  count: number;
+  x: number;
+  y: number;
+  /** The killer may take it first. */
+  ownerId: number | null;
+  ownerUntil: number;
 };
 
 export type Monster = {
@@ -113,8 +134,12 @@ export type AttackResult =
 export class World {
   private readonly playersById = new Map<number, Player>();
   private readonly monstersById = new Map<number, Monster>();
+  private readonly groundItems = new Map<number, GroundItem>();
+  /** Player ids whose inventory changed since the last tick was reported. */
+  private readonly inventoryUpdates = new Set<number>();
   private nextPlayerId = 1;
   private nextMonsterId = 1;
+  private nextGroundId = 1;
   private tickCount = 0;
   /** Small deterministic generator: the same map always behaves the same way. */
   private rngState = 0x9e3779b9;
@@ -156,6 +181,7 @@ export class World {
       level: 1,
       exp: 0,
       yang: 0,
+      inventory: new Array<InventorySlot>(INVENTORY_SLOTS).fill(null),
     };
     this.playersById.set(player.id, player);
     return player;
@@ -220,6 +246,7 @@ export class World {
       monster.targetId = null;
       const rewards = this.rewardKill(monster, player);
       monster.damageBy.clear();
+      this.dropLoot(monster, player);
       return { ok: true, damage: PLAYER_DAMAGE, killed: true, rewards };
     }
 
@@ -255,9 +282,15 @@ export class World {
       if (this.stepMonsterCombat(monster)) continue;
       this.stepMonsterWander(monster);
     }
+
+    this.collectGroundItems();
   }
 
-  snapshot(): { players: PlayerSnapshot[]; monsters: MonsterSnapshot[] } {
+  snapshot(): {
+    players: PlayerSnapshot[];
+    monsters: MonsterSnapshot[];
+    ground: GroundItemSnapshot[];
+  } {
     const players: PlayerSnapshot[] = [];
     for (const player of this.playersById.values()) {
       players.push({
@@ -290,7 +323,40 @@ export class World {
       });
     }
 
-    return { players, monsters };
+    return { players, monsters, ground: this.groundSnapshot() };
+  }
+
+  private groundSnapshot(): GroundItemSnapshot[] {
+    const items: GroundItemSnapshot[] = [];
+    for (const item of this.groundItems.values()) {
+      items.push({
+        id: item.id,
+        key: item.key,
+        x: Math.round(item.x * 10) / 10,
+        y: Math.round(item.y * 10) / 10,
+        count: item.count,
+      });
+    }
+    return items;
+  }
+
+  /** The inventory of one player, for the first message after the handshake. */
+  inventoryOf(playerId: number): InventorySlot[] | null {
+    const player = this.playersById.get(playerId);
+    return player === undefined ? null : player.inventory;
+  }
+
+  /** Inventories that changed during the last tick; clears the list. */
+  drainInventoryUpdates(): Array<{ playerId: number; slots: InventorySlot[] }> {
+    if (this.inventoryUpdates.size === 0) return [];
+
+    const updates: Array<{ playerId: number; slots: InventorySlot[] }> = [];
+    for (const playerId of this.inventoryUpdates) {
+      const player = this.playersById.get(playerId);
+      if (player !== undefined) updates.push({ playerId, slots: player.inventory });
+    }
+    this.inventoryUpdates.clear();
+    return updates;
   }
 
   // ------------------------------------------------------------------ players
@@ -364,6 +430,88 @@ export class World {
     }
 
     return rewards;
+  }
+
+  // ------------------------------------------------------------------- items
+
+  /** Rolls the loot table of a dead monster and lays it on the ground. */
+  private dropLoot(monster: Monster, killer: Player): void {
+    for (const drop of MONSTER_TYPES[monster.key].drops) {
+      if (this.random() >= drop.chance) continue;
+      if (!isItemKey(drop.key)) continue;
+
+      const count = drop.min + Math.floor(this.random() * (drop.max - drop.min + 1));
+      const angle = this.random() * Math.PI * 2;
+      const radius = 8 + this.random() * 14;
+
+      this.groundItems.set(this.nextGroundId, {
+        id: this.nextGroundId,
+        key: drop.key,
+        count,
+        x: monster.x + Math.cos(angle) * radius,
+        y: monster.y + Math.sin(angle) * radius,
+        ownerId: killer.id,
+        ownerUntil: this.tickCount + DROP_PROTECT_TICKS,
+      });
+      this.nextGroundId += 1;
+    }
+  }
+
+  /** Everyone standing close enough takes what is free for him. */
+  private collectGroundItems(): void {
+    if (this.groundItems.size === 0) return;
+
+    for (const item of [...this.groundItems.values()]) {
+      for (const player of this.playersById.values()) {
+        if (player.deadUntil > 0) continue;
+
+        const reserved =
+          item.ownerId !== null && item.ownerId !== player.id && this.tickCount < item.ownerUntil;
+        if (reserved) continue;
+        if (Math.hypot(player.x - item.x, player.y - item.y) > PICKUP_RANGE) continue;
+        if (!this.addToInventory(player, item.key, item.count)) continue;
+
+        this.groundItems.delete(item.id);
+        this.inventoryUpdates.add(player.id);
+        break;
+      }
+    }
+  }
+
+  /** Free room for one item type across all slots. */
+  private freeSpace(player: Player, key: ItemKey): number {
+    const max = ITEMS[key].stackMax;
+    let space = 0;
+
+    for (const slot of player.inventory) {
+      if (slot === null) space += max;
+      else if (slot.key === key) space += max - slot.count;
+    }
+    return space;
+  }
+
+  /** Stacks first, then fills empty slots. Refuses when it does not all fit. */
+  private addToInventory(player: Player, key: ItemKey, count: number): boolean {
+    if (this.freeSpace(player, key) < count) return false;
+
+    const max = ITEMS[key].stackMax;
+    let left = count;
+
+    for (const slot of player.inventory) {
+      if (slot === null || slot.key !== key || slot.count >= max) continue;
+      const add = Math.min(max - slot.count, left);
+      slot.count += add;
+      left -= add;
+      if (left === 0) return true;
+    }
+
+    for (let index = 0; index < player.inventory.length && left > 0; index += 1) {
+      if (player.inventory[index] !== null) continue;
+      const add = Math.min(max, left);
+      player.inventory[index] = { key, count: add };
+      left -= add;
+    }
+    return left === 0;
   }
 
   /** Books experience and Yang and resolves any level ups. */

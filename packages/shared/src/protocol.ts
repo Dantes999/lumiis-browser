@@ -5,6 +5,7 @@
 // message here and decides what actually happens.
 
 import { NAME_PATTERN, PROTOCOL_VERSION } from './constants.js';
+import type { InventorySlot } from './items.js';
 
 export type PlayerSnapshot = {
   id: number;
@@ -31,6 +32,14 @@ export type MonsterSnapshot = {
   moving: boolean;
 };
 
+export type GroundItemSnapshot = {
+  id: number;
+  key: string;
+  x: number;
+  y: number;
+  count: number;
+};
+
 /** Messages the client may send. */
 export type ClientMessage =
   | { t: 'hello'; v: number; name: string }
@@ -41,7 +50,14 @@ export type ClientMessage =
 /** Messages the server may send. */
 export type ServerMessage =
   | { t: 'welcome'; id: number; protocol: number; tickRate: number; tick: number }
-  | { t: 'snapshot'; tick: number; players: PlayerSnapshot[]; monsters: MonsterSnapshot[] }
+  | {
+      t: 'snapshot';
+      tick: number;
+      players: PlayerSnapshot[];
+      monsters: MonsterSnapshot[];
+      ground: GroundItemSnapshot[];
+    }
+  | { t: 'inventory'; slots: (InventorySlot | null)[] }
   | { t: 'pong'; at: number }
   | { t: 'notice'; text: string };
 

@@ -1,7 +1,7 @@
 // Client-side state. One mutable object: the network writes into it, the
 // simulation and the scene read from it.
 
-import type { Direction } from '@lumiis/shared';
+import type { Direction, InventorySlot } from '@lumiis/shared';
 
 export type ConnectionStatus = 'connecting' | 'online' | 'offline';
 
@@ -15,6 +15,15 @@ export type RemotePlayer = {
   moving: boolean;
   renderX: number;
   renderY: number;
+};
+
+/** An item lying on the ground. */
+export type GroundItemState = {
+  id: number;
+  key: string;
+  x: number;
+  y: number;
+  count: number;
 };
 
 /** A monster as the server last reported it, plus render smoothing. */
@@ -60,6 +69,8 @@ export type ViewState = {
   self: SelfState;
   others: Map<number, RemotePlayer>;
   monsters: Map<number, MonsterState>;
+  ground: Map<number, GroundItemState>;
+  inventory: InventorySlot[];
   notice: string | null;
   /** When the current notice stops being shown, in performance.now() ms. */
   noticeUntil: number;
@@ -89,6 +100,8 @@ export const view: ViewState = {
   },
   others: new Map(),
   monsters: new Map(),
+  ground: new Map(),
+  inventory: [],
   notice: null,
   noticeUntil: 0,
   zoom: 1,

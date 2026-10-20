@@ -90,6 +90,76 @@ body {
   background: #7ea6e0;
 }
 
+/* Buttons inside the HUD need their own pointer events, the HUD itself has none. */
+.hud-button {
+  pointer-events: auto;
+  margin-top: 6px;
+  padding: 4px 8px;
+  font: inherit;
+  color: var(--text);
+  background: #232d37;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.hud-button:active {
+  background: #2d3a46;
+}
+
+.panel {
+  position: fixed;
+  right: 12px;
+  top: 12px;
+  padding: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  z-index: 4;
+}
+
+.panel.hidden {
+  display: none;
+}
+
+.panel-title {
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.bag-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 40px);
+  gap: 4px;
+}
+
+.slot {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #141b22;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.slot-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 45%);
+}
+
+.slot-count {
+  position: absolute;
+  right: 3px;
+  bottom: 1px;
+  font-size: 11px;
+  color: var(--text);
+}
+
 /* Touch joystick: appears where the finger lands, never captures the HUD. */
 #stick {
   position: fixed;

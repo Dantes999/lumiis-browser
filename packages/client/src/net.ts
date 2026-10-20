@@ -4,6 +4,7 @@
 import { PROTOCOL_VERSION, decode, encode } from '@lumiis/shared';
 import type {
   ClientMessage,
+  GroundItemSnapshot,
   MonsterSnapshot,
   PlayerSnapshot,
   ServerMessage,
@@ -53,6 +54,7 @@ export class Connection {
       view.status = 'offline';
       view.others.clear();
       view.monsters.clear();
+      view.ground.clear();
       this.socket = null;
       if (!this.closedByUser) this.scheduleReconnect();
     });
@@ -117,7 +119,10 @@ export class Connection {
         break;
       case 'snapshot':
         view.tick = message.tick;
-        this.applySnapshot(message.players, message.monsters);
+        this.applySnapshot(message.players, message.monsters, message.ground);
+        break;
+      case 'inventory':
+        view.inventory = message.slots;
         break;
       case 'pong':
         view.pingMs = Math.max(0, Math.round(performance.now() - message.at));
@@ -133,7 +138,11 @@ export class Connection {
    * The server is always right. We keep our predicted position for rendering and
    * fade the difference out, so a correction looks like a slide, not a jump.
    */
-  private applySnapshot(players: PlayerSnapshot[], monsters: MonsterSnapshot[]): void {
+  private applySnapshot(
+    players: PlayerSnapshot[],
+    monsters: MonsterSnapshot[],
+    ground: GroundItemSnapshot[],
+  ): void {
     const seen = new Set<number>();
 
     for (const player of players) {
@@ -204,6 +213,23 @@ export class Connection {
 
     for (const id of [...view.monsters.keys()]) {
       if (!seenMonsters.has(id)) view.monsters.delete(id);
+    }
+
+    const seenGround = new Set<number>();
+    for (const item of ground) {
+      seenGround.add(item.id);
+      const existing = view.ground.get(item.id);
+      if (existing === undefined) {
+        view.ground.set(item.id, { id: item.id, key: item.key, x: item.x, y: item.y, count: item.count });
+      } else {
+        existing.x = item.x;
+        existing.y = item.y;
+        existing.count = item.count;
+      }
+    }
+
+    for (const id of [...view.ground.keys()]) {
+      if (!seenGround.has(id)) view.ground.delete(id);
     }
   }
 }

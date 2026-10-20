@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ATTACK_COOLDOWN_TICKS,
+  DROP_PROTECT_TICKS,
   MAX_LEVEL,
   MONSTER_RESPAWN_TICKS,
   MONSTER_TYPES,
@@ -13,7 +14,7 @@ import {
   spawnPosition,
   type MapData,
 } from '@lumiis/shared';
-import { World } from '../src/game/world.js';
+import { World, type Player } from '../src/game/world.js';
 
 const grassMap = (): MapData => ({
   id: 'test',
@@ -25,6 +26,16 @@ const grassMap = (): MapData => ({
 });
 
 const spawn = spawnPosition(grassMap());
+
+/** Attacks whenever possible, walks the world otherwise, until a kill lands. */
+const killOne = (world: World, playerId: number): boolean => {
+  for (let tick = 0; tick < 800; tick += 1) {
+    const result = world.attack(playerId, 1);
+    if (result.ok && result.killed) return true;
+    world.step();
+  }
+  return false;
+};
 
 const withWolf = (tx = 9, ty = 8): MapData => {
   const map = grassMap();
@@ -61,7 +72,7 @@ describe('world', () => {
     const world = new World(grassMap());
     expect(world.tick).toBe(0);
     expect(world.playerCount).toBe(0);
-    expect(world.snapshot()).toEqual({ players: [], monsters: [] });
+    expect(world.snapshot()).toEqual({ players: [], monsters: [], ground: [] });
   });
 
   it('spawns every player on the spawn tile of the map', () => {
@@ -333,16 +344,6 @@ describe('monsters fighting back', () => {
 });
 
 describe('experience and yang', () => {
-  /** Attacks whenever possible, walks the world otherwise, until a kill lands. */
-  const killOne = (world: World, playerId: number): boolean => {
-    for (let tick = 0; tick < 800; tick += 1) {
-      const result = world.attack(playerId, 1);
-      if (result.ok && result.killed) return true;
-      world.step();
-    }
-    return false;
-  };
-
   it('gives experience and yang for a kill', () => {
     const world = new World(boxedWolf());
     const player = world.addPlayer('Kain');
@@ -467,5 +468,99 @@ describe('experience and yang', () => {
 
     // Alone this time, so the full amount — the old damage is forgotten.
     expect(second.exp - sharedExp).toBe(MONSTER_TYPES.wolf.exp);
+  });
+});
+
+describe('loot', () => {
+  /** Walks a player towards a point, one tick at a time. */
+  const walkTo = (world: World, player: Player, x: number, y: number, maxTicks = 300): void => {
+    for (let tick = 0; tick < maxTicks; tick += 1) {
+      if (Math.hypot(x - player.x, y - player.y) <= 6) break;
+      const dx = Math.sign(Math.round(x - player.x));
+      const dy = Math.sign(Math.round(y - player.y));
+      world.setInput(player.id, dx, dy);
+      world.step();
+    }
+    world.setInput(player.id, 0, 0);
+  };
+
+  it('leaves an item behind that the killer can pick up', () => {
+    const world = new World(withWolf(9, 8));
+    const player = world.addPlayer('Kain');
+
+    let dropped = false;
+    for (let attempt = 0; attempt < 12 && !dropped; attempt += 1) {
+      killOne(world, player.id);
+      for (let tick = 0; tick < MONSTER_RESPAWN_TICKS + 20; tick += 1) world.step();
+      dropped = world.snapshot().ground.length > 0;
+    }
+    expect(dropped).toBe(true);
+
+    const item = world.snapshot().ground[0];
+    expect(item).toBeDefined();
+    if (item === undefined) return;
+
+    walkTo(world, player, item.x, item.y);
+    for (let tick = 0; tick < 10; tick += 1) world.step();
+
+    expect(world.snapshot().ground.some((entry) => entry.id === item.id)).toBe(false);
+    const carried = player.inventory.filter((slot) => slot !== null);
+    expect(carried.length).toBeGreaterThan(0);
+    expect(carried.reduce((sum, slot) => sum + (slot?.count ?? 0), 0)).toBeGreaterThan(0);
+  });
+
+  it('keeps a fresh drop reserved for its owner', () => {
+    const world = new World(withWolf(9, 8));
+    const killer = world.addPlayer('Killer');
+    const stranger = world.addPlayer('Stranger');
+
+    // Kill until something drops. The item is read before the next tick, so the
+    // killer has not had a chance to pick it up yet.
+    let item = world.snapshot().ground[0];
+    for (let attempt = 0; attempt < 12 && item === undefined; attempt += 1) {
+      killOne(world, killer.id);
+      item = world.snapshot().ground[0];
+      if (item === undefined) {
+        for (let tick = 0; tick < MONSTER_RESPAWN_TICKS + 20; tick += 1) world.step();
+      }
+    }
+    expect(item).toBeDefined();
+    if (item === undefined) return;
+
+    // The owner steps out; the stranger stands right on the drop.
+    world.removePlayer(killer.id);
+    walkTo(world, stranger, item.x, item.y);
+    for (let tick = 0; tick < 5; tick += 1) world.step();
+
+    expect(world.snapshot().ground.some((entry) => entry.id === item.id)).toBe(true);
+    expect(stranger.inventory.every((slot) => slot === null)).toBe(true);
+
+    // Once the protection has run out, anyone may take it.
+    for (let tick = 0; tick < DROP_PROTECT_TICKS + 5; tick += 1) world.step();
+    expect(world.snapshot().ground.some((entry) => entry.id === item.id)).toBe(false);
+    expect(stranger.inventory.some((slot) => slot !== null)).toBe(true);
+  });
+
+  it('stacks the same item into one slot', () => {
+    const world = new World(withWolf(9, 8));
+    const player = world.addPlayer('Kain');
+
+    let collected = 0;
+    for (let attempt = 0; attempt < 40 && collected < 3; attempt += 1) {
+      killOne(world, player.id);
+      for (let tick = 0; tick < MONSTER_RESPAWN_TICKS + 20; tick += 1) world.step();
+
+      const item = world.snapshot().ground[0];
+      if (item === undefined) continue;
+      walkTo(world, player, item.x, item.y);
+      for (let tick = 0; tick < 10; tick += 1) world.step();
+      collected += 1;
+    }
+
+    expect(collected).toBeGreaterThanOrEqual(3);
+    const used = player.inventory.filter((slot) => slot !== null);
+    expect(used.length).toBe(1);
+    expect(used[0]?.key).toBe('wolf_fur');
+    expect(used[0]?.count).toBeGreaterThanOrEqual(3);
   });
 });

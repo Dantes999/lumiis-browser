@@ -11,6 +11,7 @@ import { initController, walkAlong } from './controller';
 import { view } from './state';
 import { getWorldMap } from './world-map';
 import { createHud } from './ui/hud';
+import { createBag } from './ui/bag';
 
 const HUD_REFRESH_MS = 100;
 const NAME_PATTERN = /[^A-Za-z0-9_]/g;
@@ -65,7 +66,11 @@ initInput({
 connection.connect();
 
 const hud = createHud();
-window.setInterval(() => hud.render(view), HUD_REFRESH_MS);
+const bag = createBag();
+window.setInterval(() => {
+  hud.render(view);
+  bag.render(view.inventory);
+}, HUD_REFRESH_MS);
 
 // Handy for poking at the state from the console during development.
 Object.assign(window, { lumiis: { view, connection, game } });

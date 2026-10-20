@@ -3,12 +3,14 @@
 
 import Phaser from 'phaser';
 import {
+  ITEMS,
   MONSTER_KEYS,
   MONSTER_TYPES,
   TILE_SIZE,
   mapPixelHeight,
   mapPixelWidth,
   validateMap,
+  type ItemKey,
   type MapData,
 } from '@lumiis/shared';
 import { PlayerView, readRows, type SpriteRows } from '../art';
@@ -27,6 +29,7 @@ export class WorldScene extends Phaser.Scene {
   private rows: SpriteRows | null = null;
   private readonly views = new Map<number, PlayerView>();
   private readonly monsterViews = new Map<number, MonsterView>();
+  private readonly groundViews = new Map<number, Phaser.GameObjects.Container>();
   private following = false;
   private appliedZoom = 0;
   private lastSelfHp = -1;
@@ -67,8 +70,37 @@ export class WorldScene extends Phaser.Scene {
   override update(_time: number, delta: number): void {
     this.applyZoom();
     stepLocal(delta);
+    this.renderGround();
     this.renderMonsters(delta);
     this.renderPlayers(delta);
+  }
+
+  private renderGround(): void {
+    const seen = new Set<number>();
+
+    for (const item of view.ground.values()) {
+      seen.add(item.id);
+
+      let container = this.groundViews.get(item.id);
+      if (container === undefined) {
+        const colour = ITEMS[item.key as ItemKey]?.color ?? '#ffffff';
+        const tint = Phaser.Display.Color.HexStringToColor(colour).color;
+        const shadow = this.add.ellipse(0, 2, 14, 5, 0x000000, 0.3);
+        const body = this.add.rectangle(0, 0, 9, 9, tint).setStrokeStyle(1, 0x10161c);
+        container = this.add.container(0, 0, [shadow, body]);
+        this.groundViews.set(item.id, container);
+      }
+
+      const bob = Math.sin(this.time.now / 280 + item.id) * 2;
+      container.setPosition(item.x, item.y - 7 + bob);
+      container.setDepth(Math.round(item.y));
+    }
+
+    for (const [id, container] of this.groundViews) {
+      if (seen.has(id)) continue;
+      container.destroy(true);
+      this.groundViews.delete(id);
+    }
   }
 
   private renderMonsters(deltaMs: number): void {

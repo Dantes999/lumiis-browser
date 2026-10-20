@@ -15,6 +15,7 @@ import {
   encode,
   parseClientMessage,
 } from '@lumiis/shared';
+import type { InventorySlot } from '@lumiis/shared';
 import type { World, Player } from '../game/world.js';
 
 type Session = {
@@ -27,6 +28,8 @@ type Session = {
 export type Gateway = {
   /** Sends the current world state to everyone who finished the handshake. */
   broadcastSnapshot(): void;
+  /** Sends one player's inventory; used after a pickup. */
+  sendInventory(playerId: number, slots: InventorySlot[]): void;
   /** Connected sockets, including those that have not said hello yet. */
   readonly connectionCount: number;
   close(): Promise<void>;
@@ -74,6 +77,11 @@ export function attachGateway(httpServer: HttpServer, world: World): Gateway {
     }
   };
 
+  const sendInventory = (session: Session, playerId: number): void => {
+    const slots = world.inventoryOf(playerId);
+    if (slots !== null) send(session, { t: 'inventory', slots });
+  };
+
   const handleHello = (session: Session, name: string): void => {
     if (session.player !== null) {
       send(session, { t: 'notice', text: 'Already logged in.' });
@@ -88,6 +96,7 @@ export function attachGateway(httpServer: HttpServer, world: World): Gateway {
       tickRate: TICK_RATE,
       tick: world.tick,
     });
+    sendInventory(session, player.id);
   };
 
   wss.on('connection', (socket) => {
@@ -175,6 +184,7 @@ export function attachGateway(httpServer: HttpServer, world: World): Gateway {
         tick: world.tick,
         players: snapshot.players,
         monsters: snapshot.monsters,
+        ground: snapshot.ground,
       });
       for (const session of sessions) {
         if (session.player === null) continue;
@@ -185,6 +195,10 @@ export function attachGateway(httpServer: HttpServer, world: World): Gateway {
 
     get connectionCount(): number {
       return sessions.size;
+    },
+
+    sendInventory(playerId: number, slots: InventorySlot[]): void {
+      sendToPlayer(playerId, { t: 'inventory', slots });
     },
 
     close(): Promise<void> {
