@@ -54,6 +54,7 @@ describe('saving maps from the editor', () => {
     const painted = grassMap('testmap');
     painted.tiles[0] = TILE.WATER;
     painted.spawn = { x: 4, y: 4 };
+    painted.portals = [{ tx: 2, ty: 2, to: 'grove', spawnX: 1, spawnY: 1 }];
 
     const response = await put(port, '/maps/testmap.json', painted);
     expect(response.status).toBe(200);
@@ -61,6 +62,7 @@ describe('saving maps from the editor', () => {
     const written = JSON.parse(readFileSync(mapPath, 'utf8')) as MapData;
     expect(written.tiles[0]).toBe(TILE.WATER);
     expect(written.spawn).toEqual({ x: 4, y: 4 });
+    expect(written.portals).toEqual([{ tx: 2, ty: 2, to: 'grove', spawnX: 1, spawnY: 1 }]);
   });
 
   it('refuses a map that does not validate', async () => {

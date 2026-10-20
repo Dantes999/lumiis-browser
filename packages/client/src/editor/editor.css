@@ -121,6 +121,30 @@ body.editor {
   box-shadow: inset 0 0 0 1px rgb(0 0 0 / 50%);
 }
 
+.editor-row select,
+.editor-portal select,
+.editor-portal input {
+  font: inherit;
+  padding: 4px 6px;
+  color: var(--text);
+  background: #10171e;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.editor-portal {
+  display: flex;
+  gap: 4px;
+}
+
+.editor-portal select {
+  flex: 1;
+}
+
+.editor-portal input {
+  width: 56px;
+}
+
 .editor-status {
   min-height: 36px;
   color: var(--muted);

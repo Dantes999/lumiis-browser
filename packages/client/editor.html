@@ -18,13 +18,14 @@
 
         <div class="editor-row">
           <span>Map</span>
-          <strong id="map-name">…</strong>
+          <select id="map-select"></select>
         </div>
 
         <div class="editor-tools">
           <button type="button" data-tool="paint" class="active">Paint</button>
-          <button type="button" data-tool="spawn">Player spawn</button>
+          <button type="button" data-tool="spawn">Spawn</button>
           <button type="button" data-tool="mob">Monster</button>
+          <button type="button" data-tool="portal">Portal</button>
         </div>
 
         <div class="editor-label">Tiles</div>
@@ -33,9 +34,17 @@
         <div class="editor-label">Monster</div>
         <div id="mob-picker" class="palette"></div>
 
+        <div class="editor-label">Portal goes to</div>
+        <div class="editor-portal">
+          <select id="portal-target"></select>
+          <input id="portal-x" type="number" min="0" value="1" aria-label="arrival x" />
+          <input id="portal-y" type="number" min="0" value="1" aria-label="arrival y" />
+        </div>
+
         <div class="editor-actions">
           <button id="save" type="button">Save</button>
           <button id="reload" type="button" class="secondary">Reload</button>
+          <button id="new-map" type="button" class="secondary">New</button>
         </div>
 
         <div id="status" class="editor-status"></div>

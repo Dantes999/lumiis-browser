@@ -37,12 +37,21 @@ export function formatMap(map: MapData): string {
   const spawns = map.spawns
     .map((spawn) => `    { "kind": "mob", "key": "${spawn.key}", "tx": ${spawn.tx}, "ty": ${spawn.ty} }`)
     .join(',\n');
+  const portals = map.portals
+    .map(
+      (portal) =>
+        `    { "tx": ${portal.tx}, "ty": ${portal.ty}, "to": "${portal.to}", "spawnX": ${portal.spawnX}, "spawnY": ${portal.spawnY} }`,
+    )
+    .join(',\n');
 
   return `{
   "id": "${map.id}",
   "width": ${map.width},
   "height": ${map.height},
   "spawn": { "x": ${map.spawn.x}, "y": ${map.spawn.y} },
+  "portals": [
+${portals}
+  ],
   "tiles": [
 ${rows.join(',\n')}
   ],

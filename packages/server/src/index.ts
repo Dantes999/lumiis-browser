@@ -72,6 +72,12 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
       return;
     }
 
+    if (req.method === 'GET' && (path === '/maps/' || path === '/maps')) {
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ maps: realm.mapIds }));
+      return;
+    }
+
     void (path.startsWith('/maps/') ? serveShared : serveClient)(req, res);
   });
 

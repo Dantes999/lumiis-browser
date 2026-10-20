@@ -1,8 +1,7 @@
-// A small map editor: paint tiles, set the player spawn, place monsters and
-// save the result as a complete map file the game loads.
+// A small map editor: pick a map, paint tiles, set the player spawn, place
+// monsters and portals, then save it as a complete map file the game loads.
 //
-// It writes the same json shape as shared/maps/testmap.json, so the server and
-// the browser keep reading one file.
+// It writes the same json shape the server reads, so there is one source.
 
 import {
   MONSTER_KEYS,
@@ -14,9 +13,8 @@ import {
   type MonsterKey,
 } from '@lumiis/shared';
 
-const MAP_PATH = '/maps/testmap.json';
 const CELL = 12;
-const SAVE_PATH = '/maps/';
+const DEFAULT_MAP = 'testmap';
 
 const TILE_NAMES: Record<number, string> = {
   [TILE.GRASS]: 'Grass',
@@ -52,7 +50,7 @@ const TILE_COLORS: Record<number, string> = {
   [TILE.GATE_OPEN]: '#1f1f24',
 };
 
-type Tool = 'paint' | 'spawn' | 'mob';
+type Tool = 'paint' | 'spawn' | 'mob' | 'portal';
 
 const mustFind = <T extends HTMLElement>(id: string): T => {
   const element = document.getElementById(id);
@@ -64,13 +62,19 @@ const canvas = mustFind<HTMLCanvasElement>('board');
 const context = canvas.getContext('2d');
 if (context === null) throw new Error('canvas without 2d context');
 
+const mapSelect = mustFind<HTMLSelectElement>('map-select');
+const portalTarget = mustFind<HTMLSelectElement>('portal-target');
+const portalX = mustFind<HTMLInputElement>('portal-x');
+const portalY = mustFind<HTMLInputElement>('portal-y');
+const status = mustFind('status');
+
 let map: MapData | null = null;
+let mapIds: string[] = [];
 let tool: Tool = 'paint';
 let tile: number = TILE.GRASS;
 let mobKey: string = MONSTER_KEYS[0] ?? 'wolf';
 let dirty = false;
 
-const status = mustFind('status');
 const say = (text: string): void => {
   status.textContent = text;
 };
@@ -95,24 +99,19 @@ const draw = (): void => {
     }
   }
 
-  // Player spawn.
   context.strokeStyle = '#ffffff';
   context.lineWidth = 2;
   context.strokeRect(map.spawn.x * CELL + 1, map.spawn.y * CELL + 1, CELL - 2, CELL - 2);
 
-  // Monster spawns.
-  for (const spawn of map.spawns) {
-    context.fillStyle = spawn.key === 'boar' ? '#d8c07a' : '#d05f5f';
+  const dot = (tx: number, ty: number, colour: string, radius: number): void => {
+    context.fillStyle = colour;
     context.beginPath();
-    context.arc(
-      spawn.tx * CELL + CELL / 2,
-      spawn.ty * CELL + CELL / 2,
-      CELL / 3,
-      0,
-      Math.PI * 2,
-    );
+    context.arc(tx * CELL + CELL / 2, ty * CELL + CELL / 2, radius, 0, Math.PI * 2);
     context.fill();
-  }
+  };
+
+  for (const spawn of map.spawns) dot(spawn.tx, spawn.ty, spawn.key === 'boar' ? '#d8c07a' : '#d05f5f', CELL / 3);
+  for (const portal of map.portals) dot(portal.tx, portal.ty, '#a98cf0', CELL / 2.4);
 };
 
 const tileAt = (event: PointerEvent): { tx: number; ty: number } | null => {
@@ -138,14 +137,27 @@ const apply = (event: PointerEvent): void => {
   } else if (tool === 'spawn') {
     if (map.spawn.x === cell.tx && map.spawn.y === cell.ty) return;
     map.spawn = { x: cell.tx, y: cell.ty };
-  } else {
-    const existing = map.spawns.findIndex(
-      (spawn) => spawn.tx === cell.tx && spawn.ty === cell.ty,
-    );
+  } else if (tool === 'mob') {
+    const existing = map.spawns.findIndex((entry) => entry.tx === cell.tx && entry.ty === cell.ty);
     if (existing >= 0) {
       map.spawns.splice(existing, 1);
     } else {
       map.spawns.push({ kind: 'mob', key: mobKey as MonsterKey, tx: cell.tx, ty: cell.ty });
+    }
+  } else {
+    const existing = map.portals.findIndex((entry) => entry.tx === cell.tx && entry.ty === cell.ty);
+    if (existing >= 0) {
+      map.portals.splice(existing, 1);
+      map.tiles[cell.ty * map.width + cell.tx] = TILE.PATH;
+    } else {
+      map.portals.push({
+        tx: cell.tx,
+        ty: cell.ty,
+        to: portalTarget.value,
+        spawnX: Number(portalX.value) || 0,
+        spawnY: Number(portalY.value) || 0,
+      });
+      map.tiles[cell.ty * map.width + cell.tx] = TILE.PORTAL;
     }
   }
 
@@ -153,9 +165,21 @@ const apply = (event: PointerEvent): void => {
   draw();
 };
 
-const load = async (): Promise<void> => {
+const fillSelect = (select: HTMLSelectElement, entries: string[], selected: string): void => {
+  select.replaceChildren();
+  for (const entry of entries) {
+    const option = document.createElement('option');
+    option.value = entry;
+    option.textContent = entry;
+    option.selected = entry === selected;
+    select.append(option);
+  }
+};
+
+const load = async (id: string): Promise<void> => {
   say('Loading…');
-  const response = await fetch(MAP_PATH, { cache: 'no-store' });
+
+  const response = await fetch(`/maps/${id}.json`, { cache: 'no-store' });
   const parsed = validateMap(await response.json());
 
   if (!parsed.ok) {
@@ -163,18 +187,43 @@ const load = async (): Promise<void> => {
     return;
   }
 
-  map = { ...parsed.map, tiles: [...parsed.map.tiles], spawns: [...parsed.map.spawns] };
+  map = { ...parsed.map, tiles: [...parsed.map.tiles], spawns: [...parsed.map.spawns], portals: [...parsed.map.portals] };
   dirty = false;
-  mustFind('map-name').textContent = `${map.id} (${map.width}×${map.height})`;
-  say(`${map.tiles.length} tiles, ${map.spawns.length} monsters.`);
+  fillSelect(mapSelect, mapIds, map.id);
+  fillSelect(
+    portalTarget,
+    mapIds.filter((entry) => entry !== map?.id),
+    portalTarget.value || mapIds.find((entry) => entry !== map?.id) || '',
+  );
+  say(`${map.id}: ${map.width}×${map.height}, ${map.spawns.length} monsters, ${map.portals.length} portals.`);
   draw();
+};
+
+const loadList = async (): Promise<void> => {
+  const response = await fetch('/maps/', { cache: 'no-store' });
+  const body = (await response.json()) as { maps?: string[] };
+  mapIds = body.maps ?? [];
+
+  if (mapIds.length === 0) {
+    say('The server knows no maps. Is it running?');
+    return;
+  }
+
+  await load(mapIds.includes(DEFAULT_MAP) ? DEFAULT_MAP : (mapIds[0] as string));
 };
 
 const save = async (): Promise<void> => {
   if (map === null) return;
 
+  for (const portal of map.portals) {
+    if (!mapIds.includes(portal.to)) {
+      say(`Portal at ${portal.tx},${portal.ty} points at "${portal.to}", which does not exist. Save with a new map first.`);
+      return;
+    }
+  }
+
   say('Saving…');
-  const response = await fetch(`${SAVE_PATH}${map.id}.json`, {
+  const response = await fetch(`/maps/${map.id}.json`, {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(map),
@@ -187,14 +236,50 @@ const save = async (): Promise<void> => {
   }
 
   dirty = false;
-  say('Saved. Restart the game server to walk the new map.');
+  if (!mapIds.includes(map.id)) {
+    mapIds.push(map.id);
+    mapIds.sort();
+  }
+  fillSelect(mapSelect, mapIds, map.id);
+  say('Saved. Restart the game server to load the new map.');
+};
+
+const newMap = (): void => {
+  const id = window.prompt('Map id (lowercase letters, digits, underscore):', 'newmap');
+  if (id === null) return;
+  if (!/^[a-z0-9_]{1,32}$/.test(id)) {
+    say('The id may only use a-z, 0-9 and underscore.');
+    return;
+  }
+  if (mapIds.includes(id)) {
+    say(`A map called ${id} already exists.`);
+    return;
+  }
+
+  const size = Number(window.prompt('Size in tiles:', '32')) || 32;
+  const side = Math.max(8, Math.min(128, Math.floor(size)));
+
+  map = {
+    id,
+    width: side,
+    height: side,
+    spawn: { x: 1, y: 1 },
+    tiles: new Array(side * side).fill(TILE.GRASS),
+    spawns: [],
+    portals: [],
+  };
+
+  markDirty();
+  fillSelect(mapSelect, [...mapIds, id], id);
+  say(`New map ${id} (${side}×${side}). Press Save to write it.`);
+  draw();
 };
 
 const palette = mustFind('palette');
 for (let id = 0; id < TILE_COUNT; id += 1) {
   const button = document.createElement('button');
   button.type = 'button';
-  button.dataset.tile = String(id);
+  button.dataset['tile'] = String(id);
   button.classList.toggle('active', id === tile);
 
   const swatch = document.createElement('span');
@@ -221,7 +306,7 @@ const mobPicker = mustFind('mob-picker');
 for (const key of MONSTER_KEYS) {
   const button = document.createElement('button');
   button.type = 'button';
-  button.dataset.mob = key;
+  button.dataset['mob'] = key;
   button.classList.toggle('active', key === mobKey);
   button.textContent = MONSTER_TYPES[key].name;
 
@@ -262,13 +347,23 @@ canvas.addEventListener('pointercancel', () => {
   painting = false;
 });
 
+mapSelect.addEventListener('change', () => {
+  if (dirty && !window.confirm('Discard the unsaved changes?')) {
+    fillSelect(mapSelect, mapIds, map?.id ?? '');
+    return;
+  }
+  void load(mapSelect.value);
+});
+
 mustFind('save').addEventListener('click', () => {
   void save();
 });
 mustFind('reload').addEventListener('click', () => {
+  if (map === null) return;
   if (dirty && !window.confirm('Discard the unsaved changes?')) return;
-  void load();
+  void load(map.id);
 });
+mustFind('new-map').addEventListener('click', newMap);
 
 window.addEventListener('beforeunload', (event) => {
   if (!dirty) return;
@@ -276,4 +371,4 @@ window.addEventListener('beforeunload', (event) => {
   event.returnValue = '';
 });
 
-void load();
+void loadList();
