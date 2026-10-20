@@ -36,6 +36,38 @@ const RESEND_MS = 500;
 /** Two fingers closer than this cannot be told apart reliably. */
 const PINCH_MIN_DISTANCE = 24;
 const ZOOM_STORAGE_KEY = 'lumiis.zoom';
+
+/**
+ * Typing in a field must never move the player or swing a sword, and neither
+ * should the keyboard do anything while a menu is open.
+ */
+export const blocksGameKeys = (
+  tagName: string,
+  contentEditable: boolean,
+  menuVisible: boolean,
+): boolean =>
+  menuVisible ||
+  contentEditable ||
+  tagName === 'INPUT' ||
+  tagName === 'TEXTAREA' ||
+  tagName === 'SELECT';
+
+const isTyping = (event: KeyboardEvent): boolean => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return false;
+  return blocksGameKeys(target.tagName, target.isContentEditable, false);
+};
+
+/** While the login or character screen is up, the game ignores the keyboard. */
+const menuOpen = (): boolean => {
+  const login = document.getElementById('login');
+  const characters = document.getElementById('characters');
+
+  return (
+    (login !== null && !login.classList.contains('hidden')) ||
+    (characters !== null && !characters.classList.contains('hidden'))
+  );
+};
 /** A tap may wobble this much and still count as a tap, not a drag. */
 const TAP_SLOP = 10;
 const TAP_MAX_MS = 350;
@@ -108,6 +140,8 @@ export function initInput(options: InputOptions): void {
   window.setInterval(() => resend(), RESEND_MS);
 
   window.addEventListener('keydown', (event) => {
+    if (isTyping(event) || menuOpen()) return;
+
     if (event.code === 'Space') {
       event.preventDefault();
       onAttack?.();
@@ -126,6 +160,7 @@ export function initInput(options: InputOptions): void {
   });
 
   window.addEventListener('keyup', (event) => {
+    if (isTyping(event)) return;
     if (event.code in KEY_VECTORS) {
       event.preventDefault();
       pressed.delete(event.code);
