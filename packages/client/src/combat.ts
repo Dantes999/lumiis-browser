@@ -3,6 +3,7 @@
 // hit lands.
 
 import { ATTACK_RANGE, withinAttackRange } from '@lumiis/shared';
+import { sfx } from './audio';
 import { view, type MonsterState } from './state';
 
 /** How close to the pointer a monster has to be to count as clicked. */
@@ -11,6 +12,11 @@ const TAP_RADIUS = 26;
 let sender: (target: number) => void = () => {
   // Replaced once the connection exists.
 };
+
+/** Until this moment the figure shows its attack frames. */
+let attackUntil = 0;
+
+export const attackPoseUntil = (): number => attackUntil;
 
 export const setAttackSender = (fn: (target: number) => void): void => {
   sender = fn;
@@ -36,6 +42,8 @@ export function attackNearestInRange(): boolean {
   if (target === null) return false;
 
   sender(target.id);
+  attackUntil = performance.now() + 320;
+  sfx.swing();
   return true;
 }
 
@@ -46,5 +54,7 @@ export function attackAt(worldX: number, worldY: number): boolean {
   if (!withinAttackRange(view.self, target)) return false;
 
   sender(target.id);
+  attackUntil = performance.now() + 320;
+  sfx.swing();
   return true;
 }

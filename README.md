@@ -40,6 +40,13 @@ npm run typecheck
 To try it on a phone in the same network, open `http://<your-ip>:3000`. The
 server binds to `0.0.0.0` by default; set `HOST` to narrow that.
 
+## Sound
+
+There are no audio files: every sound is generated in the browser with the Web
+Audio API (swing, hit, kill, hurt, pickup, level up). The settings panel has a
+switch and a volume slider. The browser only starts audio after a click, so the
+context is created when the login button is pressed.
+
 ## Maps
 
 Two maps ship with the project: `testmap` (64x64) and `grove` (24x24), linked by

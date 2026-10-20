@@ -14,7 +14,9 @@ import {
   type ItemKey,
   type MapData,
 } from '@lumiis/shared';
+import { sfx } from '../audio';
 import { PlayerView, readTables, spriteSheets, type ArtTables } from '../art';
+import { attackPoseUntil } from '../combat';
 import { MOB_CELL_H, MOB_CELL_W, MonsterView } from '../mobart';
 import { renderedSelfPosition, stepLocal } from '../sim';
 import { view } from '../state';
@@ -37,6 +39,9 @@ export class WorldScene extends Phaser.Scene {
   private layer: Phaser.Tilemaps.TilemapLayer | null = null;
   private lastSelfHp = -1;
   private flashUntil = 0;
+  private lastLevel = -1;
+  private lastItemCount = -1;
+  private readonly lastMonsterHp = new Map<number, number>();
 
   constructor() {
     super('world');
@@ -105,6 +110,33 @@ export class WorldScene extends Phaser.Scene {
     this.renderGround();
     this.renderMonsters(delta);
     this.renderPlayers(delta);
+    this.watchInventory();
+  }
+
+  /** A rising number where the hit landed. */
+  private showDamage(x: number, y: number, amount: number, color: string): void {
+    const text = this.add
+      .text(Math.round(x), Math.round(y), `-${Math.round(amount)}`, {
+        fontFamily: 'ui-monospace, monospace',
+        fontSize: '11px',
+        color,
+      })
+      .setOrigin(0.5)
+      .setDepth(20000);
+
+    this.tweens.add({
+      targets: text,
+      y: Math.round(y) - 22,
+      alpha: 0,
+      duration: 650,
+      onComplete: () => text.destroy(),
+    });
+  }
+
+  private watchInventory(): void {
+    const total = view.inventory.reduce((sum, slot) => sum + (slot?.count ?? 0), 0);
+    if (this.lastItemCount >= 0 && total > this.lastItemCount) sfx.pickup();
+    this.lastItemCount = total;
   }
 
   private renderGround(): void {
@@ -154,12 +186,24 @@ export class WorldScene extends Phaser.Scene {
       monsterView.setPosition(monster.renderX, monster.renderY);
       monsterView.setPose(monster.dir, monster.moving, column);
       monsterView.setHealth(monster.hp, monster.maxHp);
+
+      const previousHp = this.lastMonsterHp.get(monster.id);
+      if (previousHp !== undefined && monster.hp < previousHp) {
+        const lost = previousHp - monster.hp;
+        if (lost > 0) {
+          this.showDamage(monster.renderX, monster.renderY - 30, lost, '#ffd479');
+          sfx.hit();
+        }
+        if (monster.hp <= 0) sfx.kill();
+      }
+      this.lastMonsterHp.set(monster.id, monster.hp);
     }
 
     for (const [id, monsterView] of this.monsterViews) {
       if (seen.has(id)) continue;
       monsterView.destroy();
       this.monsterViews.delete(id);
+      this.lastMonsterHp.delete(id);
     }
   }
 

@@ -2,11 +2,14 @@
 // Stored in the browser and sent to the server, which is the one that collects.
 
 import { ITEM_KEYS, ITEMS } from '@lumiis/shared';
+import { setAudioSettings } from '../audio';
 
 export type PickupSettings = {
   autoPickup: boolean;
   /** Item types auto pickup may take. An empty list takes nothing. */
   types: string[];
+  sound: boolean;
+  volume: number;
 };
 
 const STORAGE_KEY = 'lumiis.pickup';
@@ -20,16 +23,23 @@ const mustFind = (id: string): HTMLElement => {
 const load = (): PickupSettings => {
   try {
     const raw = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? 'null') as unknown;
-    if (typeof raw !== 'object' || raw === null) return { autoPickup: false, types: [...ITEM_KEYS] };
+    if (typeof raw !== 'object' || raw === null) {
+      return { autoPickup: false, types: [...ITEM_KEYS], sound: true, volume: 0.5 };
+    }
 
-    const stored = raw as { autoPickup?: unknown; types?: unknown };
+    const stored = raw as { autoPickup?: unknown; types?: unknown; sound?: unknown; volume?: unknown };
     const types = Array.isArray(stored.types)
       ? stored.types.filter((entry): entry is string => typeof entry === 'string')
       : [...ITEM_KEYS];
 
-    return { autoPickup: stored.autoPickup === true, types };
+    return {
+      autoPickup: stored.autoPickup === true,
+      types,
+      sound: stored.sound !== false,
+      volume: typeof stored.volume === 'number' ? Math.min(1, Math.max(0, stored.volume)) : 0.5,
+    };
   } catch {
-    return { autoPickup: false, types: [...ITEM_KEYS] };
+    return { autoPickup: false, types: [...ITEM_KEYS], sound: true, volume: 0.5 };
   }
 };
 
@@ -42,6 +52,8 @@ export function createSettings(onChange: (settings: PickupSettings) => void): Se
   const toggleButton = mustFind('settings-toggle');
   const auto = mustFind('auto-pickup') as HTMLInputElement;
   const filter = mustFind('pickup-filter');
+  const soundOn = mustFind('sound-on') as HTMLInputElement;
+  const soundVolume = mustFind('sound-volume') as HTMLInputElement;
 
   let settings = load();
 
@@ -79,6 +91,21 @@ export function createSettings(onChange: (settings: PickupSettings) => void): Se
   });
 
   auto.checked = settings.autoPickup;
+  soundOn.checked = settings.sound;
+  soundVolume.value = String(Math.round(settings.volume * 100));
+  setAudioSettings(settings.sound, settings.volume);
+
+  soundOn.addEventListener('change', () => {
+    settings = { ...settings, sound: soundOn.checked };
+    setAudioSettings(settings.sound, settings.volume);
+    save();
+  });
+
+  soundVolume.addEventListener('input', () => {
+    settings = { ...settings, volume: Number(soundVolume.value) / 100 };
+    setAudioSettings(settings.sound, settings.volume);
+    save();
+  });
 
   auto.addEventListener('change', () => {
     settings = { ...settings, autoPickup: auto.checked };

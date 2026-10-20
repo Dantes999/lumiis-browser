@@ -7,6 +7,7 @@ import { WorldScene } from './scene/world-scene';
 import { Connection } from './net';
 import { initInput } from './input';
 import { attackAt, attackNearestInRange, setAttackSender } from './combat';
+import { initAudio, resumeAudio } from './audio';
 import { initController, walkAlong } from './controller';
 import { itemNear, orderPickup, pickupNearestInRange, setPickupSender, tickPickup } from './loot';
 import { view } from './state';
@@ -45,6 +46,9 @@ const settings = createSettings((value) => {
 });
 
 const login = createLogin((name, password, mode) => {
+  // The browser only allows sound after a click, so this is the moment.
+  initAudio();
+  resumeAudio();
   connection.submit(name, password, mode);
 });
 
