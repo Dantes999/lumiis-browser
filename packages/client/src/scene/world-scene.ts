@@ -16,6 +16,7 @@ export class WorldScene extends Phaser.Scene {
   private rows: SpriteRows | null = null;
   private readonly views = new Map<number, PlayerView>();
   private following = false;
+  private appliedZoom = 0;
 
   constructor() {
     super('world');
@@ -43,8 +44,15 @@ export class WorldScene extends Phaser.Scene {
   }
 
   override update(_time: number, delta: number): void {
+    this.applyZoom();
     stepLocal(delta);
     this.renderPlayers(delta);
+  }
+
+  private applyZoom(): void {
+    if (this.appliedZoom === view.zoom) return;
+    this.appliedZoom = view.zoom;
+    this.cameras.main.setZoom(view.zoom);
   }
 
   private drawGround(): void {

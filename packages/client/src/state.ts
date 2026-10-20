@@ -41,6 +41,8 @@ export type ViewState = {
   self: SelfState;
   others: Map<number, RemotePlayer>;
   notice: string | null;
+  /** Camera zoom; 1 shows the world at native size. */
+  zoom: number;
 };
 
 export const view: ViewState = {
@@ -51,6 +53,7 @@ export const view: ViewState = {
   self: { x: 0, y: 0, prevX: 0, prevY: 0, dir: 0, moving: false, offsetX: 0, offsetY: 0 },
   others: new Map(),
   notice: null,
+  zoom: 1,
 };
 
 export const playerCount = (): number => view.others.size + (view.selfId === null ? 0 : 1);
