@@ -47,6 +47,9 @@ export type SelfState = {
   offsetY: number;
   hp: number;
   maxHp: number;
+  level: number;
+  exp: number;
+  yang: number;
 };
 
 export type ViewState = {
@@ -58,6 +61,8 @@ export type ViewState = {
   others: Map<number, RemotePlayer>;
   monsters: Map<number, MonsterState>;
   notice: string | null;
+  /** When the current notice stops being shown, in performance.now() ms. */
+  noticeUntil: number;
   /** Camera zoom; 1 shows the world at native size. */
   zoom: number;
 };
@@ -78,10 +83,14 @@ export const view: ViewState = {
     offsetY: 0,
     hp: 100,
     maxHp: 100,
+    level: 1,
+    exp: 0,
+    yang: 0,
   },
   others: new Map(),
   monsters: new Map(),
   notice: null,
+  noticeUntil: 0,
   zoom: 1,
 };
 

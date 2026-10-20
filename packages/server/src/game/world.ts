@@ -4,6 +4,7 @@
 
 import {
   ATTACK_COOLDOWN_TICKS,
+  MAX_LEVEL,
   MONSTER_ATTACK_COOLDOWN_TICKS,
   MONSTER_ATTACK_RANGE,
   MONSTER_GIVE_UP_FACTOR,
@@ -11,11 +12,14 @@ import {
   MONSTER_TYPES,
   PLAYER_DAMAGE,
   PLAYER_MAX_HP,
+  PLAYER_REGEN_HP,
+  PLAYER_REGEN_TICKS,
   PLAYER_RESPAWN_HP_SHARE,
   PLAYER_RESPAWN_TICKS,
   TICK_MS,
   TILE_SIZE,
   dirFromInput,
+  expForNextLevel,
   moveWithCollision,
   spawnPosition,
   withinAttackRange,
@@ -56,6 +60,10 @@ export type Player = {
   deadUntil: number;
   /** Tick of the last accepted hit, for the attack cooldown. */
   lastAttackTick: number;
+  level: number;
+  /** Experience towards the next level, not total experience. */
+  exp: number;
+  yang: number;
 };
 
 export type Monster = {
@@ -83,7 +91,13 @@ export type Monster = {
 };
 
 export type AttackResult =
-  | { ok: true; damage: number; killed: boolean }
+  | {
+      ok: true;
+      damage: number;
+      killed: boolean;
+      /** Only present when the hit killed the monster. */
+      reward?: { exp: number; yang: number; levelUps: number };
+    }
   | { ok: false; reason: string };
 
 export class World {
@@ -129,6 +143,9 @@ export class World {
       maxHp: PLAYER_MAX_HP,
       deadUntil: 0,
       lastAttackTick: -ATTACK_COOLDOWN_TICKS,
+      level: 1,
+      exp: 0,
+      yang: 0,
     };
     this.playersById.set(player.id, player);
     return player;
@@ -190,7 +207,8 @@ export class World {
       monster.respawnAt = this.tickCount + MONSTER_RESPAWN_TICKS;
       monster.wanderDir = null;
       monster.targetId = null;
-      return { ok: true, damage: PLAYER_DAMAGE, killed: true };
+      const reward = this.rewardKill(player, monster.key);
+      return { ok: true, damage: PLAYER_DAMAGE, killed: true, reward };
     }
 
     return { ok: true, damage: PLAYER_DAMAGE, killed: false };
@@ -205,6 +223,11 @@ export class World {
         if (this.tickCount >= player.deadUntil) this.revivePlayer(player);
         continue;
       }
+
+      if (this.tickCount % PLAYER_REGEN_TICKS === 0 && player.hp < player.maxHp) {
+        player.hp = Math.min(player.maxHp, player.hp + PLAYER_REGEN_HP);
+      }
+
       if (!player.moving) continue;
 
       const next = moveWithCollision(this.map, player.x, player.y, player.dir, TICK_SECONDS);
@@ -234,6 +257,9 @@ export class World {
         moving: player.moving,
         hp: player.hp,
         maxHp: player.maxHp,
+        level: player.level,
+        exp: player.exp,
+        yang: player.yang,
       });
     }
 
@@ -275,6 +301,30 @@ export class World {
     player.deadUntil = 0;
     player.moving = false;
     player.lastAttackTick = this.tickCount - ATTACK_COOLDOWN_TICKS;
+  }
+
+  /** Experience and Yang for a kill, including any level ups it causes. */
+  private rewardKill(
+    player: Player,
+    key: MonsterKey,
+  ): { exp: number; yang: number; levelUps: number } {
+    const type = MONSTER_TYPES[key];
+    const yang = type.yangMin + Math.floor(this.random() * (type.yangMax - type.yangMin + 1));
+
+    player.yang += yang;
+    player.exp += type.exp;
+
+    let levelUps = 0;
+    while (player.level < MAX_LEVEL && player.exp >= expForNextLevel(player.level)) {
+      player.exp -= expForNextLevel(player.level);
+      player.level += 1;
+      levelUps += 1;
+    }
+
+    // Levelling up puts the player back on his feet.
+    if (levelUps > 0) player.hp = player.maxHp;
+
+    return { exp: type.exp, yang, levelUps };
   }
 
   // ----------------------------------------------------------------- monsters

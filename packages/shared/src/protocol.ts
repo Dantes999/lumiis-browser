@@ -15,6 +15,9 @@ export type PlayerSnapshot = {
   moving: boolean;
   hp: number;
   maxHp: number;
+  level: number;
+  exp: number;
+  yang: number;
 };
 
 export type MonsterSnapshot = {

@@ -125,7 +125,18 @@ export function attachGateway(httpServer: HttpServer, world: World): Gateway {
             break;
           }
           const result = world.attack(session.player.id, parsed.message.target);
-          if (!result.ok) send(session, { t: 'notice', text: result.reason });
+          if (!result.ok) {
+            send(session, { t: 'notice', text: result.reason });
+            break;
+          }
+          if (result.killed && result.reward !== undefined) {
+            const level = world.getPlayer(session.player.id)?.level ?? 1;
+            const prefix = result.reward.levelUps > 0 ? `Level ${level}! ` : '';
+            send(session, {
+              t: 'notice',
+              text: `${prefix}+${result.reward.exp} EXP, +${result.reward.yang} Yang`,
+            });
+          }
           break;
         }
         case 'ping':

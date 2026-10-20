@@ -18,6 +18,11 @@ export const MONSTER_TYPES = {
     aggro: 140,
     /** Damage per bite. */
     damage: 8,
+    /** Experience for the player who kills it. */
+    exp: 24,
+    /** Yang dropped, as a range. */
+    yangMin: 6,
+    yangMax: 14,
   },
   boar: {
     look: 'boar',
@@ -28,6 +33,9 @@ export const MONSTER_TYPES = {
     leash: 64,
     aggro: 100,
     damage: 12,
+    exp: 45,
+    yangMin: 10,
+    yangMax: 22,
   },
 } as const;
 
@@ -68,6 +76,12 @@ export const PLAYER_RESPAWN_TICKS = 60;
 
 /** Coming back at full health would make death meaningless. */
 export const PLAYER_RESPAWN_HP_SHARE = 0.5;
+
+/** Health regained per regeneration step (one second). */
+export const PLAYER_REGEN_HP = 1;
+
+/** 20 ticks = one point of health per second while alive. */
+export const PLAYER_REGEN_TICKS = 20;
 
 export const withinAttackRange = (
   from: { x: number; y: number },

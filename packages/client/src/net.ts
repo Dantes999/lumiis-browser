@@ -124,6 +124,7 @@ export class Connection {
         break;
       case 'notice':
         view.notice = message.text;
+        view.noticeUntil = performance.now() + 3000;
         break;
     }
   }
@@ -141,6 +142,9 @@ export class Connection {
         if (player.hp <= 0 && view.self.hp > 0) cancelWalk();
         view.self.hp = player.hp;
         view.self.maxHp = player.maxHp;
+        view.self.level = player.level;
+        view.self.exp = player.exp;
+        view.self.yang = player.yang;
         continue;
       }
 

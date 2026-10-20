@@ -34,6 +34,9 @@ const place = (x: number, y: number, dir = 6): void => {
     offsetY: 0,
     hp: 100,
     maxHp: 100,
+    level: 1,
+    exp: 0,
+    yang: 0,
   };
   resetSimulation();
 };

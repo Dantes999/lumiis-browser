@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ATTACK_COOLDOWN_TICKS,
+  MAX_LEVEL,
   MONSTER_RESPAWN_TICKS,
   MONSTER_TYPES,
   PLAYER_DAMAGE,
@@ -8,6 +9,7 @@ import {
   PLAYER_RESPAWN_HP_SHARE,
   PLAYER_RESPAWN_TICKS,
   TILE,
+  expForNextLevel,
   spawnPosition,
   type MapData,
 } from '@lumiis/shared';
@@ -151,6 +153,9 @@ describe('world', () => {
         moving: false,
         hp: PLAYER_MAX_HP,
         maxHp: PLAYER_MAX_HP,
+        level: 1,
+        exp: 0,
+        yang: 0,
       },
     ]);
   });
@@ -324,5 +329,80 @@ describe('monsters fighting back', () => {
     expect(player.y).toBe(spawn.y);
     expect(player.hp).toBeGreaterThan(0);
     expect(player.hp).toBeLessThanOrEqual(PLAYER_MAX_HP * PLAYER_RESPAWN_HP_SHARE);
+  });
+});
+
+describe('experience and yang', () => {
+  /** Attacks whenever possible, walks the world otherwise, until a kill lands. */
+  const killOne = (world: World, playerId: number): boolean => {
+    for (let tick = 0; tick < 800; tick += 1) {
+      const result = world.attack(playerId, 1);
+      if (result.ok && result.killed) return true;
+      world.step();
+    }
+    return false;
+  };
+
+  it('gives experience and yang for a kill', () => {
+    const world = new World(boxedWolf());
+    const player = world.addPlayer('Kain');
+
+    expect(killOne(world, player.id)).toBe(true);
+
+    expect(player.exp).toBe(MONSTER_TYPES.wolf.exp);
+    expect(player.yang).toBeGreaterThanOrEqual(MONSTER_TYPES.wolf.yangMin);
+    expect(player.yang).toBeLessThanOrEqual(MONSTER_TYPES.wolf.yangMax);
+  });
+
+  it('gives nothing for a hit that does not kill', () => {
+    const world = new World(boxedWolf());
+    const player = world.addPlayer('Kain');
+
+    const result = world.attack(player.id, 1);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.killed).toBe(false);
+      expect(result.reward).toBeUndefined();
+    }
+    expect(player.exp).toBe(0);
+    expect(player.yang).toBe(0);
+  });
+
+  it('levels up when the experience is enough and heals on the way', () => {
+    const world = new World(boxedWolf());
+    const player = world.addPlayer('Kain');
+
+    const needed = expForNextLevel(1);
+    const kills = Math.ceil(needed / MONSTER_TYPES.wolf.exp);
+
+    let levelled = false;
+    for (let kill = 0; kill < kills && !levelled; kill += 1) {
+      for (let tick = 0; tick < 800 && !levelled; tick += 1) {
+        const result = world.attack(player.id, 1);
+        if (result.ok && result.killed) {
+          if (result.reward !== undefined && result.reward.levelUps > 0) {
+            // Checked immediately: before any further bite can happen.
+            expect(player.hp).toBe(player.maxHp);
+            levelled = true;
+          }
+          break;
+        }
+        world.step();
+      }
+    }
+
+    expect(levelled).toBe(true);
+    expect(player.level).toBe(2);
+    expect(player.exp).toBe(MONSTER_TYPES.wolf.exp * kills - needed);
+  });
+
+  it('never goes past the maximum level', () => {
+    const world = new World(boxedWolf());
+    const player = world.addPlayer('Kain');
+    player.level = MAX_LEVEL;
+    player.exp = expForNextLevel(MAX_LEVEL - 1);
+
+    killOne(world, player.id);
+    expect(player.level).toBe(MAX_LEVEL);
   });
 });
