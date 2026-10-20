@@ -29,6 +29,15 @@ export type AttackPose = {
 let pose: AttackPose | null = null;
 let swings = 0;
 
+/** A little extra so the client does not out-run the server and get "Not so fast". */
+const SWING_GRACE_MS = 60;
+
+/** The arm must be back before the next swing starts. */
+const canSwing = (): boolean => {
+  if (pose === null) return true;
+  return performance.now() - pose.startedAt >= pose.durationMs + SWING_GRACE_MS;
+};
+
 export const attackPose = (): AttackPose | null => pose;
 
 const nearest = (x: number, y: number, radius: number): MonsterState | null => {
@@ -45,7 +54,9 @@ const nearest = (x: number, y: number, radius: number): MonsterState | null => {
   return best;
 };
 
-const begin = (target: MonsterState | null, fallback: Direction): void => {
+const begin = (target: MonsterState | null, fallback: Direction): boolean => {
+  if (!canSwing()) return false;
+
   const profile = swingFor(view.equipment.weapon);
 
   const toward =
@@ -65,6 +76,7 @@ const begin = (target: MonsterState | null, fallback: Direction): void => {
   };
 
   sfx.swing();
+  return true;
 };
 
 /** Space bar: swing at the closest monster in reach, otherwise straight ahead. */
@@ -79,16 +91,12 @@ export function swingForward(): void {
  */
 export function attackAt(worldX: number, worldY: number): boolean {
   const target = nearest(worldX, worldY, TAP_RADIUS);
-  if (target !== null) {
-    begin(target, view.self.dir);
-    return true;
-  }
+  if (target !== null) return begin(target, view.self.dir);
 
   const dir = dirFromInput(worldX - view.self.x, worldY - view.self.y);
   if (dir === null) return false;
 
-  begin(null, dir);
-  return true;
+  return begin(null, dir);
 }
 
 export const setAttackSender = (fn: (message: SwingMessage) => void): void => {

@@ -144,12 +144,13 @@ export function initInput(options: InputOptions): void {
 
     if (event.code === 'Space') {
       event.preventDefault();
-      onAttack?.();
+      // A held key repeats on its own; one press is one swing.
+      if (!event.repeat) onAttack?.();
       return;
     }
     if (event.code === 'KeyY') {
       event.preventDefault();
-      onPickup?.();
+      if (!event.repeat) onPickup?.();
       return;
     }
     if (event.code in KEY_VECTORS) {
