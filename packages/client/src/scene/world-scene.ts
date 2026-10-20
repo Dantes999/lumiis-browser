@@ -4,13 +4,13 @@
 import Phaser from 'phaser';
 import { TILE_SIZE, WORLD_PIXELS } from '@lumiis/shared';
 import { PlayerView, readRows, type SpriteRows } from '../art';
-import { stepLocal } from '../sim';
+import { renderedSelfPosition, stepLocal } from '../sim';
 import { view } from '../state';
 
 /** Milliseconds per walking frame. */
 const STEP_FRAME_MS = 180;
-/** How much of the remaining distance other players close per frame. */
-const OTHERS_SMOOTHING = 0.25;
+/** Time constant for other players catching up to their reported position. */
+const OTHERS_TAU_MS = 60;
 
 export class WorldScene extends Phaser.Scene {
   private rows: SpriteRows | null = null;
@@ -44,7 +44,7 @@ export class WorldScene extends Phaser.Scene {
 
   override update(_time: number, delta: number): void {
     stepLocal(delta);
-    this.renderPlayers();
+    this.renderPlayers(delta);
   }
 
   private drawGround(): void {
@@ -67,17 +67,19 @@ export class WorldScene extends Phaser.Scene {
     border.strokeRect(0, 0, WORLD_PIXELS, WORLD_PIXELS);
   }
 
-  private renderPlayers(): void {
+  private renderPlayers(deltaMs: number): void {
     const rows = this.rows;
     if (rows === null) return;
 
     const column = Math.floor(this.time.now / STEP_FRAME_MS) % 2 === 0 ? 1 : 2;
     const seen = new Set<number>();
+    // Frame-rate independent: the same slide at 30, 60 or 144 frames per second.
+    const share = 1 - Math.exp(-deltaMs / OTHERS_TAU_MS);
 
     for (const player of view.others.values()) {
       seen.add(player.id);
-      player.renderX += (player.x - player.renderX) * OTHERS_SMOOTHING;
-      player.renderY += (player.y - player.renderY) * OTHERS_SMOOTHING;
+      player.renderX += (player.x - player.renderX) * share;
+      player.renderY += (player.y - player.renderY) * share;
 
       const playerView = this.viewFor(player.id, rows);
       playerView.setPosition(player.renderX, player.renderY);
@@ -88,12 +90,15 @@ export class WorldScene extends Phaser.Scene {
     if (selfId !== null) {
       seen.add(selfId);
       const self = view.self;
+      const drawn = renderedSelfPosition();
       const selfView = this.viewFor(selfId, rows);
-      selfView.setPosition(self.x + self.offsetX, self.y + self.offsetY);
+      selfView.setPosition(drawn.x, drawn.y);
       selfView.setPose(rows, self.dir, self.moving ? column : 0);
 
       if (!this.following) {
-        this.cameras.main.startFollow(selfView.container, true, 0.15, 0.15);
+        // No pixel rounding: the camera follows the already interpolated
+        // position exactly, so there is nothing left to snap.
+        this.cameras.main.startFollow(selfView.container, false, 1, 1);
         this.following = true;
       }
     }

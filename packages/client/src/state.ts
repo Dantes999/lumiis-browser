@@ -18,13 +18,15 @@ export type RemotePlayer = {
 };
 
 /**
- * The local player. x/y are the predicted position; offsetX/offsetY is the
- * difference to the last server snapshot, faded out over a few frames so a
- * correction is never a visible jump.
+ * The local player. x/y are the predicted position; prevX/prevY the position
+ * before the last simulation step, which is what makes motion smooth between
+ * the 20 Hz steps. offsetX/offsetY is the last server correction, faded out.
  */
 export type SelfState = {
   x: number;
   y: number;
+  prevX: number;
+  prevY: number;
   dir: Direction;
   moving: boolean;
   offsetX: number;
@@ -46,7 +48,7 @@ export const view: ViewState = {
   tick: 0,
   pingMs: null,
   selfId: null,
-  self: { x: 0, y: 0, dir: 0, moving: false, offsetX: 0, offsetY: 0 },
+  self: { x: 0, y: 0, prevX: 0, prevY: 0, dir: 0, moving: false, offsetX: 0, offsetY: 0 },
   others: new Map(),
   notice: null,
 };

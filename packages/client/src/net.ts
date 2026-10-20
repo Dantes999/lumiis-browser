@@ -3,12 +3,11 @@
 
 import { PROTOCOL_VERSION, decode, encode } from '@lumiis/shared';
 import type { ClientMessage, PlayerSnapshot, ServerMessage } from '@lumiis/shared';
+import { applyServerPosition } from './sim';
 import { view } from './state';
 
 const PING_INTERVAL_MS = 2000;
 const MAX_RECONNECT_DELAY_MS = 10000;
-/** Corrections larger than this are a teleport, not a rounding error. */
-const MAX_SMOOTH_CORRECTION = 64;
 
 export class Connection {
   private socket: WebSocket | null = null;
@@ -127,18 +126,7 @@ export class Connection {
 
     for (const player of players) {
       if (player.id === view.selfId) {
-        const renderedX = view.self.x + view.self.offsetX;
-        const renderedY = view.self.y + view.self.offsetY;
-
-        view.self.x = player.x;
-        view.self.y = player.y;
-
-        const errorX = renderedX - player.x;
-        const errorY = renderedY - player.y;
-        const tooFar = Math.hypot(errorX, errorY) > MAX_SMOOTH_CORRECTION;
-
-        view.self.offsetX = tooFar ? 0 : errorX;
-        view.self.offsetY = tooFar ? 0 : errorY;
+        applyServerPosition(player.x, player.y);
         continue;
       }
 

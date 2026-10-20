@@ -21,13 +21,15 @@ const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game',
   backgroundColor: '#0b0f13',
+  // Crisp pixel edges, but no snapping of the camera to whole pixels: rounding
+  // the scroll while the figure moves smoothly produces visible micro-stutter.
+  render: { pixelArt: true, antialias: false, roundPixels: false },
   scale: {
     mode: Phaser.Scale.RESIZE,
     autoCenter: Phaser.Scale.CENTER_BOTH,
     width: window.innerWidth,
     height: window.innerHeight,
   },
-  pixelArt: true,
   scene: [WorldScene],
 });
 
