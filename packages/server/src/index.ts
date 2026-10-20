@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { SNAPSHOT_EVERY_TICKS, TICK_MS, TICK_RATE } from '@lumiis/shared';
 import { World } from './game/world.js';
 import { FixedStepLoop } from './game/loop.js';
+import { loadMap } from './game/map.js';
 import { attachGateway, type Gateway } from './net/gateway.js';
 import { createStaticHandler } from './http/static.js';
 
@@ -16,6 +17,7 @@ export type GameServerOptions = {
   port?: number;
   host?: string;
   staticDir?: string;
+  mapPath?: string;
 };
 
 export type GameServer = {
@@ -26,20 +28,31 @@ export type GameServer = {
   close(): Promise<void>;
 };
 
-const defaultStaticDir = (): string =>
-  resolve(dirname(fileURLToPath(import.meta.url)), '../../client/dist');
+const here = dirname(fileURLToPath(import.meta.url));
+
+const defaultStaticDir = (): string => resolve(here, '../../client/dist');
+const defaultMapPath = (): string => resolve(here, '../../shared/maps/testmap.json');
 
 export async function createGameServer(options: GameServerOptions = {}): Promise<GameServer> {
   const port = options.port ?? Number(process.env['PORT'] ?? 3000);
   const host = options.host ?? process.env['HOST'] ?? '0.0.0.0';
   const staticDir = options.staticDir ?? defaultStaticDir();
+  const mapPath = options.mapPath ?? defaultMapPath();
 
-  const serveStatic = createStaticHandler(staticDir);
+  const map = loadMap(mapPath);
+  // The map is served from the same file the server loaded, so server and
+  // browser can never disagree about where the walls are.
+  const sharedRoot = dirname(dirname(mapPath));
+
+  const serveClient = createStaticHandler(staticDir);
+  const serveShared = createStaticHandler(sharedRoot);
+
   const httpServer = createServer((req, res) => {
-    void serveStatic(req, res);
+    const path = req.url ?? '/';
+    void (path.startsWith('/maps/') ? serveShared : serveClient)(req, res);
   });
 
-  const world = new World();
+  const world = new World(map);
   const gateway = attachGateway(httpServer, world);
 
   const loop = new FixedStepLoop(TICK_MS, () => {
@@ -76,6 +89,7 @@ async function main(): Promise<void> {
   server.loop.start();
 
   console.log(`Lumiis server listening on port ${server.port} (${TICK_RATE} ticks/s)`);
+  console.log(`Map: ${server.world.map.id} (${server.world.map.width}x${server.world.map.height})`);
   console.log(`Open http://localhost:${server.port} in a browser.`);
 
   let closing = false;

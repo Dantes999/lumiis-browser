@@ -1,11 +1,19 @@
-// The world view: ground, players, camera.
+// The world view: tilemap, players, camera.
 // Positions come from the simulation; the server is the final word.
 
 import Phaser from 'phaser';
-import { TILE_SIZE, WORLD_PIXELS } from '@lumiis/shared';
+import {
+  TILE_SIZE,
+  mapPixelHeight,
+  mapPixelWidth,
+  validateMap,
+  type MapData,
+} from '@lumiis/shared';
 import { PlayerView, readRows, type SpriteRows } from '../art';
 import { renderedSelfPosition, stepLocal } from '../sim';
 import { view } from '../state';
+import { buildTilesetTexture } from '../tiles';
+import { setWorldMap } from '../world-map';
 
 /** Milliseconds per walking frame. */
 const STEP_FRAME_MS = 180;
@@ -23,6 +31,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   preload(): void {
+    this.load.json('map', '/maps/testmap.json');
     this.load.json('rows_armor', '/assets/ruestungen/ruestungen.json');
     this.load.json('rows_head', '/assets/modelle/spieler/spieler.json');
     this.load.json('rows_hair', '/assets/haare/haare.json');
@@ -36,11 +45,8 @@ export class WorldScene extends Phaser.Scene {
 
   create(): void {
     this.rows = readRows(this);
-    this.drawGround();
-
     this.cameras.main.setBackgroundColor('#0b0f13');
-    this.cameras.main.setBounds(0, 0, WORLD_PIXELS, WORLD_PIXELS);
-    this.cameras.main.centerOn(WORLD_PIXELS / 2, WORLD_PIXELS / 2);
+    this.buildWorld();
   }
 
   override update(_time: number, delta: number): void {
@@ -49,30 +55,47 @@ export class WorldScene extends Phaser.Scene {
     this.renderPlayers(delta);
   }
 
+  private buildWorld(): void {
+    const check = validateMap(this.cache.json.get('map'));
+    if (!check.ok) {
+      console.error('map could not be loaded:', check.errors);
+      return;
+    }
+
+    const map: MapData = check.map;
+    setWorldMap(map);
+
+    buildTilesetTexture(this);
+    this.addTileLayer(map);
+
+    this.cameras.main.setBounds(0, 0, mapPixelWidth(map), mapPixelHeight(map));
+    this.cameras.main.centerOn(mapPixelWidth(map) / 2, mapPixelHeight(map) / 2);
+  }
+
+  private addTileLayer(map: MapData): void {
+    const rows: number[][] = [];
+    for (let y = 0; y < map.height; y += 1) {
+      rows.push(map.tiles.slice(y * map.width, (y + 1) * map.width));
+    }
+
+    const tilemap = this.make.tilemap({
+      data: rows,
+      tileWidth: TILE_SIZE,
+      tileHeight: TILE_SIZE,
+    });
+    const tileset = tilemap.addTilesetImage('tiles', 'tileset', TILE_SIZE, TILE_SIZE, 0, 0);
+    if (tileset === null) {
+      console.error('tileset texture missing');
+      return;
+    }
+
+    tilemap.createLayer(0, tileset, 0, 0)?.setDepth(-10);
+  }
+
   private applyZoom(): void {
     if (this.appliedZoom === view.zoom) return;
     this.appliedZoom = view.zoom;
     this.cameras.main.setZoom(view.zoom);
-  }
-
-  private drawGround(): void {
-    const checker = this.make.graphics({ x: 0, y: 0 }, false);
-    checker.fillStyle(0x16241d, 1);
-    checker.fillRect(0, 0, TILE_SIZE * 2, TILE_SIZE * 2);
-    checker.fillStyle(0x1a2a22, 1);
-    checker.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-    checker.fillRect(TILE_SIZE, TILE_SIZE, TILE_SIZE, TILE_SIZE);
-    checker.generateTexture('ground', TILE_SIZE * 2, TILE_SIZE * 2);
-    checker.destroy();
-
-    this.add
-      .tileSprite(0, 0, WORLD_PIXELS, WORLD_PIXELS, 'ground')
-      .setOrigin(0, 0)
-      .setDepth(-10);
-
-    const border = this.add.graphics().setDepth(-9);
-    border.lineStyle(4, 0x2f4a3a, 1);
-    border.strokeRect(0, 0, WORLD_PIXELS, WORLD_PIXELS);
   }
 
   private renderPlayers(deltaMs: number): void {

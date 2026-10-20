@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  DIR_COUNT,
-  PLAYER_INSET,
-  WALK_SPEED,
-  WORLD_PIXELS,
-  dirFromInput,
-  stepPosition,
-} from '@lumiis/shared';
+import { DIR_COUNT, WALK_SPEED, dirFromInput, stepPosition } from '@lumiis/shared';
 
 describe('direction from input', () => {
   it('returns null when nothing is pressed', () => {
@@ -48,30 +41,22 @@ describe('stepping a position', () => {
   const dt = 1 / 20;
 
   it('moves exactly speed times time in a cardinal direction', () => {
-    const next = stepPosition(WORLD_PIXELS / 2, WORLD_PIXELS / 2, 6, dt);
-    expect(next.x).toBeCloseTo(WORLD_PIXELS / 2 + WALK_SPEED * dt, 5);
-    expect(next.y).toBeCloseTo(WORLD_PIXELS / 2, 5);
+    const next = stepPosition(100, 100, 6, dt);
+    expect(next.x).toBeCloseTo(100 + WALK_SPEED * dt, 5);
+    expect(next.y).toBeCloseTo(100, 5);
   });
 
   it('does not move faster on a diagonal', () => {
-    const start = { x: WORLD_PIXELS / 2, y: WORLD_PIXELS / 2 };
-    const next = stepPosition(start.x, start.y, 7, dt);
-    const distance = Math.hypot(next.x - start.x, next.y - start.y);
-    expect(distance).toBeCloseTo(WALK_SPEED * dt, 5);
+    const next = stepPosition(100, 100, 7, dt);
+    expect(Math.hypot(next.x - 100, next.y - 100)).toBeCloseTo(WALK_SPEED * dt, 5);
   });
 
-  it('stays inside the world', () => {
-    const edge = stepPosition(WORLD_PIXELS - PLAYER_INSET, WORLD_PIXELS / 2, 6, 10);
-    expect(edge.x).toBe(WORLD_PIXELS - PLAYER_INSET);
-
-    const corner = stepPosition(0, 0, 3, 10);
-    expect(corner.x).toBe(PLAYER_INSET);
-    expect(corner.y).toBe(PLAYER_INSET);
+  it('does not clamp: the map decides where the ground ends', () => {
+    expect(stepPosition(5, 5, 2, dt).x).toBeLessThan(5);
+    expect(stepPosition(5, 5, 4, dt).y).toBeLessThan(5);
   });
 
   it('is a pure function: same input, same output', () => {
-    const first = stepPosition(100, 200, 5, dt);
-    const second = stepPosition(100, 200, 5, dt);
-    expect(first).toEqual(second);
+    expect(stepPosition(100, 200, 5, dt)).toEqual(stepPosition(100, 200, 5, dt));
   });
 });

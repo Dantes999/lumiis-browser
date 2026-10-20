@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
-import { PROTOCOL_VERSION, WORLD_PIXELS } from '@lumiis/shared';
+import { PROTOCOL_VERSION } from '@lumiis/shared';
 import { createGameServer, type GameServer } from '../src/index.js';
 
 let server: GameServer | null = null;
@@ -103,18 +103,26 @@ describe('gateway', () => {
 
     socket.send(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, name: 'Kain' }));
     const welcome = (await nextMessage(socket)) as { id: number };
+
+    const ownPosition = async (): Promise<number | null> => {
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        const message = (await nextMessage(socket)) as Record<string, unknown>;
+        if (message['t'] !== 'snapshot') continue;
+        const players = message['players'] as Array<{ id: number; x: number }>;
+        const me = players.find((player) => player.id === welcome.id);
+        if (me !== undefined) return me.x;
+      }
+      return null;
+    };
+
+    const before = await ownPosition();
     socket.send(JSON.stringify({ t: 'input', dx: 1, dy: 0 }));
+    const after = await ownPosition();
 
-    let moved = false;
-    for (let attempt = 0; attempt < 20 && !moved; attempt += 1) {
-      const message = (await nextMessage(socket)) as Record<string, unknown>;
-      if (message['t'] !== 'snapshot') continue;
-      const players = message['players'] as Array<{ id: number; x: number }>;
-      const me = players.find((player) => player.id === welcome.id);
-      if (me !== undefined && me.x > WORLD_PIXELS / 2) moved = true;
-    }
+    expect(before).not.toBeNull();
+    expect(after).not.toBeNull();
+    expect(after as number).toBeGreaterThan(before as number);
 
-    expect(moved).toBe(true);
     socket.close();
   });
 

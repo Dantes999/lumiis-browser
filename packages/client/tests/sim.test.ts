@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { TICK_MS, WALK_SPEED } from '@lumiis/shared';
+import { TILE, TICK_MS, WALK_SPEED, type MapData } from '@lumiis/shared';
 import { view } from '../src/state';
+import { setWorldMap } from '../src/world-map';
 import {
   applyServerPosition,
   interpolationAlpha,
@@ -11,6 +12,14 @@ import {
 
 /** Pixels moved per tick at walking speed. */
 const STEP_PX = (WALK_SPEED * TICK_MS) / 1000;
+
+const grassMap: MapData = {
+  id: 'test',
+  width: 16,
+  height: 16,
+  spawn: { x: 2, y: 2 },
+  tiles: new Array(16 * 16).fill(TILE.GRASS),
+};
 
 const place = (x: number, y: number, dir = 6): void => {
   view.self = {
@@ -26,7 +35,10 @@ const place = (x: number, y: number, dir = 6): void => {
   resetSimulation();
 };
 
-beforeEach(() => place(100, 100));
+beforeEach(() => {
+  setWorldMap(grassMap);
+  place(100, 100);
+});
 
 describe('local prediction', () => {
   it('draws between the last two steps', () => {

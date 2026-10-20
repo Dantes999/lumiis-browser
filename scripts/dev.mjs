@@ -49,7 +49,7 @@ try {
 
 start('shared watch', ['run', 'watch', '--workspace', '@lumiis/shared']);
 start('server watch', ['run', 'watch', '--workspace', '@lumiis/server']);
-start('server', ['start']);
+start('server', ['run', 'watch:run', '--workspace', '@lumiis/server']);
 start('client', ['run', 'dev', '--workspace', '@lumiis/client']);
 
 console.log('[dev] server on http://localhost:3000, client with hot reload on http://localhost:5173');

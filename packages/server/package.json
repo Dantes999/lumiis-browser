@@ -7,7 +7,8 @@
   "scripts": {
     "build": "tsc -p .",
     "watch": "tsc -p . --watch --preserveWatchOutput",
-    "typecheck": "tsc -p . --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
+    "watch:run": "node --watch dist/index.js"
   },
   "dependencies": {
     "@lumiis/shared": "*",

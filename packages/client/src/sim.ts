@@ -9,8 +9,9 @@
 // is carried in offsetX/offsetY and moved into the position a little each frame,
 // so a correction is a short slide instead of a teleport.
 
-import { TICK_MS, stepPosition } from '@lumiis/shared';
+import { TICK_MS, moveWithCollision } from '@lumiis/shared';
 import { view } from './state';
+import { getWorldMap } from './world-map';
 
 const TICK_SECONDS = TICK_MS / 1000;
 const MAX_STEPS_PER_FRAME = 5;
@@ -45,7 +46,11 @@ function stepOnce(): void {
   self.prevY = self.y;
   if (!self.moving) return;
 
-  const next = stepPosition(self.x, self.y, self.dir, TICK_SECONDS);
+  // Without a map there is no ground, so there is nothing to predict.
+  const map = getWorldMap();
+  if (map === null) return;
+
+  const next = moveWithCollision(map, self.x, self.y, self.dir, TICK_SECONDS);
   self.x = next.x;
   self.y = next.y;
 }

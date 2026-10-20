@@ -1,18 +1,10 @@
-// Movement rules. This file is imported by the server *and* the browser, so a
-// position that the client predicts is computed by exactly the same code the
-// server uses to decide where the player really is.
+// Movement maths. Pure vectors: no map, no clamping, no knowledge of the world.
+// The map decides what is walkable; this file only decides direction and length.
 
 import { TILE_SIZE } from './constants.js';
 
-/** The test world is a square of tiles. Real maps replace this later. */
-export const WORLD_TILES = 64;
-export const WORLD_PIXELS = WORLD_TILES * TILE_SIZE;
-
 /** Walking speed in pixels per second. One tile is TILE_SIZE pixels. */
 export const WALK_SPEED = TILE_SIZE * 4;
-
-/** Keeps the feet this many pixels away from the world border. */
-export const PLAYER_INSET = 8;
 
 export const DIR_COUNT = 8;
 
@@ -50,14 +42,12 @@ export function dirFromInput(dx: number, dy: number): Direction | null {
   return null;
 }
 
-const clamp = (value: number): number =>
-  Math.min(WORLD_PIXELS - PLAYER_INSET, Math.max(PLAYER_INSET, value));
-
 export type Position = { x: number; y: number };
 
 /**
- * One movement step. Pure function: same input, same result, forever.
- * Diagonals are normalised so walking north-east is not faster than north.
+ * One movement step without any collision. Pure function: same input, same
+ * result, forever. Diagonals are normalised so walking north-east is not faster
+ * than walking north.
  */
 export function stepPosition(
   x: number,
@@ -70,8 +60,8 @@ export function stepPosition(
   if (vector === undefined) return { x, y };
 
   const length = Math.hypot(vector[0], vector[1]);
-  const stepX = (vector[0] / length) * speed * deltaSeconds;
-  const stepY = (vector[1] / length) * speed * deltaSeconds;
-
-  return { x: clamp(x + stepX), y: clamp(y + stepY) };
+  return {
+    x: x + (vector[0] / length) * speed * deltaSeconds,
+    y: y + (vector[1] / length) * speed * deltaSeconds,
+  };
 }

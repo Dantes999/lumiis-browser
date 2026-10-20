@@ -3,5 +3,6 @@
 // ever be written once.
 
 export * from './constants.js';
+export * from './map.js';
 export * from './movement.js';
 export * from './protocol.js';

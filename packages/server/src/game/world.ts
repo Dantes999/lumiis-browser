@@ -2,8 +2,8 @@
 //
 // The client only sends intents; this class is the only place where state changes.
 
-import { TICK_MS, WORLD_PIXELS, dirFromInput, stepPosition } from '@lumiis/shared';
-import type { Direction, PlayerSnapshot } from '@lumiis/shared';
+import { TICK_MS, dirFromInput, moveWithCollision, spawnPosition } from '@lumiis/shared';
+import type { Direction, MapData, PlayerSnapshot } from '@lumiis/shared';
 
 /** Seconds the world advances per tick. */
 const TICK_SECONDS = TICK_MS / 1000;
@@ -23,6 +23,8 @@ export class World {
   private nextPlayerId = 1;
   private tickCount = 0;
 
+  constructor(readonly map: MapData) {}
+
   /** Ticks simulated since the server started. */
   get tick(): number {
     return this.tickCount;
@@ -33,12 +35,12 @@ export class World {
   }
 
   addPlayer(name: string): Player {
-    const spawn = WORLD_PIXELS / 2;
+    const spawn = spawnPosition(this.map);
     const player: Player = {
       id: this.nextPlayerId++,
       name,
-      x: spawn,
-      y: spawn,
+      x: spawn.x,
+      y: spawn.y,
       dir: 0,
       moving: false,
     };
@@ -73,14 +75,14 @@ export class World {
 
   /**
    * One simulation step. Movement, monsters, combat and physics arrive here in
-   * later slices; for now every moving player takes one step.
+   * later slices; for now every moving player takes one step with collision.
    */
   step(): void {
     this.tickCount += 1;
 
     for (const player of this.playersById.values()) {
       if (!player.moving) continue;
-      const next = stepPosition(player.x, player.y, player.dir, TICK_SECONDS);
+      const next = moveWithCollision(this.map, player.x, player.y, player.dir, TICK_SECONDS);
       player.x = next.x;
       player.y = next.y;
     }
