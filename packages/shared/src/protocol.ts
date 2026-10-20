@@ -48,6 +48,8 @@ export type GroundItemSnapshot = {
 /** Messages the client may send. */
 export type ClientMessage =
   | { t: 'login'; name: string; password: string; mode: 'login' | 'register' }
+  | { t: 'select'; id: number }
+  | { t: 'createCharacter'; name: string }
   | { t: 'input'; dx: number; dy: number }
   | { t: 'attack'; target: number }
   | { t: 'pickup'; target: number }
@@ -65,9 +67,12 @@ export type ServerMessage =
       ground: GroundItemSnapshot[];
     }
   | { t: 'inventory'; slots: (InventorySlot | null)[] }
+  | { t: 'characters'; list: CharacterSummary[]; max: number }
   | { t: 'authError'; reason: string }
   | { t: 'pong'; at: number }
   | { t: 'notice'; text: string };
+
+export type CharacterSummary = { id: number; name: string; level: number };
 
 export type ParsedMessage =
   | { ok: true; message: ClientMessage }
@@ -136,6 +141,20 @@ export function parseClientMessage(input: unknown): ParsedMessage {
         return fail('pickup needs an item id');
       }
       return { ok: true, message: { t: 'pickup', target } };
+    }
+
+    case 'select': {
+      const id = message.id;
+      if (typeof id !== 'number' || !Number.isInteger(id) || id < 1) {
+        return fail('select needs a character id');
+      }
+      return { ok: true, message: { t: 'select', id } };
+    }
+
+    case 'createCharacter': {
+      const name = message.name;
+      if (typeof name !== 'string' || !NAME_PATTERN.test(name)) return fail('invalid character name');
+      return { ok: true, message: { t: 'createCharacter', name } };
     }
 
     case 'settings': {

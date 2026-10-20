@@ -17,7 +17,7 @@ import {
 } from '@lumiis/shared';
 import type { Direction, InventorySlot } from '@lumiis/shared';
 import type { World, Player } from '../game/world.js';
-import type { Store } from '../store/db.js';
+import { MAX_CHARACTERS, type Store } from '../store/db.js';
 
 type Session = {
   socket: WebSocket;
@@ -26,6 +26,8 @@ type Session = {
   tokensAt: number;
   /** Failed logins on this connection, to slow down guessing. */
   loginAttempts: number;
+  /** Set after a successful login, before a character is chosen. */
+  accountId: number | null;
 };
 
 export type Gateway = {
@@ -91,7 +93,50 @@ export function attachGateway(httpServer: HttpServer, world: World, store: Store
 
   const savePlayer = (player: Player): void => {
     const state = world.saveOf(player.id);
-    if (state !== null) store.saveCharacter(player.accountId, state);
+    if (state !== null) store.saveCharacter(player.characterId, state);
+  };
+
+  const sendCharacters = (session: Session, accountId: number): void => {
+    send(session, { t: 'characters', list: store.listCharacters(accountId), max: MAX_CHARACTERS });
+  };
+
+  /** Loads a character and puts the player into the world. */
+  const enterWorld = (session: Session, characterId: number): void => {
+    if (session.accountId === null || session.player !== null) return;
+    if (store.characterOwner(characterId) !== session.accountId) {
+      send(session, { t: 'authError', reason: 'That character is not yours.' });
+      return;
+    }
+
+    const save = store.loadCharacter(characterId);
+    if (save === null) {
+      send(session, { t: 'authError', reason: 'That character no longer exists.' });
+      return;
+    }
+
+    const player = world.addPlayer({
+      accountId: session.accountId,
+      characterId,
+      name: save.name,
+      x: save.x,
+      y: save.y,
+      dir: save.dir as Direction,
+      hp: save.hp,
+      level: save.level,
+      exp: save.exp,
+      yang: save.yang,
+      inventory: save.inventory,
+    });
+
+    session.player = player;
+    send(session, {
+      t: 'welcome',
+      id: player.id,
+      protocol: PROTOCOL_VERSION,
+      tickRate: TICK_RATE,
+      tick: world.tick,
+    });
+    sendInventory(session, player.id);
   };
 
   /**
@@ -102,7 +147,7 @@ export function attachGateway(httpServer: HttpServer, world: World, store: Store
     session: Session,
     message: { name: string; password: string; mode: 'login' | 'register' },
   ): Promise<void> => {
-    if (session.player !== null) {
+    if (session.accountId !== null || session.player !== null) {
       send(session, { t: 'authError', reason: 'Already logged in.' });
       return;
     }
@@ -123,35 +168,24 @@ export function attachGateway(httpServer: HttpServer, world: World, store: Store
       send(session, { t: 'authError', reason: result.reason });
       return;
     }
-    if (session.player !== null) return;
 
-    const save = result.save;
-    const player = world.addPlayer({
-      accountId: result.accountId,
-      name: result.name,
-      ...(save === null
-        ? {}
-        : {
-            x: save.x,
-            y: save.y,
-            dir: save.dir as Direction,
-            hp: save.hp,
-            level: save.level,
-            exp: save.exp,
-            yang: save.yang,
-            inventory: save.inventory,
-          }),
-    });
+    session.accountId = result.accountId;
+    sendCharacters(session, result.accountId);
+  };
 
-    session.player = player;
-    send(session, {
-      t: 'welcome',
-      id: player.id,
-      protocol: PROTOCOL_VERSION,
-      tickRate: TICK_RATE,
-      tick: world.tick,
-    });
-    sendInventory(session, player.id);
+  const handleCreate = (session: Session, name: string): void => {
+    if (session.accountId === null) {
+      send(session, { t: 'authError', reason: 'Log in first.' });
+      return;
+    }
+
+    const result = store.createCharacter(session.accountId, name);
+    if (!result.ok) {
+      send(session, { t: 'authError', reason: result.reason });
+      sendCharacters(session, session.accountId);
+      return;
+    }
+    enterWorld(session, result.id);
   };
 
   wss.on('connection', (socket) => {
@@ -161,6 +195,7 @@ export function attachGateway(httpServer: HttpServer, world: World, store: Store
       tokens: MAX_MESSAGES_PER_SECOND,
       tokensAt: performance.now(),
       loginAttempts: 0,
+      accountId: null,
     };
     sessions.add(session);
 
@@ -186,16 +221,22 @@ export function attachGateway(httpServer: HttpServer, world: World, store: Store
         case 'login':
           void handleLogin(session, parsed.message);
           break;
+        case 'select':
+          enterWorld(session, parsed.message.id);
+          break;
+        case 'createCharacter':
+          handleCreate(session, parsed.message.name);
+          break;
         case 'input':
           if (session.player === null) {
-            send(session, { t: 'notice', text: 'Say hello before moving.' });
+            send(session, { t: 'notice', text: 'Log in first.' });
             break;
           }
           world.setInput(session.player.id, parsed.message.dx, parsed.message.dy);
           break;
         case 'attack': {
           if (session.player === null) {
-            send(session, { t: 'notice', text: 'Say hello before fighting.' });
+            send(session, { t: 'notice', text: 'Log in first.' });
             break;
           }          const result = world.attack(session.player.id, parsed.message.target);
           if (!result.ok) {
@@ -216,7 +257,7 @@ export function attachGateway(httpServer: HttpServer, world: World, store: Store
         }
         case 'pickup': {
           if (session.player === null) {
-            send(session, { t: 'notice', text: 'Say hello before picking things up.' });
+            send(session, { t: 'notice', text: 'Log in first.' });
             break;
           }
           const result = world.pickup(session.player.id, parsed.message.target);

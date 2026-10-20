@@ -13,6 +13,7 @@ import { view } from './state';
 import { getWorldMap } from './world-map';
 import { createHud } from './ui/hud';
 import { createBag } from './ui/bag';
+import { createCharacterScreen } from './ui/characters';
 import { createLogin } from './ui/login';
 import { createSettings } from './ui/settings';
 
@@ -47,8 +48,16 @@ const login = createLogin((name, password, mode) => {
   connection.submit(name, password, mode);
 });
 
+const characters = createCharacterScreen(
+  (id) => connection.selectCharacter(id),
+  (name) => connection.createCharacter(name),
+);
+
 connection.setWelcomeHandler(() => {
   login.hide();
+  characters.hide();
+  view.characters = null;
+
   const value = settings.current();
   connection.setPickupSettings(value.autoPickup, value.types);
 });
@@ -92,7 +101,15 @@ window.setInterval(() => {
   hud.render(view);
   bag.render(view.inventory);
   tickPickup();
-  if (view.authError !== null) login.showError(view.authError);
+
+  if (view.characters !== null) {
+    login.hide();
+    characters.show(view.characters, view.characterMax);
+  }
+  if (view.authError !== null) {
+    login.showError(view.authError);
+    characters.showError(view.authError);
+  }
 }, HUD_REFRESH_MS);
 
 // Handy for poking at the state from the console during development.

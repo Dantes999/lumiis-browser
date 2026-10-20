@@ -35,6 +35,22 @@ const closedWith = (socket: WebSocket, timeoutMs = 2000): Promise<number> =>
     });
   });
 
+const nextOfType = async (socket: WebSocket, type: string): Promise<Record<string, unknown>> => {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const message = (await nextMessage(socket)) as Record<string, unknown>;
+    if (message['t'] === type) return message;
+  }
+  throw new Error(`no ${type} message`);
+};
+
+/** Registers or logs in, creates the character and waits for the welcome. */
+const enterAs = async (socket: WebSocket, name = 'Kain'): Promise<Record<string, unknown>> => {
+  socket.send(JSON.stringify({ t: 'login', name, password: 'secret123', mode: 'register' }));
+  await nextOfType(socket, 'characters');
+  socket.send(JSON.stringify({ t: 'createCharacter', name }));
+  return nextOfType(socket, 'welcome');
+};
+
 const startServer = async (): Promise<number> => {
   server = await createGameServer({
     port: 0,
@@ -47,12 +63,11 @@ const startServer = async (): Promise<number> => {
 };
 
 describe('gateway', () => {
-  it('welcomes a client after a valid hello', async () => {
+  it('lists characters and welcomes the player after choosing one', async () => {
     const port = await startServer();
     const socket = await openSocket(port);
 
-    socket.send(JSON.stringify({ t: 'login', name: 'Kain', password: 'secret123', mode: 'register' }));
-    const welcome = (await nextMessage(socket)) as Record<string, unknown>;
+    const welcome = await enterAs(socket);
 
     expect(welcome['t']).toBe('welcome');
     expect(welcome['protocol']).toBe(PROTOCOL_VERSION);
@@ -66,8 +81,7 @@ describe('gateway', () => {
     const port = await startServer();
     const socket = await openSocket(port);
 
-    socket.send(JSON.stringify({ t: 'login', name: 'Kain', password: 'secret123', mode: 'register' }));
-    await nextMessage(socket);
+    await enterAs(socket);
 
     const snapshot = (await nextMessage(socket)) as Record<string, unknown>;
     expect(snapshot['t']).toBe('snapshot');
@@ -80,8 +94,7 @@ describe('gateway', () => {
     const port = await startServer();
     const socket = await openSocket(port);
 
-    socket.send(JSON.stringify({ t: 'login', name: 'Kain', password: 'secret123', mode: 'register' }));
-    await nextMessage(socket);
+    await enterAs(socket);
 
     socket.send(JSON.stringify({ t: 'ping', at: 4242 }));
     let pong: Record<string, unknown> | null = null;
@@ -106,8 +119,7 @@ describe('gateway', () => {
     const port = await startServer();
     const socket = await openSocket(port);
 
-    socket.send(JSON.stringify({ t: 'login', name: 'Kain', password: 'secret123', mode: 'register' }));
-    const welcome = (await nextMessage(socket)) as { id: number };
+    const welcome = (await enterAs(socket)) as { id: number };
 
     const ownPosition = async (): Promise<number | null> => {
       for (let attempt = 0; attempt < 20; attempt += 1) {
@@ -135,8 +147,7 @@ describe('gateway', () => {
     const port = await startServer();
     const socket = await openSocket(port);
 
-    socket.send(JSON.stringify({ t: 'login', name: 'Kain', password: 'secret123', mode: 'register' }));
-    await nextMessage(socket);
+    await enterAs(socket);
 
     socket.send(JSON.stringify({ t: 'input', dx: 2, dy: 0 }));
     expect(await closedWith(socket)).toBe(1002);
@@ -154,8 +165,7 @@ describe('gateway', () => {
     const port = await startServer();
     const socket = await openSocket(port);
 
-    socket.send(JSON.stringify({ t: 'login', name: 'Kain', password: 'secret123', mode: 'register' }));
-    await nextMessage(socket);
+    await enterAs(socket);
     expect(server?.world.playerCount).toBe(1);
 
     socket.close();

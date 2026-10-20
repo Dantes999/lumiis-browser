@@ -1,7 +1,7 @@
 // Client-side state. One mutable object: the network writes into it, the
 // simulation and the scene read from it.
 
-import type { Direction, InventorySlot } from '@lumiis/shared';
+import type { CharacterSummary, Direction, InventorySlot } from '@lumiis/shared';
 
 export type ConnectionStatus = 'connecting' | 'online' | 'offline';
 
@@ -74,6 +74,9 @@ export type ViewState = {
   notice: string | null;
   /** Last login failure, shown in the login box. */
   authError: string | null;
+  /** Characters of the logged in account, null until the server sent them. */
+  characters: CharacterSummary[] | null;
+  characterMax: number;
   /** When the current notice stops being shown, in performance.now() ms. */
   noticeUntil: number;
   /** Camera zoom; 1 shows the world at native size. */
@@ -106,6 +109,8 @@ export const view: ViewState = {
   inventory: [],
   notice: null,
   authError: null,
+  characters: null,
+  characterMax: 4,
   noticeUntil: 0,
   zoom: 1,
 };

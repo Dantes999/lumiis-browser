@@ -188,8 +188,9 @@ body {
   box-shadow: inset 0 0 0 1px rgb(0 0 0 / 45%);
 }
 
-/* Login */
-#login {
+/* Login and character screen */
+#login,
+#characters {
   position: fixed;
   inset: 0;
   display: flex;
@@ -199,8 +200,50 @@ body {
   z-index: 10;
 }
 
-#login.hidden {
+#login.hidden,
+#characters.hidden {
   display: none;
+}
+
+.character-list {
+  display: grid;
+  gap: 4px;
+  max-height: 40vh;
+  overflow: auto;
+}
+
+.character-row {
+  font: inherit;
+  text-align: left;
+  padding: 8px;
+  color: var(--text);
+  background: #10171e;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.character-row:hover {
+  border-color: var(--accent);
+}
+
+.character-empty {
+  color: var(--muted);
+}
+
+#character-create {
+  font: inherit;
+  padding: 8px;
+  color: #0b1116;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+#character-create:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .login-box {

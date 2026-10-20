@@ -24,6 +24,7 @@ import {
   TILE_SIZE,
   dirFromInput,
   expForNextLevel,
+  canStand,
   isItemKey,
   moveWithCollision,
   spawnPosition,
@@ -57,6 +58,7 @@ const STUCK_LIMIT_TICKS = 40;
 
 export type PlayerSeed = {
   accountId: number;
+  characterId: number;
   name: string;
   x?: number;
   y?: number;
@@ -70,8 +72,10 @@ export type PlayerSeed = {
 
 export type Player = {
   id: number;
-  /** Row in the accounts table; the character is saved under it. */
+  /** Row in the accounts table. */
   accountId: number;
+  /** Row in the characters table; the save is written under it. */
+  characterId: number;
   name: string;
   /** Position in world pixels, measured at the feet. */
   x: number;
@@ -189,6 +193,7 @@ export class World {
     const player: Player = {
       id: this.nextPlayerId++,
       accountId: seed.accountId,
+      characterId: seed.characterId,
       name: seed.name,
       x: seed.x ?? spawn.x,
       y: seed.y ?? spawn.y,
@@ -208,6 +213,12 @@ export class World {
       autoPickupTypes: new Set<ItemKey>(),
     };
 
+    // A fresh or moved character may stand somewhere that is not walkable.
+    if (!canStand(this.map, player.x, player.y)) {
+      player.x = spawn.x;
+      player.y = spawn.y;
+    }
+
     // A character that was stored dead comes back on his feet at the spawn.
     if (player.hp <= 0) {
       player.hp = Math.max(1, Math.round(player.maxHp * PLAYER_RESPAWN_HP_SHARE));
@@ -225,6 +236,7 @@ export class World {
     if (player === undefined) return null;
 
     return {
+      name: player.name,
       level: player.level,
       exp: player.exp,
       yang: player.yang,

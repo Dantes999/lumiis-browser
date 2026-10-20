@@ -1,4 +1,4 @@
-// Accounts and character saves in one SQLite file.
+// Accounts, characters and their items in one SQLite file.
 //
 // One process, one file: WAL mode, one transaction per save, and passwords
 // hashed with scrypt. The hash is computed asynchronously, so a login does not
@@ -14,10 +14,17 @@ import { INVENTORY_SLOTS, isItemKey, type InventorySlot, type ItemKey } from '@l
 // breaks the test runner. Loading it through require works in both worlds.
 const nodeRequire = createRequire(import.meta.url);
 const { DatabaseSync } = nodeRequire('node:sqlite') as { DatabaseSync: typeof Database };
+
 const scryptAsync = promisify(scrypt);
 const KEY_LENGTH = 64;
 
+/** Character slots per account. */
+export const MAX_CHARACTERS = 4;
+
+export type CharacterSummary = { id: number; name: string; level: number };
+
 export type CharacterSave = {
+  name: string;
   level: number;
   exp: number;
   yang: number;
@@ -30,11 +37,15 @@ export type CharacterSave = {
 };
 
 export type AuthResult =
-  | { ok: true; accountId: number; name: string; save: CharacterSave | null }
+  | { ok: true; accountId: number; name: string }
   | { ok: false; reason: string };
+
+export type CreateResult = { ok: true; id: number } | { ok: false; reason: string };
 
 type AccountRow = { id: number; name: string; salt: string; hash: string };
 type CharacterRow = {
+  id: number;
+  name: string;
   level: number;
   exp: number;
   yang: number;
@@ -57,7 +68,9 @@ CREATE TABLE IF NOT EXISTS accounts (
 );
 
 CREATE TABLE IF NOT EXISTS characters (
-  account_id INTEGER PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  name TEXT NOT NULL UNIQUE COLLATE NOCASE,
   level INTEGER NOT NULL,
   exp INTEGER NOT NULL,
   yang INTEGER NOT NULL,
@@ -70,12 +83,14 @@ CREATE TABLE IF NOT EXISTS characters (
 );
 
 CREATE TABLE IF NOT EXISTS character_items (
-  account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  character_id INTEGER NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
   slot INTEGER NOT NULL,
   item_key TEXT NOT NULL,
   count INTEGER NOT NULL,
-  PRIMARY KEY (account_id, slot)
+  PRIMARY KEY (character_id, slot)
 );
+
+CREATE INDEX IF NOT EXISTS characters_by_account ON characters (account_id);
 `;
 
 const hashPassword = async (password: string, salt: string): Promise<Buffer> =>
@@ -88,7 +103,68 @@ export class Store {
     this.db = new DatabaseSync(file);
     this.db.exec('PRAGMA journal_mode = WAL');
     this.db.exec('PRAGMA foreign_keys = ON');
+    this.migrate();
     this.db.exec(SCHEMA);
+  }
+
+  /**
+   * The first version kept one character per account, keyed by account id.
+   * Saves from that version are carried over instead of dropped.
+   */
+  private migrate(): void {
+    const columns = this.db.prepare("PRAGMA table_info('characters')").all() as unknown as Array<{
+      name: string;
+    }>;
+    if (columns.length === 0) return;
+    if (columns.some((column) => column.name === 'id')) return;
+
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      this.db.exec(`
+        ALTER TABLE characters RENAME TO characters_v1;
+        ALTER TABLE character_items RENAME TO character_items_v1;
+
+        CREATE TABLE characters (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+          name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+          level INTEGER NOT NULL,
+          exp INTEGER NOT NULL,
+          yang INTEGER NOT NULL,
+          hp INTEGER NOT NULL,
+          map TEXT NOT NULL,
+          x REAL NOT NULL,
+          y REAL NOT NULL,
+          dir INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+
+        CREATE TABLE character_items (
+          character_id INTEGER NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+          slot INTEGER NOT NULL,
+          item_key TEXT NOT NULL,
+          count INTEGER NOT NULL,
+          PRIMARY KEY (character_id, slot)
+        );
+
+        INSERT INTO characters
+          (id, account_id, name, level, exp, yang, hp, map, x, y, dir, updated_at)
+        SELECT c.account_id, c.account_id, a.name, c.level, c.exp, c.yang, c.hp,
+               c.map, c.x, c.y, c.dir, c.updated_at
+        FROM characters_v1 c
+        JOIN accounts a ON a.id = c.account_id;
+
+        INSERT INTO character_items (character_id, slot, item_key, count)
+        SELECT account_id, slot, item_key, count FROM character_items_v1;
+
+        DROP TABLE characters_v1;
+        DROP TABLE character_items_v1;
+      `);
+      this.db.exec('COMMIT');
+    } catch (error) {
+      this.db.exec('ROLLBACK');
+      throw error;
+    }
   }
 
   async register(name: string, password: string): Promise<AuthResult> {
@@ -103,7 +179,7 @@ export class Store {
         .prepare('INSERT INTO accounts (name, salt, hash, created_at) VALUES (?, ?, ?, ?)')
         .run(name, salt, hash, Date.now());
 
-      return { ok: true, accountId: Number(info.lastInsertRowid), name, save: null };
+      return { ok: true, accountId: Number(info.lastInsertRowid), name };
     } catch {
       // Two registrations for the same name at the same moment.
       return { ok: false, reason: 'That name is already taken.' };
@@ -129,20 +205,62 @@ export class Store {
     }
 
     this.db.prepare('UPDATE accounts SET last_login_at = ? WHERE id = ?').run(Date.now(), row.id);
-
-    return { ok: true, accountId: row.id, name: row.name, save: this.loadCharacter(row.id) };
+    return { ok: true, accountId: row.id, name: row.name };
   }
 
-  loadCharacter(accountId: number): CharacterSave | null {
+  listCharacters(accountId: number): CharacterSummary[] {
+    const rows = this.db
+      .prepare('SELECT id, name, level FROM characters WHERE account_id = ? ORDER BY id')
+      .all(accountId) as unknown as Array<{ id: number; name: string; level: number }>;
+
+    return rows.map((row) => ({ id: Number(row.id), name: row.name, level: Number(row.level) }));
+  }
+
+  createCharacter(accountId: number, name: string): CreateResult {
+    const count = this.listCharacters(accountId).length;
+    if (count >= MAX_CHARACTERS) {
+      return { ok: false, reason: `You already have ${MAX_CHARACTERS} characters.` };
+    }
+
+    const taken = this.db.prepare('SELECT id FROM characters WHERE name = ?').get(name);
+    if (taken !== undefined) return { ok: false, reason: 'That character name is taken.' };
+
+    try {
+      const info = this.db
+        .prepare(
+          `INSERT INTO characters
+             (account_id, name, level, exp, yang, hp, map, x, y, dir, updated_at)
+           VALUES (?, ?, 1, 0, 0, 100, 'testmap', 0, 0, 0, ?)`,
+        )
+        .run(accountId, name, Date.now());
+
+      return { ok: true, id: Number(info.lastInsertRowid) };
+    } catch {
+      return { ok: false, reason: 'That character name is taken.' };
+    }
+  }
+
+  /** Only a character of this account may be loaded. */
+  characterOwner(characterId: number): number | null {
     const row = this.db
-      .prepare('SELECT level, exp, yang, hp, map, x, y, dir FROM characters WHERE account_id = ?')
-      .get(accountId) as unknown as CharacterRow | undefined;
+      .prepare('SELECT account_id FROM characters WHERE id = ?')
+      .get(characterId) as unknown as { account_id: number } | undefined;
+
+    return row === undefined ? null : Number(row.account_id);
+  }
+
+  loadCharacter(characterId: number): CharacterSave | null {
+    const row = this.db
+      .prepare(
+        'SELECT id, name, level, exp, yang, hp, map, x, y, dir FROM characters WHERE id = ?',
+      )
+      .get(characterId) as unknown as CharacterRow | undefined;
 
     if (row === undefined) return null;
 
     const items = this.db
-      .prepare('SELECT slot, item_key, count FROM character_items WHERE account_id = ?')
-      .all(accountId) as unknown as ItemRow[];
+      .prepare('SELECT slot, item_key, count FROM character_items WHERE character_id = ?')
+      .all(characterId) as unknown as ItemRow[];
 
     const inventory = new Array<InventorySlot>(INVENTORY_SLOTS).fill(null);
     for (const item of items) {
@@ -153,6 +271,7 @@ export class Store {
     }
 
     return {
+      name: row.name,
       level: Number(row.level),
       exp: Number(row.exp),
       yang: Number(row.yang),
@@ -166,30 +285,20 @@ export class Store {
   }
 
   /** Character and items in one transaction: a save is never half written. */
-  saveCharacter(accountId: number, save: CharacterSave): void {
+  saveCharacter(characterId: number, save: CharacterSave): void {
     const writeCharacter = this.db.prepare(`
-      INSERT INTO characters (account_id, level, exp, yang, hp, map, x, y, dir, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(account_id) DO UPDATE SET
-        level = excluded.level,
-        exp = excluded.exp,
-        yang = excluded.yang,
-        hp = excluded.hp,
-        map = excluded.map,
-        x = excluded.x,
-        y = excluded.y,
-        dir = excluded.dir,
-        updated_at = excluded.updated_at
+      UPDATE characters SET
+        level = ?, exp = ?, yang = ?, hp = ?, map = ?, x = ?, y = ?, dir = ?, updated_at = ?
+      WHERE id = ?
     `);
-    const clearItems = this.db.prepare('DELETE FROM character_items WHERE account_id = ?');
+    const clearItems = this.db.prepare('DELETE FROM character_items WHERE character_id = ?');
     const writeItem = this.db.prepare(
-      'INSERT INTO character_items (account_id, slot, item_key, count) VALUES (?, ?, ?, ?)',
+      'INSERT INTO character_items (character_id, slot, item_key, count) VALUES (?, ?, ?, ?)',
     );
 
     this.db.exec('BEGIN IMMEDIATE');
     try {
       writeCharacter.run(
-        accountId,
         save.level,
         save.exp,
         save.yang,
@@ -199,12 +308,13 @@ export class Store {
         save.y,
         save.dir,
         Date.now(),
+        characterId,
       );
-      clearItems.run(accountId);
+      clearItems.run(characterId);
 
       save.inventory.forEach((slot, index) => {
         if (slot === null) return;
-        writeItem.run(accountId, index, slot.key, slot.count);
+        writeItem.run(characterId, index, slot.key, slot.count);
       });
 
       this.db.exec('COMMIT');

@@ -75,6 +75,8 @@ export function step(x: number, y: number): void {
 
 /** Re-sends the current intent; a lost frame heals within half a second. */
 export function resend(): void {
+  // Before the login the server would only answer "log in first".
+  if (view.status !== 'online') return;
   sender(sent.dx, sent.dy);
 }
 

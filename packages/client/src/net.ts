@@ -74,6 +74,14 @@ export class Connection {
     this.socket?.close();
   }
 
+  selectCharacter(id: number): void {
+    this.send({ t: 'select', id });
+  }
+
+  createCharacter(name: string): void {
+    this.send({ t: 'createCharacter', name });
+  }
+
   /** Sends a login attempt, connecting first if needed. */
   submit(name: string, password: string, mode: 'login' | 'register'): void {
     this.credentials = { name, password, mode };
@@ -165,6 +173,10 @@ export class Connection {
         break;
       case 'authError':
         view.authError = message.reason;
+        break;
+      case 'characters':
+        view.characters = message.list;
+        view.characterMax = message.max;
         break;
     }
   }

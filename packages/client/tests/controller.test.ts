@@ -102,11 +102,19 @@ describe('click to walk', () => {
   });
 
   it('sends the current intent again on request', () => {
+    view.status = 'online';
     setManualInput(0, -1);
     resend();
     expect(sent).toEqual([
       [0, -1],
       [0, -1],
     ]);
+  });
+
+  it('stays quiet before the login is done', () => {
+    view.status = 'connecting';
+    setManualInput(0, -1);
+    resend();
+    expect(sent).toHaveLength(1);
   });
 });
