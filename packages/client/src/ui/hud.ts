@@ -18,13 +18,26 @@ export function createHud(): Hud {
   const tick = mustFind('tick');
   const ping = mustFind('ping');
   const players = mustFind('players');
+  const hp = mustFind('hp');
+  const hpFill = mustFind('hp-fill');
 
   return {
     render(state: ViewState): void {
-      status.textContent = state.notice === null ? state.status : `${state.status} – ${state.notice}`;
+      const dead = state.self.hp <= 0;
+      status.textContent = dead
+        ? 'down'
+        : state.notice === null
+          ? state.status
+          : `${state.status} – ${state.notice}`;
+
       tick.textContent = String(state.tick);
       ping.textContent = state.pingMs === null ? '–' : `${state.pingMs} ms`;
       players.textContent = String(playerCount());
+
+      hp.textContent = `${Math.max(0, Math.round(state.self.hp))} / ${state.self.maxHp}`;
+      const share = state.self.maxHp === 0 ? 0 : state.self.hp / state.self.maxHp;
+      hpFill.style.width = `${Math.max(0, Math.min(1, share)) * 100}%`;
+      hpFill.classList.toggle('low', share <= 0.3);
     },
   };
 }

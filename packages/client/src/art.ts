@@ -85,8 +85,7 @@ export class PlayerView {
     this.container.setDepth(Math.round(y));
   }
 
-  setPose(rows: SpriteRows, dir: Direction, column: number): void {
-    const view = viewOf(dir);
+  setPose(rows: SpriteRows, dir: Direction, column: number): void {    const view = viewOf(dir);
     const flip = flipOf(dir);
     const rowSets = [rows.body, rows.head, rows.hair];
 
@@ -95,6 +94,14 @@ export class PlayerView {
       const row = rowSet[view] ?? 0;
       layer.setFrame(frameFor(row, column));
       layer.setFlipX(flip);
+    }
+  }
+
+  /** Red flash while a monster is biting. */
+  setTint(color: number | null): void {
+    for (const layer of this.layers) {
+      if (color === null) layer.clearTint();
+      else layer.setTint(color);
     }
   }
 

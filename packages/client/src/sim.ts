@@ -48,6 +48,13 @@ function stepOnce(): void {
 
   // Click-to-walk steers here; without a path this leaves the intent untouched.
   stepController(self.x, self.y);
+
+  // The dead do not walk: the server ignores input, so predicting it would only
+  // produce a correction every tick.
+  if (self.hp <= 0) {
+    self.moving = false;
+    return;
+  }
   if (!self.moving) return;
 
   // Without a map there is no ground, so there is nothing to predict.

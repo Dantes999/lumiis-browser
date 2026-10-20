@@ -4,6 +4,9 @@ import {
   MONSTER_RESPAWN_TICKS,
   MONSTER_TYPES,
   PLAYER_DAMAGE,
+  PLAYER_MAX_HP,
+  PLAYER_RESPAWN_HP_SHARE,
+  PLAYER_RESPAWN_TICKS,
   TILE,
   spawnPosition,
   type MapData,
@@ -20,6 +23,36 @@ const grassMap = (): MapData => ({
 });
 
 const spawn = spawnPosition(grassMap());
+
+const withWolf = (tx = 9, ty = 8): MapData => {
+  const map = grassMap();
+  map.spawns = [{ kind: 'mob', key: 'wolf', tx, ty }];
+  return map;
+};
+
+/**
+ * A wolf in a one-tile pocket with the player right below it. The pocket is
+ * closed on all eight sides, so the rules can be tested without wandering
+ * moving the target out of reach.
+ */
+const boxedWolf = (): MapData => {
+  const map = grassMap();
+  map.spawn = { x: 9, y: 9 };
+  for (const [x, y] of [
+    [8, 7],
+    [9, 7],
+    [10, 7],
+    [8, 8],
+    [10, 8],
+    [8, 9],
+    [10, 9],
+    [9, 10],
+  ]) {
+    map.tiles[(y as number) * 16 + (x as number)] = TILE.WALL;
+  }
+  map.spawns = [{ kind: 'mob', key: 'wolf', tx: 9, ty: 8 }];
+  return map;
+};
 
 describe('world', () => {
   it('starts empty at tick zero', () => {
@@ -109,42 +142,21 @@ describe('world', () => {
     const world = new World(grassMap());
     world.addPlayer('Kain');
     expect(world.snapshot().players).toEqual([
-      { id: 1, name: 'Kain', x: spawn.x, y: Math.round(spawn.y * 10) / 10, dir: 0, moving: false },
+      {
+        id: 1,
+        name: 'Kain',
+        x: spawn.x,
+        y: Math.round(spawn.y * 10) / 10,
+        dir: 0,
+        moving: false,
+        hp: PLAYER_MAX_HP,
+        maxHp: PLAYER_MAX_HP,
+      },
     ]);
   });
 });
 
 describe('monsters', () => {
-  const withWolf = (tx = 9, ty = 8): MapData => {
-    const map = grassMap();
-    map.spawns = [{ kind: 'mob', key: 'wolf', tx, ty }];
-    return map;
-  };
-
-  /**
-   * A wolf in a one-tile pocket with the player right below it. The pocket is
-   * closed on all eight sides, so the rules can be tested without wandering
-   * moving the target out of reach.
-   */
-  const boxedWolf = (): MapData => {
-    const map = grassMap();
-    map.spawn = { x: 9, y: 9 };
-    for (const [x, y] of [
-      [8, 7],
-      [9, 7],
-      [10, 7],
-      [8, 8],
-      [10, 8],
-      [8, 9],
-      [10, 9],
-      [9, 10],
-    ]) {
-      map.tiles[(y as number) * 16 + (x as number)] = TILE.WALL;
-    }
-    map.spawns = [{ kind: 'mob', key: 'wolf', tx: 9, ty: 8 }];
-    return map;
-  };
-
   it('spawns the monsters the map asks for', () => {
     const world = new World(withWolf());
     expect(world.monsterCount).toBe(1);
@@ -230,5 +242,87 @@ describe('monsters', () => {
     // One step beyond the leash is allowed: the turn happens after the step.
     expect(furthest).toBeGreaterThan(0);
     expect(furthest).toBeLessThanOrEqual(MONSTER_TYPES.wolf.leash + 8);
+  });
+});
+
+describe('monsters fighting back', () => {
+  const withWolfAt = withWolf;
+
+  const distanceTo = (world: World, playerId: number, monsterId: number): number => {
+    const player = world.getPlayer(playerId);
+    const monster = world.getMonster(monsterId);
+    if (player === undefined || monster === undefined) return Number.POSITIVE_INFINITY;
+    return Math.hypot(player.x - monster.x, player.y - monster.y);
+  };
+
+  it('notices a player nearby and closes in', () => {
+    const world = new World(withWolfAt(12, 8));
+    const player = world.addPlayer('Kain');
+
+    const before = distanceTo(world, player.id, 1);
+    for (let tick = 0; tick < 10; tick += 1) world.step();
+
+    expect(world.getMonster(1)?.targetId).toBe(player.id);
+    expect(distanceTo(world, player.id, 1)).toBeLessThan(before);
+  });
+
+  it('ignores a player that is out of sight', () => {
+    const world = new World(withWolfAt(15, 15));
+    const player = world.addPlayer('Kain');
+
+    for (let tick = 0; tick < 10; tick += 1) world.step();
+    expect(world.getMonster(1)?.targetId).toBeNull();
+    expect(player.hp).toBe(PLAYER_MAX_HP);
+  });
+
+  it('bites a player that stands next to it', () => {
+    const world = new World(boxedWolf());
+    const player = world.addPlayer('Kain');
+
+    world.step(); // notice the player
+    world.step(); // bite
+
+    expect(player.hp).toBe(PLAYER_MAX_HP - MONSTER_TYPES.wolf.damage);
+  });
+
+  it('does not bite more often than its cooldown allows', () => {
+    const world = new World(boxedWolf());
+    const player = world.addPlayer('Kain');
+
+    world.step();
+    world.step();
+    const afterFirstBite = player.hp;
+
+    for (let tick = 0; tick < 10; tick += 1) world.step();
+    expect(player.hp).toBe(afterFirstBite);
+  });
+
+  it('kills a player who just stands there, then revives him at the spawn', () => {
+    const world = new World(boxedWolf());
+    const player = world.addPlayer('Kain');
+    const spawn = spawnPosition(world.map);
+
+    let ticks = 0;
+    while (player.hp > 0 && ticks < 2000) {
+      world.step();
+      ticks += 1;
+    }
+
+    expect(player.hp).toBe(0);
+    expect(player.deadUntil).toBeGreaterThan(0);
+
+    // The dead cannot act.
+    world.setInput(player.id, 1, 0);
+    world.step();
+    expect(player.moving).toBe(false);
+    expect(world.attack(player.id, 1).ok).toBe(false);
+
+    // And they come back at the spawn with reduced health.
+    for (let tick = 0; tick < PLAYER_RESPAWN_TICKS + 1; tick += 1) world.step();
+    expect(player.deadUntil).toBe(0);
+    expect(player.x).toBe(spawn.x);
+    expect(player.y).toBe(spawn.y);
+    expect(player.hp).toBeGreaterThan(0);
+    expect(player.hp).toBeLessThanOrEqual(PLAYER_MAX_HP * PLAYER_RESPAWN_HP_SHARE);
   });
 });

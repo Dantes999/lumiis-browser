@@ -10,15 +10,24 @@ export const MONSTER_TYPES = {
     maxHp: 40,
     /** Pixels per second while wandering. */
     speed: 48,
+    /** Pixels per second while chasing a player. */
+    chaseSpeed: 96,
     /** How far a monster may wander from its spawn, in pixels. */
     leash: 96,
+    /** A player closer than this becomes the target. */
+    aggro: 140,
+    /** Damage per bite. */
+    damage: 8,
   },
   boar: {
     look: 'boar',
     name: 'Wild boar',
     maxHp: 70,
     speed: 32,
+    chaseSpeed: 64,
     leash: 64,
+    aggro: 100,
+    damage: 12,
   },
 } as const;
 
@@ -41,6 +50,24 @@ export const PLAYER_DAMAGE = 12;
 
 /** 200 ticks = ten seconds until a killed monster comes back. */
 export const MONSTER_RESPAWN_TICKS = 200;
+
+/** How close a monster has to be to bite. */
+export const MONSTER_ATTACK_RANGE = 40;
+
+/** 20 ticks = one bite per second. */
+export const MONSTER_ATTACK_COOLDOWN_TICKS = 20;
+
+/** A monster gives up when the target is this many aggro radii away. */
+export const MONSTER_GIVE_UP_FACTOR = 2.5;
+
+/** Player health until character stats arrive. */
+export const PLAYER_MAX_HP = 100;
+
+/** 60 ticks = three seconds lying on the ground. */
+export const PLAYER_RESPAWN_TICKS = 60;
+
+/** Coming back at full health would make death meaningless. */
+export const PLAYER_RESPAWN_HP_SHARE = 0.5;
 
 export const withinAttackRange = (
   from: { x: number; y: number },

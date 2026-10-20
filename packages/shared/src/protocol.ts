@@ -13,6 +13,8 @@ export type PlayerSnapshot = {
   y: number;
   dir: number;
   moving: boolean;
+  hp: number;
+  maxHp: number;
 };
 
 export type MonsterSnapshot = {

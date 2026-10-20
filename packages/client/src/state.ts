@@ -45,6 +45,8 @@ export type SelfState = {
   moving: boolean;
   offsetX: number;
   offsetY: number;
+  hp: number;
+  maxHp: number;
 };
 
 export type ViewState = {
@@ -65,7 +67,18 @@ export const view: ViewState = {
   tick: 0,
   pingMs: null,
   selfId: null,
-  self: { x: 0, y: 0, prevX: 0, prevY: 0, dir: 0, moving: false, offsetX: 0, offsetY: 0 },
+  self: {
+    x: 0,
+    y: 0,
+    prevX: 0,
+    prevY: 0,
+    dir: 0,
+    moving: false,
+    offsetX: 0,
+    offsetY: 0,
+    hp: 100,
+    maxHp: 100,
+  },
   others: new Map(),
   monsters: new Map(),
   notice: null,

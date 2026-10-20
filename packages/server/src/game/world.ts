@@ -4,9 +4,15 @@
 
 import {
   ATTACK_COOLDOWN_TICKS,
+  MONSTER_ATTACK_COOLDOWN_TICKS,
+  MONSTER_ATTACK_RANGE,
+  MONSTER_GIVE_UP_FACTOR,
   MONSTER_RESPAWN_TICKS,
   MONSTER_TYPES,
   PLAYER_DAMAGE,
+  PLAYER_MAX_HP,
+  PLAYER_RESPAWN_HP_SHARE,
+  PLAYER_RESPAWN_TICKS,
   TICK_MS,
   TILE_SIZE,
   dirFromInput,
@@ -33,6 +39,8 @@ const PAUSE_MIN_TICKS = 20;
 const PAUSE_MAX_TICKS = 50;
 /** After bumping into something, a monster waits this long before turning. */
 const BLOCKED_PAUSE_TICKS = 5;
+/** A chasing monster that cannot get closer for this long loses interest. */
+const STUCK_LIMIT_TICKS = 40;
 
 export type Player = {
   id: number;
@@ -42,6 +50,10 @@ export type Player = {
   y: number;
   dir: Direction;
   moving: boolean;
+  hp: number;
+  maxHp: number;
+  /** 0 while alive, otherwise the tick this player stands up again. */
+  deadUntil: number;
   /** Tick of the last accepted hit, for the attack cooldown. */
   lastAttackTick: number;
 };
@@ -57,11 +69,17 @@ export type Monster = {
   homeX: number;
   homeY: number;
   speed: number;
+  chaseSpeed: number;
   leash: number;
-  wanderDir: Direction | null;
-  wanderUntil: number;
+  aggro: number;
+  damage: number;
   /** 0 while alive, otherwise the tick this monster returns on. */
   respawnAt: number;
+  targetId: number | null;
+  lastAttackTick: number;
+  stuckTicks: number;
+  wanderDir: Direction | null;
+  wanderUntil: number;
 };
 
 export type AttackResult =
@@ -107,6 +125,9 @@ export class World {
       y: spawn.y,
       dir: 0,
       moving: false,
+      hp: PLAYER_MAX_HP,
+      maxHp: PLAYER_MAX_HP,
+      deadUntil: 0,
       lastAttackTick: -ATTACK_COOLDOWN_TICKS,
     };
     this.playersById.set(player.id, player);
@@ -114,6 +135,9 @@ export class World {
   }
 
   removePlayer(id: number): boolean {
+    for (const monster of this.monstersById.values()) {
+      if (monster.targetId === id) monster.targetId = null;
+    }
     return this.playersById.delete(id);
   }
 
@@ -127,7 +151,7 @@ export class World {
    */
   setInput(id: number, dx: number, dy: number): void {
     const player = this.playersById.get(id);
-    if (player === undefined) return;
+    if (player === undefined || player.deadUntil > 0) return;
 
     const dir = dirFromInput(dx, dy);
     if (dir === null) {
@@ -145,6 +169,7 @@ export class World {
   attack(playerId: number, targetId: number): AttackResult {
     const player = this.playersById.get(playerId);
     if (player === undefined) return { ok: false, reason: 'You are not in the world.' };
+    if (player.deadUntil > 0) return { ok: false, reason: 'You are down.' };
 
     const monster = this.monstersById.get(targetId);
     if (monster === undefined || monster.respawnAt > 0) {
@@ -164,24 +189,37 @@ export class World {
       monster.hp = 0;
       monster.respawnAt = this.tickCount + MONSTER_RESPAWN_TICKS;
       monster.wanderDir = null;
+      monster.targetId = null;
       return { ok: true, damage: PLAYER_DAMAGE, killed: true };
     }
 
     return { ok: true, damage: PLAYER_DAMAGE, killed: false };
   }
 
-  /** One simulation step: movement, monsters, respawns. */
+  /** One simulation step: players, monsters, deaths and respawns. */
   step(): void {
     this.tickCount += 1;
 
     for (const player of this.playersById.values()) {
+      if (player.deadUntil > 0) {
+        if (this.tickCount >= player.deadUntil) this.revivePlayer(player);
+        continue;
+      }
       if (!player.moving) continue;
+
       const next = moveWithCollision(this.map, player.x, player.y, player.dir, TICK_SECONDS);
       player.x = next.x;
       player.y = next.y;
     }
 
-    this.stepMonsters();
+    for (const monster of this.monstersById.values()) {
+      if (monster.respawnAt > 0) {
+        if (this.tickCount >= monster.respawnAt) this.reviveMonster(monster);
+        continue;
+      }
+      if (this.stepMonsterCombat(monster)) continue;
+      this.stepMonsterWander(monster);
+    }
   }
 
   snapshot(): { players: PlayerSnapshot[]; monsters: MonsterSnapshot[] } {
@@ -194,6 +232,8 @@ export class World {
         y: Math.round(player.y * 10) / 10,
         dir: player.dir,
         moving: player.moving,
+        hp: player.hp,
+        maxHp: player.maxHp,
       });
     }
 
@@ -208,14 +248,36 @@ export class World {
         dir: monster.dir,
         hp: monster.hp,
         maxHp: monster.maxHp,
-        moving: monster.wanderDir !== null,
+        moving: monster.wanderDir !== null || monster.targetId !== null,
       });
     }
 
     return { players, monsters };
   }
 
-  // ---------------------------------------------------------------- monsters
+  // ------------------------------------------------------------------ players
+
+  private hurtPlayer(player: Player, damage: number): void {
+    if (player.deadUntil > 0) return;
+
+    player.hp = Math.max(0, player.hp - damage);
+    if (player.hp > 0) return;
+
+    player.deadUntil = this.tickCount + PLAYER_RESPAWN_TICKS;
+    player.moving = false;
+  }
+
+  private revivePlayer(player: Player): void {
+    const spawn = spawnPosition(this.map);
+    player.x = spawn.x;
+    player.y = spawn.y;
+    player.hp = Math.max(1, Math.round(player.maxHp * PLAYER_RESPAWN_HP_SHARE));
+    player.deadUntil = 0;
+    player.moving = false;
+    player.lastAttackTick = this.tickCount - ATTACK_COOLDOWN_TICKS;
+  }
+
+  // ----------------------------------------------------------------- monsters
 
   private spawnMonsters(): void {
     for (const spawn of this.map.spawns) {
@@ -234,48 +296,121 @@ export class World {
         homeX: x,
         homeY: y,
         speed: type.speed,
+        chaseSpeed: type.chaseSpeed,
         leash: type.leash,
+        aggro: type.aggro,
+        damage: type.damage,
+        respawnAt: 0,
+        targetId: null,
+        lastAttackTick: -MONSTER_ATTACK_COOLDOWN_TICKS,
+        stuckTicks: 0,
         wanderDir: null,
         wanderUntil: 0,
-        respawnAt: 0,
       });
       this.nextMonsterId += 1;
     }
   }
 
-  private stepMonsters(): void {
-    for (const monster of this.monstersById.values()) {
-      if (monster.respawnAt > 0) {
-        if (this.tickCount >= monster.respawnAt) this.reviveMonster(monster);
-        continue;
+  /** Returns true when the monster spent the tick on a target. */
+  private stepMonsterCombat(monster: Monster): boolean {
+    const target = monster.targetId === null ? undefined : this.playersById.get(monster.targetId);
+
+    if (target !== undefined && target.deadUntil === 0) {
+      const distance = Math.hypot(target.x - monster.x, target.y - monster.y);
+      const fromHome = Math.hypot(target.x - monster.homeX, target.y - monster.homeY);
+
+      if (distance > monster.aggro * MONSTER_GIVE_UP_FACTOR || fromHome > monster.leash * 3) {
+        monster.targetId = null;
+        return false;
       }
 
-      if (this.tickCount >= monster.wanderUntil) this.chooseWander(monster);
-      if (monster.wanderDir === null) continue;
-
-      const next = moveWithCollision(
-        this.map,
-        monster.x,
-        monster.y,
-        monster.wanderDir,
-        TICK_SECONDS,
-        monster.speed,
-      );
-
-      if (next.x === monster.x && next.y === monster.y) {
-        // Something is in the way; stand still for a moment, then try elsewhere.
+      if (distance <= MONSTER_ATTACK_RANGE) {
         monster.wanderDir = null;
-        monster.wanderUntil = this.tickCount + BLOCKED_PAUSE_TICKS;
-        continue;
+        monster.dir = dirFromInput(target.x - monster.x, target.y - monster.y) ?? monster.dir;
+
+        if (this.tickCount - monster.lastAttackTick >= MONSTER_ATTACK_COOLDOWN_TICKS) {
+          monster.lastAttackTick = this.tickCount;
+          this.hurtPlayer(target, monster.damage);
+        }
+        return true;
       }
 
-      monster.x = next.x;
-      monster.y = next.y;
+      const dir = dirFromInput(target.x - monster.x, target.y - monster.y);
+      if (dir !== null) {
+        monster.dir = dir;
+        const beforeX = monster.x;
+        const beforeY = monster.y;
+        const next = moveWithCollision(
+          this.map,
+          monster.x,
+          monster.y,
+          dir,
+          TICK_SECONDS,
+          monster.chaseSpeed,
+        );
+        monster.x = next.x;
+        monster.y = next.y;
 
-      if (Math.hypot(monster.x - monster.homeX, monster.y - monster.homeY) > monster.leash) {
-        monster.wanderDir = dirFromInput(monster.homeX - monster.x, monster.homeY - monster.y) ?? 0;
-        monster.wanderUntil = this.tickCount + 10;
+        if (monster.x === beforeX && monster.y === beforeY) {
+          monster.stuckTicks += 1;
+          if (monster.stuckTicks > STUCK_LIMIT_TICKS) monster.targetId = null;
+        } else {
+          monster.stuckTicks = 0;
+        }
       }
+      return true;
+    }
+
+    // The target is gone or dead: look for a new one.
+    monster.targetId = null;
+    const found = this.findTarget(monster);
+    if (found === null) return false;
+
+    monster.targetId = found.id;
+    return true;
+  }
+
+  private findTarget(monster: Monster): Player | null {
+    let best: Player | null = null;
+    let bestDistance = monster.aggro;
+
+    for (const player of this.playersById.values()) {
+      if (player.deadUntil > 0) continue;
+      const distance = Math.hypot(player.x - monster.x, player.y - monster.y);
+      if (distance <= bestDistance) {
+        best = player;
+        bestDistance = distance;
+      }
+    }
+    return best;
+  }
+
+  private stepMonsterWander(monster: Monster): void {
+    if (this.tickCount >= monster.wanderUntil) this.chooseWander(monster);
+    if (monster.wanderDir === null) return;
+
+    const next = moveWithCollision(
+      this.map,
+      monster.x,
+      monster.y,
+      monster.wanderDir,
+      TICK_SECONDS,
+      monster.speed,
+    );
+
+    if (next.x === monster.x && next.y === monster.y) {
+      // Something is in the way; stand still for a moment, then try elsewhere.
+      monster.wanderDir = null;
+      monster.wanderUntil = this.tickCount + BLOCKED_PAUSE_TICKS;
+      return;
+    }
+
+    monster.x = next.x;
+    monster.y = next.y;
+
+    if (Math.hypot(monster.x - monster.homeX, monster.y - monster.homeY) > monster.leash) {
+      monster.wanderDir = dirFromInput(monster.homeX - monster.x, monster.homeY - monster.y) ?? 0;
+      monster.wanderUntil = this.tickCount + 10;
     }
   }
 
@@ -298,6 +433,8 @@ export class World {
     monster.y = monster.homeY;
     monster.wanderDir = null;
     monster.wanderUntil = this.tickCount + 10;
+    monster.targetId = null;
+    monster.lastAttackTick = this.tickCount - MONSTER_ATTACK_COOLDOWN_TICKS;
   }
 
   private randomTicks(min: number, max: number): number {

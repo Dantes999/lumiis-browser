@@ -29,6 +29,8 @@ export class WorldScene extends Phaser.Scene {
   private readonly monsterViews = new Map<number, MonsterView>();
   private following = false;
   private appliedZoom = 0;
+  private lastSelfHp = -1;
+  private flashUntil = 0;
 
   constructor() {
     super('world');
@@ -167,6 +169,11 @@ export class WorldScene extends Phaser.Scene {
       const selfView = this.viewFor(selfId, rows);
       selfView.setPosition(drawn.x, drawn.y);
       selfView.setPose(rows, self.dir, self.moving ? column : 0);
+
+      // A hit is shown as a short red flash on the figure.
+      if (self.hp < this.lastSelfHp) this.flashUntil = this.time.now + 140;
+      this.lastSelfHp = self.hp;
+      selfView.setTint(this.time.now < this.flashUntil ? 0xff8080 : null);
 
       if (!this.following) {
         // No pixel rounding: the camera follows the already interpolated

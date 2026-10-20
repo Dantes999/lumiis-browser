@@ -64,6 +64,24 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.hp-bar {
+  height: 6px;
+  margin-top: 3px;
+  border-radius: 3px;
+  background: #3a1d1d;
+  overflow: hidden;
+}
+
+.hp-fill {
+  height: 100%;
+  width: 100%;
+  background: #6fd07a;
+}
+
+.hp-fill.low {
+  background: #d05f5f;
+}
+
 /* Touch joystick: appears where the finger lands, never captures the HUD. */
 #stick {
   position: fixed;
