@@ -74,6 +74,34 @@ describe('protocol', () => {
     }
   });
 
+  it('accepts a pickup order and settings from the client', () => {
+    expect(parseClientMessage({ t: 'pickup', target: 4 })).toEqual({
+      ok: true,
+      message: { t: 'pickup', target: 4 },
+    });
+    expect(
+      parseClientMessage({ t: 'settings', autoPickup: true, autoPickupTypes: ['wolf_fur'] }),
+    ).toEqual({
+      ok: true,
+      message: { t: 'settings', autoPickup: true, autoPickupTypes: ['wolf_fur'] },
+    });
+  });
+
+  it('rejects pickup orders and settings that make no sense', () => {
+    for (const bad of [
+      { t: 'pickup' },
+      { t: 'pickup', target: 0 },
+      { t: 'pickup', target: '3' },
+      { t: 'settings' },
+      { t: 'settings', autoPickup: 'yes', autoPickupTypes: [] },
+      { t: 'settings', autoPickup: true, autoPickupTypes: 'wolf_fur' },
+      { t: 'settings', autoPickup: true, autoPickupTypes: ['not_an_item'] },
+      { t: 'settings', autoPickup: true, autoPickupTypes: [1, 2] },
+    ]) {
+      expect(parseClientMessage(bad).ok).toBe(false);
+    }
+  });
+
   it('rejects unknown message types', () => {
     expect(parseClientMessage({ t: 'teleport', x: 1, y: 1 }).ok).toBe(false);
   });

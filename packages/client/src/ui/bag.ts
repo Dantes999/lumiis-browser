@@ -27,6 +27,10 @@ export function createBag(): Bag {
   }
 
   const toggle = (): void => {
+    if (panel.classList.contains('hidden')) {
+      const settingsPanel = document.getElementById('settings');
+      if (settingsPanel !== null) settingsPanel.classList.add('hidden');
+    }
     panel.classList.toggle('hidden');
   };
 

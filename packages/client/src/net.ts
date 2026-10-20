@@ -22,6 +22,7 @@ export class Connection {
   private reconnectTimer: number | null = null;
   private reconnectDelayMs = 1000;
   private closedByUser = false;
+  private onWelcome: (() => void) | null = null;
 
   constructor(private readonly name: string) {}
 
@@ -80,6 +81,19 @@ export class Connection {
     this.send({ t: 'attack', target });
   }
 
+  pickup(target: number): void {
+    this.send({ t: 'pickup', target });
+  }
+
+  setPickupSettings(autoPickup: boolean, autoPickupTypes: string[]): void {
+    this.send({ t: 'settings', autoPickup, autoPickupTypes });
+  }
+
+  /** Called after every successful handshake, so settings can be re-sent. */
+  setWelcomeHandler(handler: () => void): void {
+    this.onWelcome = handler;
+  }
+
   private scheduleReconnect(): void {
     if (this.reconnectTimer !== null) return;
     const delay = this.reconnectDelayMs;
@@ -116,6 +130,7 @@ export class Connection {
         view.status = 'online';
         view.selfId = message.id;
         view.tick = message.tick;
+        this.onWelcome?.();
         break;
       case 'snapshot':
         view.tick = message.tick;

@@ -11,6 +11,8 @@ export type SendInput = (dx: number, dy: number) => void;
 export type InputOptions = {
   /** Space bar: attack whatever is closest and in reach. */
   onAttack?: () => void;
+  /** Y key: pick up the closest item in reach. */
+  onPickup?: () => void;
   /** A short tap or click on the world, in screen pixels. */
   onTap?: (screenX: number, screenY: number) => void;
 };
@@ -39,7 +41,7 @@ const TAP_SLOP = 10;
 const TAP_MAX_MS = 350;
 
 export function initInput(options: InputOptions): void {
-  const { onAttack, onTap } = options;
+  const { onAttack, onPickup, onTap } = options;
 
   const pressed = new Set<string>();
 
@@ -109,6 +111,11 @@ export function initInput(options: InputOptions): void {
     if (event.code === 'Space') {
       event.preventDefault();
       onAttack?.();
+      return;
+    }
+    if (event.code === 'KeyY') {
+      event.preventDefault();
+      onPickup?.();
       return;
     }
     if (event.code in KEY_VECTORS) {

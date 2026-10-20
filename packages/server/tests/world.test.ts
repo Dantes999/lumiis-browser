@@ -484,61 +484,78 @@ describe('loot', () => {
     world.setInput(player.id, 0, 0);
   };
 
-  it('leaves an item behind that the killer can pick up', () => {
+  /** Kills until a drop appears; returns it while it still lies on the ground. */
+  const killForDrop = (world: World, playerId: number) => {
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      killOne(world, playerId);
+      const item = world.snapshot().ground[0];
+      if (item !== undefined) return item;
+      for (let tick = 0; tick < MONSTER_RESPAWN_TICKS + 20; tick += 1) world.step();
+    }
+    return undefined;
+  };
+
+  it('leaves drops where they fall until the player asks for them', () => {
     const world = new World(withWolf(9, 8));
     const player = world.addPlayer('Kain');
 
-    let dropped = false;
-    for (let attempt = 0; attempt < 12 && !dropped; attempt += 1) {
-      killOne(world, player.id);
-      for (let tick = 0; tick < MONSTER_RESPAWN_TICKS + 20; tick += 1) world.step();
-      dropped = world.snapshot().ground.length > 0;
-    }
-    expect(dropped).toBe(true);
-
-    const item = world.snapshot().ground[0];
+    const item = killForDrop(world, player.id);
     expect(item).toBeDefined();
     if (item === undefined) return;
 
     walkTo(world, player, item.x, item.y);
     for (let tick = 0; tick < 10; tick += 1) world.step();
 
+    // Auto pickup is off by default: standing on it changes nothing.
+    expect(world.snapshot().ground.some((entry) => entry.id === item.id)).toBe(true);
+    expect(player.inventory.every((slot) => slot === null)).toBe(true);
+
+    // The explicit order takes it.
+    expect(world.pickup(player.id, item.id).ok).toBe(true);
     expect(world.snapshot().ground.some((entry) => entry.id === item.id)).toBe(false);
-    const carried = player.inventory.filter((slot) => slot !== null);
-    expect(carried.length).toBeGreaterThan(0);
-    expect(carried.reduce((sum, slot) => sum + (slot?.count ?? 0), 0)).toBeGreaterThan(0);
+    expect(player.inventory.filter((slot) => slot !== null)).toHaveLength(1);
   });
 
-  it('keeps a fresh drop reserved for its owner', () => {
+  it('refuses an item that is out of reach or still reserved', () => {
     const world = new World(withWolf(9, 8));
     const killer = world.addPlayer('Killer');
     const stranger = world.addPlayer('Stranger');
 
-    // Kill until something drops. The item is read before the next tick, so the
-    // killer has not had a chance to pick it up yet.
-    let item = world.snapshot().ground[0];
-    for (let attempt = 0; attempt < 12 && item === undefined; attempt += 1) {
-      killOne(world, killer.id);
-      item = world.snapshot().ground[0];
-      if (item === undefined) {
-        for (let tick = 0; tick < MONSTER_RESPAWN_TICKS + 20; tick += 1) world.step();
-      }
-    }
+    const item = killForDrop(world, killer.id);
     expect(item).toBeDefined();
     if (item === undefined) return;
 
-    // The owner steps out; the stranger stands right on the drop.
+    // The stranger is at the spawn, not next to the drop.
+    expect(world.pickup(stranger.id, item.id).ok).toBe(false);
+
     world.removePlayer(killer.id);
     walkTo(world, stranger, item.x, item.y);
-    for (let tick = 0; tick < 5; tick += 1) world.step();
 
-    expect(world.snapshot().ground.some((entry) => entry.id === item.id)).toBe(true);
-    expect(stranger.inventory.every((slot) => slot === null)).toBe(true);
+    // In reach now, but the killer's five seconds are still running.
+    expect(world.pickup(stranger.id, item.id).ok).toBe(false);
 
-    // Once the protection has run out, anyone may take it.
     for (let tick = 0; tick < DROP_PROTECT_TICKS + 5; tick += 1) world.step();
+    expect(world.pickup(stranger.id, item.id).ok).toBe(true);
+  });
+
+  it('auto pickup only takes the types that were chosen', () => {
+    const world = new World(withWolf(9, 8));
+    const player = world.addPlayer('Kain');
+    world.setPickupSettings(player.id, true, ['boar_tusk']);
+
+    const item = killForDrop(world, player.id);
+    expect(item?.key).toBe('wolf_fur');
+    if (item === undefined) return;
+
+    walkTo(world, player, item.x, item.y);
+    for (let tick = 0; tick < 10; tick += 1) world.step();
+    expect(world.snapshot().ground.some((entry) => entry.id === item.id)).toBe(true);
+
+    // Allow pelts and stand on it again.
+    world.setPickupSettings(player.id, true, ['wolf_fur']);
+    for (let tick = 0; tick < 5; tick += 1) world.step();
     expect(world.snapshot().ground.some((entry) => entry.id === item.id)).toBe(false);
-    expect(stranger.inventory.some((slot) => slot !== null)).toBe(true);
+    expect(player.inventory.some((slot) => slot !== null)).toBe(true);
   });
 
   it('stacks the same item into one slot', () => {
@@ -547,19 +564,15 @@ describe('loot', () => {
 
     let collected = 0;
     for (let attempt = 0; attempt < 40 && collected < 3; attempt += 1) {
-      killOne(world, player.id);
-      for (let tick = 0; tick < MONSTER_RESPAWN_TICKS + 20; tick += 1) world.step();
-
-      const item = world.snapshot().ground[0];
+      const item = killForDrop(world, player.id);
       if (item === undefined) continue;
       walkTo(world, player, item.x, item.y);
-      for (let tick = 0; tick < 10; tick += 1) world.step();
-      collected += 1;
+      if (world.pickup(player.id, item.id).ok) collected += 1;
     }
 
     expect(collected).toBeGreaterThanOrEqual(3);
     const used = player.inventory.filter((slot) => slot !== null);
-    expect(used.length).toBe(1);
+    expect(used).toHaveLength(1);
     expect(used[0]?.key).toBe('wolf_fur');
     expect(used[0]?.count).toBeGreaterThanOrEqual(3);
   });

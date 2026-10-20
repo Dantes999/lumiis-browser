@@ -141,8 +141,7 @@ export function attachGateway(httpServer: HttpServer, world: World): Gateway {
           if (session.player === null) {
             send(session, { t: 'notice', text: 'Say hello before fighting.' });
             break;
-          }
-          const result = world.attack(session.player.id, parsed.message.target);
+          }          const result = world.attack(session.player.id, parsed.message.target);
           if (!result.ok) {
             send(session, { t: 'notice', text: result.reason });
             break;
@@ -157,6 +156,24 @@ export function attachGateway(httpServer: HttpServer, world: World): Gateway {
               });
             }
           }
+          break;
+        }
+        case 'pickup': {
+          if (session.player === null) {
+            send(session, { t: 'notice', text: 'Say hello before picking things up.' });
+            break;
+          }
+          const result = world.pickup(session.player.id, parsed.message.target);
+          if (!result.ok) send(session, { t: 'notice', text: result.reason });
+          break;
+        }
+        case 'settings': {
+          if (session.player === null) break;
+          world.setPickupSettings(
+            session.player.id,
+            parsed.message.autoPickup,
+            parsed.message.autoPickupTypes,
+          );
           break;
         }
         case 'ping':

@@ -73,6 +73,9 @@ export type Player = {
   exp: number;
   yang: number;
   inventory: InventorySlot[];
+  /** Picks up drops on its own, limited to autoPickupTypes when that is set. */
+  autoPickup: boolean;
+  autoPickupTypes: Set<ItemKey>;
 };
 
 /** An item lying on the ground, waiting to be picked up. */
@@ -182,6 +185,8 @@ export class World {
       exp: 0,
       yang: 0,
       inventory: new Array<InventorySlot>(INVENTORY_SLOTS).fill(null),
+      autoPickup: false,
+      autoPickupTypes: new Set<ItemKey>(),
     };
     this.playersById.set(player.id, player);
     return player;
@@ -461,21 +466,65 @@ export class World {
   private collectGroundItems(): void {
     if (this.groundItems.size === 0) return;
 
-    for (const item of [...this.groundItems.values()]) {
-      for (const player of this.playersById.values()) {
-        if (player.deadUntil > 0) continue;
+    for (const player of this.playersById.values()) {
+      if (!player.autoPickup || player.deadUntil > 0) continue;
 
-        const reserved =
-          item.ownerId !== null && item.ownerId !== player.id && this.tickCount < item.ownerUntil;
-        if (reserved) continue;
-        if (Math.hypot(player.x - item.x, player.y - item.y) > PICKUP_RANGE) continue;
-        if (!this.addToInventory(player, item.key, item.count)) continue;
-
-        this.groundItems.delete(item.id);
-        this.inventoryUpdates.add(player.id);
-        break;
+      for (const item of [...this.groundItems.values()]) {
+        if (!player.autoPickupTypes.has(item.key)) continue;
+        this.tryPickup(player, item);
       }
     }
+  }
+
+  /** Takes one specific item; used by the pickup order from the client. */
+  pickup(
+    playerId: number,
+    itemId: number,
+  ): { ok: true; key: ItemKey; count: number } | { ok: false; reason: string } {
+    const player = this.playersById.get(playerId);
+    if (player === undefined) return { ok: false, reason: 'You are not in the world.' };
+    if (player.deadUntil > 0) return { ok: false, reason: 'You are down.' };
+
+    const item = this.groundItems.get(itemId);
+    if (item === undefined) return { ok: false, reason: 'That item is gone.' };
+
+    const reserved =
+      item.ownerId !== null && item.ownerId !== player.id && this.tickCount < item.ownerUntil;
+    if (reserved) return { ok: false, reason: 'That is still someone else\'s.' };
+    if (Math.hypot(player.x - item.x, player.y - item.y) > PICKUP_RANGE) {
+      return { ok: false, reason: 'Too far away.' };
+    }
+    if (this.freeSpace(player, item.key) < item.count) {
+      return { ok: false, reason: 'Your inventory is full.' };
+    }
+
+    const key = item.key;
+    const count = item.count;
+    this.tryPickup(player, item);
+    return { ok: true, key, count };
+  }
+
+  /** Auto pickup and its item filter, as chosen in the client settings. */
+  setPickupSettings(playerId: number, autoPickup: boolean, types: string[]): void {
+    const player = this.playersById.get(playerId);
+    if (player === undefined) return;
+
+    player.autoPickup = autoPickup;
+    player.autoPickupTypes = new Set(types.filter(isItemKey));
+  }
+
+  private tryPickup(player: Player, item: GroundItem): boolean {
+    if (player.deadUntil > 0) return false;
+
+    const reserved =
+      item.ownerId !== null && item.ownerId !== player.id && this.tickCount < item.ownerUntil;
+    if (reserved) return false;
+    if (Math.hypot(player.x - item.x, player.y - item.y) > PICKUP_RANGE) return false;
+    if (!this.addToInventory(player, item.key, item.count)) return false;
+
+    this.groundItems.delete(item.id);
+    this.inventoryUpdates.add(player.id);
+    return true;
   }
 
   /** Free room for one item type across all slots. */

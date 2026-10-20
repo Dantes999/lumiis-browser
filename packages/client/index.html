@@ -49,11 +49,19 @@
         <span id="yang" class="hud-value">0</span>
       </div>
       <button id="bag-toggle" class="hud-button" type="button">Bag</button>
+      <button id="settings-toggle" class="hud-button" type="button">Settings</button>
     </div>
 
     <div id="bag" class="panel hidden">
       <div class="panel-title">Inventory</div>
       <div id="bag-grid" class="bag-grid"></div>
+    </div>
+
+    <div id="settings" class="panel hidden">
+      <div class="panel-title">Settings</div>
+      <label class="filter-row"><input type="checkbox" id="auto-pickup" /> Auto pickup</label>
+      <div class="filter-title">Auto pickup takes</div>
+      <div id="pickup-filter" class="filter-list"></div>
     </div>
 
     <script type="module" src="/src/main.ts"></script>

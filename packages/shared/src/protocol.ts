@@ -5,7 +5,7 @@
 // message here and decides what actually happens.
 
 import { NAME_PATTERN, PROTOCOL_VERSION } from './constants.js';
-import type { InventorySlot } from './items.js';
+import { isItemKey, type InventorySlot } from './items.js';
 
 export type PlayerSnapshot = {
   id: number;
@@ -45,6 +45,8 @@ export type ClientMessage =
   | { t: 'hello'; v: number; name: string }
   | { t: 'input'; dx: number; dy: number }
   | { t: 'attack'; target: number }
+  | { t: 'pickup'; target: number }
+  | { t: 'settings'; autoPickup: boolean; autoPickupTypes: string[] }
   | { t: 'ping'; at: number };
 
 /** Messages the server may send. */
@@ -112,6 +114,31 @@ export function parseClientMessage(input: unknown): ParsedMessage {
         return fail('attack needs a monster id');
       }
       return { ok: true, message: { t: 'attack', target } };
+    }
+
+    case 'pickup': {
+      const target = message.target;
+      if (typeof target !== 'number' || !Number.isInteger(target) || target < 1) {
+        return fail('pickup needs an item id');
+      }
+      return { ok: true, message: { t: 'pickup', target } };
+    }
+
+    case 'settings': {
+      const autoPickup = message.autoPickup;
+      const types = message.autoPickupTypes;
+
+      if (typeof autoPickup !== 'boolean') return fail('settings need autoPickup');
+      if (!Array.isArray(types) || types.length > 64) return fail('settings need a type list');
+      if (!types.every((entry) => typeof entry === 'string')) {
+        return fail('settings types must be strings');
+      }
+
+      const autoPickupTypes = types as string[];
+      for (const type of autoPickupTypes) {
+        if (!isItemKey(type)) return fail(`unknown item type in settings: ${type}`);
+      }
+      return { ok: true, message: { t: 'settings', autoPickup, autoPickupTypes } };
     }
 
     case 'ping': {

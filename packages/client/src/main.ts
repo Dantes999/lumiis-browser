@@ -8,10 +8,12 @@ import { Connection } from './net';
 import { initInput } from './input';
 import { attackAt, attackNearestInRange, setAttackSender } from './combat';
 import { initController, walkAlong } from './controller';
+import { itemNear, orderPickup, pickupNearestInRange, setPickupSender, tickPickup } from './loot';
 import { view } from './state';
 import { getWorldMap } from './world-map';
 import { createHud } from './ui/hud';
 import { createBag } from './ui/bag';
+import { createSettings } from './ui/settings';
 
 const HUD_REFRESH_MS = 100;
 const NAME_PATTERN = /[^A-Za-z0-9_]/g;
@@ -40,11 +42,23 @@ const game = new Phaser.Game({
 
 const connection = new Connection(playerName());
 setAttackSender((target) => connection.attack(target));
+setPickupSender((itemId) => connection.pickup(itemId));
 initController((dx, dy) => connection.setInput(dx, dy));
+
+const settings = createSettings((value) => {
+  connection.setPickupSettings(value.autoPickup, value.types);
+});
+connection.setWelcomeHandler(() => {
+  const value = settings.current();
+  connection.setPickupSettings(value.autoPickup, value.types);
+});
 
 initInput({
   onAttack: () => {
     attackNearestInRange();
+  },
+  onPickup: () => {
+    pickupNearestInRange();
   },
   onTap: (screenX, screenY) => {
     const scene = game.scene.getScene('world');
@@ -52,11 +66,20 @@ initInput({
 
     const point = scene.cameras.main.getWorldPoint(screenX, screenY);
 
-    // A tap on a monster within reach is a hit; anything else is a walk order.
+    // A tap on a monster within reach is a hit.
     if (attackAt(point.x, point.y)) return;
 
     const map = getWorldMap();
     if (map === null) return;
+
+    // A tap on an item is an order: walk there and take it.
+    const item = itemNear(point.x, point.y);
+    if (item !== null) {
+      orderPickup(item.id);
+      const path = findPath(map, { x: view.self.x, y: view.self.y }, { x: item.x, y: item.y });
+      if (path !== null) walkAlong(path);
+      return;
+    }
 
     const path = findPath(map, { x: view.self.x, y: view.self.y }, point);
     if (path !== null) walkAlong(path);
@@ -70,6 +93,7 @@ const bag = createBag();
 window.setInterval(() => {
   hud.render(view);
   bag.render(view.inventory);
+  tickPickup();
 }, HUD_REFRESH_MS);
 
 // Handy for poking at the state from the console during development.
