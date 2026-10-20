@@ -84,6 +84,16 @@
     { "kind": "mob", "key": "boar", "tx": 22, "ty": 53 },
     { "kind": "mob", "key": "boar", "tx": 24, "ty": 56 },
     { "kind": "mob", "key": "boar", "tx": 14, "ty": 58 },
-    { "kind": "mob", "key": "boar", "tx": 38, "ty": 46 }
+    { "kind": "mob", "key": "boar", "tx": 38, "ty": 46 },
+    { "kind": "mob", "key": "dummy", "tx": 40, "ty": 44 },
+    { "kind": "mob", "key": "dummy", "tx": 33, "ty": 47 },
+    { "kind": "mob", "key": "dummy", "tx": 34, "ty": 47 },
+    { "kind": "mob", "key": "dummy", "tx": 35, "ty": 47 },
+    { "kind": "mob", "key": "dummy", "tx": 38, "ty": 50 },
+    { "kind": "mob", "key": "dummy", "tx": 39, "ty": 50 },
+    { "kind": "mob", "key": "dummy", "tx": 38, "ty": 51 },
+    { "kind": "mob", "key": "dummy", "tx": 39, "ty": 51 },
+    { "kind": "mob", "key": "dummy", "tx": 46, "ty": 43 },
+    { "kind": "mob", "key": "dummy", "tx": 49, "ty": 43 }
   ]
 }

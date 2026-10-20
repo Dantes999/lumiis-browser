@@ -206,10 +206,9 @@ export class WorldScene extends Phaser.Scene {
     const shown = attackPose();
     if (shown !== null && shown.startedAt !== this.shownSwingAt) {
       this.shownSwingAt = shown.startedAt;
-      const self = view.self;
       const reach = swingFor(view.equipment.weapon).range;
       this.trails.push(
-        new SwingTrail(this, self.x, self.y, shown.dir, shown.sweep, shown.durationMs, reach),
+        new SwingTrail(this, () => renderedSelfPosition(), shown.dir, shown.sweep, shown.durationMs, reach),
       );
     }
 
@@ -219,11 +218,11 @@ export class WorldScene extends Phaser.Scene {
         const count = (this.swingCounts.get(id) ?? 0) + 1;
         this.swingCounts.set(id, count);
         const reach = swingFor(isItemKey(player.weapon) ? player.weapon : null).range;
+        const follow = player;
         this.trails.push(
           new SwingTrail(
             this,
-            player.renderX,
-            player.renderY,
+            () => ({ x: follow.renderX, y: follow.renderY }),
             player.dir,
             count % 2 === 0 ? -1 : 1,
             swingMs(swingFor(isItemKey(player.weapon) ? player.weapon : null)),

@@ -32,25 +32,26 @@ export class SwingTrail {
   private readonly start: number;
   private readonly end: number;
   private readonly reach: number;
+  private readonly follow: () => { x: number; y: number };
   private elapsed = 0;
 
   constructor(
     scene: Phaser.Scene,
-    x: number,
-    y: number,
+    follow: () => { x: number; y: number },
     dir: Direction,
     sweep: 1 | -1,
     private readonly durationMs: number,
     reach: number,
   ) {
+    this.follow = follow;
     this.reach = Math.max(MIN_REACH, reach);
     this.start = angleOf(dir) - SWING_ARC * sweep;
     this.end = angleOf(dir) + SWING_ARC * sweep;
 
     this.graphics = scene.add.graphics();
-    this.graphics.setPosition(x, y - BLADE_HEIGHT);
+    this.graphics.setPosition(follow().x, follow().y - BLADE_HEIGHT);
     // In front of the figure: depth grows with the feet position.
-    this.graphics.setDepth(Math.round(y) + 1);
+    this.graphics.setDepth(Math.round(follow().y) + 1);
     this.redraw(0);
   }
 
@@ -59,6 +60,11 @@ export class SwingTrail {
   }
 
   update(deltaMs: number): void {
+    // The streak belongs to the swinging figure, so it moves with it.
+    const position = this.follow();
+    this.graphics.setPosition(position.x, position.y - BLADE_HEIGHT);
+    this.graphics.setDepth(Math.round(position.y) + 1);
+
     this.elapsed += deltaMs;
     const progress = Math.min(1, this.elapsed / this.durationMs);
     this.redraw(progress);

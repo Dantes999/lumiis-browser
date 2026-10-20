@@ -48,6 +48,21 @@ export const MONSTER_TYPES = {
       { key: 'plate_armor', chance: 0.02, min: 1, max: 1 },
     ],
   },
+  /** A standing target for testing swings and reach; never fights back. */
+  dummy: {
+    look: 'dummy',
+    name: 'Training dummy',
+    maxHp: 100000,
+    speed: 0,
+    chaseSpeed: 0,
+    leash: 0,
+    aggro: 0,
+    damage: 0,
+    exp: 0,
+    yangMin: 0,
+    yangMax: 0,
+    drops: [],
+  },
 } as const;
 
 export type MonsterKey = keyof typeof MONSTER_TYPES;
