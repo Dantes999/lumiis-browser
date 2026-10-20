@@ -16,7 +16,8 @@ import {
   parseClientMessage,
 } from '@lumiis/shared';
 import type { Direction, InventorySlot } from '@lumiis/shared';
-import type { World, Player } from '../game/world.js';
+import type { Player } from '../game/world.js';
+import type { Realm } from '../game/realm.js';
 import { MAX_CHARACTERS, type Store } from '../store/db.js';
 
 type Session = {
@@ -46,7 +47,7 @@ const refuse = (socket: WebSocket, code: number, reason: string): void => {
   socket.close(code, reason);
 };
 
-export function attachGateway(httpServer: HttpServer, world: World, store: Store): Gateway {
+export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store): Gateway {
   const wss = new WebSocketServer({
     server: httpServer,
     path: '/ws',
@@ -85,15 +86,15 @@ export function attachGateway(httpServer: HttpServer, world: World, store: Store
   };
 
   const sendInventory = (session: Session, playerId: number): void => {
-    const slots = world.inventoryOf(playerId);
-    const equipment = world.equipmentOf(playerId);
+    const slots = realm.inventoryOf(playerId);
+    const equipment = realm.equipmentOf(playerId);
     if (slots !== null && equipment !== null) send(session, { t: 'inventory', slots, equipment });
   };
 
   const MAX_LOGIN_ATTEMPTS = 6;
 
   const savePlayer = (player: Player): void => {
-    const state = world.saveOf(player.id);
+    const state = realm.saveOf(player.id);
     if (state !== null) store.saveCharacter(player.characterId, state);
   };
 
@@ -115,7 +116,8 @@ export function attachGateway(httpServer: HttpServer, world: World, store: Store
       return;
     }
 
-    const player = world.addPlayer({
+    const player = realm.join({
+      map: save.map,
       accountId: session.accountId,
       characterId,
       name: save.name,
@@ -130,13 +132,19 @@ export function attachGateway(httpServer: HttpServer, world: World, store: Store
       equipment: save.equipment,
     });
 
+    if (player === null) {
+      send(session, { t: 'authError', reason: 'The map you were on no longer exists.' });
+      return;
+    }
+
     session.player = player;
     send(session, {
       t: 'welcome',
       id: player.id,
       protocol: PROTOCOL_VERSION,
       tickRate: TICK_RATE,
-      tick: world.tick,
+      tick: realm.worldOf(player.id)?.tick ?? 0,
+      map: realm.worldIdOf(player.id) ?? save.map,
     });
     sendInventory(session, player.id);
   };
@@ -234,20 +242,20 @@ export function attachGateway(httpServer: HttpServer, world: World, store: Store
             send(session, { t: 'notice', text: 'Log in first.' });
             break;
           }
-          world.setInput(session.player.id, parsed.message.dx, parsed.message.dy);
+          realm.setInput(session.player.id, parsed.message.dx, parsed.message.dy);
           break;
         case 'attack': {
           if (session.player === null) {
             send(session, { t: 'notice', text: 'Log in first.' });
             break;
-          }          const result = world.attack(session.player.id, parsed.message.target);
+          }          const result = realm.attack(session.player.id, parsed.message.target);
           if (!result.ok) {
             send(session, { t: 'notice', text: result.reason });
             break;
           }
           if (result.killed && result.rewards !== undefined) {
             for (const reward of result.rewards) {
-              const level = world.getPlayer(reward.playerId)?.level ?? 1;
+              const level = realm.worldOf(reward.playerId)?.getPlayer(reward.playerId)?.level ?? 1;
               const prefix = reward.levelUps > 0 ? `Level ${level}! ` : '';
               sendToPlayer(reward.playerId, {
                 t: 'notice',
@@ -262,7 +270,7 @@ export function attachGateway(httpServer: HttpServer, world: World, store: Store
             send(session, { t: 'notice', text: 'Log in first.' });
             break;
           }
-          const result = world.equip(session.player.id, parsed.message.slot);
+          const result = realm.equip(session.player.id, parsed.message.slot);
           if (!result.ok) send(session, { t: 'notice', text: result.reason });
           break;
         }
@@ -271,7 +279,7 @@ export function attachGateway(httpServer: HttpServer, world: World, store: Store
             send(session, { t: 'notice', text: 'Log in first.' });
             break;
           }
-          const result = world.unequip(session.player.id, parsed.message.piece);
+          const result = realm.unequip(session.player.id, parsed.message.piece);
           if (!result.ok) send(session, { t: 'notice', text: result.reason });
           break;
         }
@@ -280,13 +288,13 @@ export function attachGateway(httpServer: HttpServer, world: World, store: Store
             send(session, { t: 'notice', text: 'Log in first.' });
             break;
           }
-          const result = world.pickup(session.player.id, parsed.message.target);
+          const result = realm.pickup(session.player.id, parsed.message.target);
           if (!result.ok) send(session, { t: 'notice', text: result.reason });
           break;
         }
         case 'settings': {
           if (session.player === null) break;
-          world.setPickupSettings(
+          realm.setPickupSettings(
             session.player.id,
             parsed.message.autoPickup,
             parsed.message.autoPickupTypes,
@@ -304,7 +312,7 @@ export function attachGateway(httpServer: HttpServer, world: World, store: Store
       const player = session.player;
       if (player === null) return;
       savePlayer(player);
-      world.removePlayer(player.id);
+      realm.leave(player.id);
     });
 
     socket.on('error', () => {
@@ -315,18 +323,15 @@ export function attachGateway(httpServer: HttpServer, world: World, store: Store
 
   return {
     broadcastSnapshot(): void {
-      const snapshot = world.snapshot();
-      const message = encode({
-        t: 'snapshot',
-        tick: world.tick,
-        players: snapshot.players,
-        monsters: snapshot.monsters,
-        ground: snapshot.ground,
-      });
+      const snapshots = realm.snapshotJson();
+
       for (const session of sessions) {
         if (session.player === null) continue;
         if (session.socket.readyState !== WebSocket.OPEN) continue;
-        session.socket.send(message);
+
+        const worldId = realm.worldIdOf(session.player.id);
+        const message = worldId === null ? undefined : snapshots.get(worldId);
+        if (message !== undefined) session.socket.send(message);
       }
     },
 

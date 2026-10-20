@@ -26,6 +26,7 @@ const grassMap = (): MapData => ({
   spawn: { x: 8, y: 8 },
   tiles: new Array(16 * 16).fill(TILE.GRASS),
   spawns: [],
+  portals: [],
 });
 
 const spawn = spawnPosition(grassMap());

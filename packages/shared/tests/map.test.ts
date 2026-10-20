@@ -16,7 +16,7 @@ import {
 const mapWith = (changes: Record<number, number> = {}, size = 8): MapData => {
   const tiles = new Array(size * size).fill(TILE.GRASS);
   for (const [index, tile] of Object.entries(changes)) tiles[Number(index)] = tile;
-  return { id: 'test', width: size, height: size, spawn: { x: 1, y: 1 }, tiles, spawns: [] };
+  return { id: 'test', width: size, height: size, spawn: { x: 1, y: 1 }, tiles, spawns: [], portals: [] };
 };
 
 const at = (x: number, y: number, size = 8): number => y * size + x;

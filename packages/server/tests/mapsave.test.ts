@@ -19,6 +19,7 @@ const grassMap = (id: string): MapData => ({
   spawn: { x: 1, y: 1 },
   tiles: new Array(8 * 8).fill(TILE.GRASS),
   spawns: [],
+  portals: [],
 });
 
 const setup = async (): Promise<{ mapPath: string; port: number }> => {

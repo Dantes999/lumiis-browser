@@ -37,6 +37,18 @@ export const SOLID: ReadonlySet<number> = new Set<number>([
   TILE.GATE,
 ]);
 
+/** A tile that takes the player to another map. */
+export type Portal = {
+  /** Where the portal tile is. */
+  tx: number;
+  ty: number;
+  /** Map the player arrives on. */
+  to: string;
+  /** Tile the player arrives at. */
+  spawnX: number;
+  spawnY: number;
+};
+
 export type MonsterSpawn = {
   kind: 'mob';
   key: MonsterKey;
@@ -55,6 +67,8 @@ export type MapData = {
   tiles: number[];
   /** Where monsters start out. */
   spawns: MonsterSpawn[];
+  /** Tiles that lead to other maps. */
+  portals: Portal[];
 };
 
 export type MapCheck = { ok: true; map: MapData } | { ok: false; errors: string[] };
@@ -111,6 +125,53 @@ export function validateMap(input: unknown): MapCheck {
     }
   }
 
+  const rawPortals = raw['portals'];
+  const portals: Portal[] = [];
+
+  if (rawPortals !== undefined) {
+    if (!Array.isArray(rawPortals)) {
+      errors.push('portals must be an array');
+    } else {
+      rawPortals.forEach((entry, index) => {
+        if (typeof entry !== 'object' || entry === null) {
+          errors.push(`portal ${index} is not an object`);
+          return;
+        }
+        const point = entry as Record<string, unknown>;
+        const tx = point['tx'];
+        const ty = point['ty'];
+        const to = point['to'];
+        const spawnX = point['spawnX'];
+        const spawnY = point['spawnY'];
+
+        if (typeof to !== 'string' || !/^[a-z0-9_]{1,32}$/.test(to)) {
+          errors.push(`portal ${index} needs a target map`);
+        }
+        if (![tx, ty, spawnX, spawnY].every(isInteger)) {
+          errors.push(`portal ${index} needs integer tiles`);
+        } else if (
+          isInteger(tx) &&
+          isInteger(ty) &&
+          isInteger(width) &&
+          isInteger(height) &&
+          (tx < 0 || ty < 0 || tx >= width || ty >= height)
+        ) {
+          errors.push(`portal ${index} is outside the map`);
+        }
+
+        if (typeof to === 'string' && [tx, ty, spawnX, spawnY].every(isInteger)) {
+          portals.push({
+            tx: tx as number,
+            ty: ty as number,
+            to,
+            spawnX: spawnX as number,
+            spawnY: spawnY as number,
+          });
+        }
+      });
+    }
+  }
+
   const rawSpawns = raw['spawns'];
   const spawns: MonsterSpawn[] = [];
 
@@ -158,6 +219,7 @@ export function validateMap(input: unknown): MapCheck {
       spawn: { x: (spawn as { x: number }).x, y: (spawn as { y: number }).y },
       tiles: tiles as number[],
       spawns,
+      portals,
     },
   };
 }

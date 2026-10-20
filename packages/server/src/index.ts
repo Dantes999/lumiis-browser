@@ -8,9 +8,10 @@ import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { SNAPSHOT_EVERY_TICKS, TICK_MS, TICK_RATE } from '@lumiis/shared';
-import { World } from './game/world.js';
+import type { World } from './game/world.js';
 import { FixedStepLoop } from './game/loop.js';
-import { loadMap } from './game/map.js';
+import { loadMaps } from './game/map.js';
+import { Realm } from './game/realm.js';
 import { Store } from './store/db.js';
 import { attachGateway, type Gateway } from './net/gateway.js';
 import { handleMapSave } from './http/mapsave.js';
@@ -27,6 +28,8 @@ export type GameServerOptions = {
 
 export type GameServer = {
   readonly port: number;
+  readonly realm: Realm;
+  /** The first map, for logs and tests. */
   readonly world: World;
   readonly loop: FixedStepLoop;
   readonly gateway: Gateway;
@@ -53,7 +56,7 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
   if (dataFile !== ':memory:') mkdirSync(dirname(dataFile), { recursive: true });
   const store = new Store(dataFile);
 
-  const map = loadMap(mapPath);
+  const maps = loadMaps(mapPath);
   // The map is served from the same file the server loaded, so server and
   // browser can never disagree about where the walls are.
   const sharedRoot = dirname(dirname(mapPath));
@@ -72,18 +75,22 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
     void (path.startsWith('/maps/') ? serveShared : serveClient)(req, res);
   });
 
-  const world = new World(map);
-  const gateway = attachGateway(httpServer, world, store);
+  const realm = new Realm(maps);
+  const world = realm.primary;
+  if (world === null) throw new Error('no map loaded');
+
+  const gateway = attachGateway(httpServer, realm, store);
 
   const loop = new FixedStepLoop(TICK_MS, () => {
-    world.step();
+    realm.tick();
 
-    for (const update of world.drainInventoryUpdates()) {
+    for (const update of realm.drainInventoryUpdates()) {
       gateway.sendInventory(update.playerId);
     }
 
-    if (world.tick % SNAPSHOT_EVERY_TICKS === 0) gateway.broadcastSnapshot();
-    if (world.tick % (TICK_RATE * SAVE_EVERY_SECONDS) === 0) gateway.saveAll();
+    const tick = realm.primary?.tick ?? 0;
+    if (tick % SNAPSHOT_EVERY_TICKS === 0) gateway.broadcastSnapshot();
+    if (tick % (TICK_RATE * SAVE_EVERY_SECONDS) === 0) gateway.saveAll();
   });
 
   await new Promise<void>((resolve, reject) => {
@@ -99,6 +106,7 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
 
   return {
     port: boundPort,
+    realm,
     world,
     loop,
     gateway,
@@ -118,7 +126,7 @@ async function main(): Promise<void> {
   server.loop.start();
 
   console.log(`Lumiis server listening on port ${server.port} (${TICK_RATE} ticks/s)`);
-  console.log(`Map: ${server.world.map.id} (${server.world.map.width}x${server.world.map.height})`);
+  console.log(`Maps: ${server.realm.mapIds.join(', ')}`);
   console.log(`Open http://localhost:${server.port} in a browser.`);
 
   let closing = false;

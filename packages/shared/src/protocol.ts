@@ -63,10 +63,20 @@ export type ClientMessage =
 
 /** Messages the server may send. */
 export type ServerMessage =
-  | { t: 'welcome'; id: number; protocol: number; tickRate: number; tick: number }
+  | {
+      t: 'welcome';
+      id: number;
+      protocol: number;
+      tickRate: number;
+      tick: number;
+      /** Map the player is standing on. */
+      map: string;
+    }
   | {
       t: 'snapshot';
       tick: number;
+      /** Map this snapshot belongs to. */
+      map: string;
       players: PlayerSnapshot[];
       monsters: MonsterSnapshot[];
       ground: GroundItemSnapshot[];

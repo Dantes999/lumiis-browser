@@ -33,6 +33,8 @@ export class WorldScene extends Phaser.Scene {
   private readonly groundViews = new Map<number, Phaser.GameObjects.Container>();
   private following = false;
   private appliedZoom = 0;
+  private mapId: string | null = null;
+  private layer: Phaser.Tilemaps.TilemapLayer | null = null;
   private lastSelfHp = -1;
   private flashUntil = 0;
 
@@ -41,7 +43,6 @@ export class WorldScene extends Phaser.Scene {
   }
 
   preload(): void {
-    this.load.json('map', '/maps/testmap.json');
     this.load.json('rows_armor', '/assets/ruestungen/ruestungen.json');
     this.load.json('rows_head', '/assets/modelle/spieler/spieler.json');
     this.load.json('rows_hair', '/assets/haare/haare.json');
@@ -64,10 +65,41 @@ export class WorldScene extends Phaser.Scene {
   create(): void {
     this.tables = readTables(this);
     this.cameras.main.setBackgroundColor('#0b0f13');
-    this.buildWorld();
+    buildTilesetTexture(this);
+  }
+
+  /** Loads and builds the map the server put us on, and swaps it on a portal. */
+  private syncMap(): void {
+    const id = view.mapId;
+    if (id === null || id === this.mapId) return;
+
+    this.mapId = id;
+    void this.loadMap(id);
+  }
+
+  private async loadMap(id: string): Promise<void> {
+    const response = await fetch(`/maps/${id}.json`, { cache: 'no-store' });
+    const check = validateMap(await response.json());
+
+    if (!check.ok) {
+      console.error(`map ${id} is invalid:`, check.errors);
+      return;
+    }
+
+    const map = check.map;
+    setWorldMap(map);
+
+    this.layer?.destroy();
+    this.layer = this.addTileLayer(map);
+
+    this.cameras.main.setBounds(0, 0, mapPixelWidth(map), mapPixelHeight(map));
+    if (!this.following) {
+      this.cameras.main.centerOn(mapPixelWidth(map) / 2, mapPixelHeight(map) / 2);
+    }
   }
 
   override update(_time: number, delta: number): void {
+    this.syncMap();
     this.applyZoom();
     stepLocal(delta);
     this.renderGround();
@@ -131,24 +163,7 @@ export class WorldScene extends Phaser.Scene {
     }
   }
 
-  private buildWorld(): void {
-    const check = validateMap(this.cache.json.get('map'));
-    if (!check.ok) {
-      console.error('map could not be loaded:', check.errors);
-      return;
-    }
-
-    const map: MapData = check.map;
-    setWorldMap(map);
-
-    buildTilesetTexture(this);
-    this.addTileLayer(map);
-
-    this.cameras.main.setBounds(0, 0, mapPixelWidth(map), mapPixelHeight(map));
-    this.cameras.main.centerOn(mapPixelWidth(map) / 2, mapPixelHeight(map) / 2);
-  }
-
-  private addTileLayer(map: MapData): void {
+  private addTileLayer(map: MapData): Phaser.Tilemaps.TilemapLayer | null {
     const rows: number[][] = [];
     for (let y = 0; y < map.height; y += 1) {
       rows.push(map.tiles.slice(y * map.width, (y + 1) * map.width));
@@ -162,10 +177,12 @@ export class WorldScene extends Phaser.Scene {
     const tileset = tilemap.addTilesetImage('tiles', 'tileset', TILE_SIZE, TILE_SIZE, 0, 0);
     if (tileset === null) {
       console.error('tileset texture missing');
-      return;
+      return null;
     }
 
-    tilemap.createLayer(0, tileset, 0, 0)?.setDepth(-10);
+    const layer = tilemap.createLayer(0, tileset, 0, 0);
+    layer?.setDepth(-10);
+    return layer;
   }
 
   private applyZoom(): void {

@@ -161,12 +161,14 @@ export class Connection {
         view.status = 'online';
         view.selfId = message.id;
         view.tick = message.tick;
+        view.mapId = message.map;
         // A reconnect must log in, not try to register the same name again.
         if (this.credentials !== null) this.credentials.mode = 'login';
         this.onWelcome?.();
         break;
       case 'snapshot':
         view.tick = message.tick;
+        view.mapId = message.map;
         this.applySnapshot(message.players, message.monsters, message.ground);
         break;
       case 'inventory':

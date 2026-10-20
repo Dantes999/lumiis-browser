@@ -20,6 +20,7 @@ const grassMap: MapData = {
   spawn: { x: 2, y: 2 },
   tiles: new Array(16 * 16).fill(TILE.GRASS),
   spawns: [],
+  portals: [],
 };
 
 const place = (x: number, y: number, dir = 6): void => {

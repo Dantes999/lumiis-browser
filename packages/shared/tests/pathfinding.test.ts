@@ -18,6 +18,7 @@ const mapOf = (): MapData => ({
   spawn: { x: 1, y: 1 },
   tiles: new Array(SIZE * SIZE).fill(TILE.GRASS),
   spawns: [],
+  portals: [],
 });
 
 const setTile = (map: MapData, x: number, y: number, tile: number): void => {

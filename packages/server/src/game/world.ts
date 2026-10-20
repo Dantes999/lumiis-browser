@@ -22,6 +22,7 @@ import {
   PLAYER_RESPAWN_TICKS,
   TICK_MS,
   TILE_SIZE,
+  TILE,
   dirFromInput,
   expForNextLevel,
   canStand,
@@ -29,7 +30,9 @@ import {
   isItemKey,
   itemDef,
   moveWithCollision,
+  nearestWalkable,
   spawnPosition,
+  tileAt,
   withinAttackRange,
 } from '@lumiis/shared';
 import type { CharacterSave } from '../store/db.js';
@@ -149,6 +152,9 @@ export type KillReward = {
   levelUps: number;
 };
 
+/** A player walking into a portal; the realm moves him. */
+export type Warp = { playerId: number; to: string; x: number; y: number };
+
 export type AttackResult =
   | {
       ok: true;
@@ -165,6 +171,8 @@ export class World {
   private readonly groundItems = new Map<number, GroundItem>();
   /** Player ids whose inventory changed since the last tick was reported. */
   private readonly inventoryUpdates = new Set<number>();
+  /** Portals walked into during the last tick. */
+  private readonly warps: Warp[] = [];
   private nextPlayerId = 1;
   private nextMonsterId = 1;
   private nextGroundId = 1;
@@ -224,6 +232,19 @@ export class World {
     if (!canStand(this.map, player.x, player.y)) {
       player.x = spawn.x;
       player.y = spawn.y;
+    }
+
+    // Even the spawn may be a tree in a bad map; then pick the next free tile.
+    if (!canStand(this.map, player.x, player.y)) {
+      const spot = nearestWalkable(
+        this.map,
+        Math.floor(player.x / TILE_SIZE),
+        Math.floor(player.y / TILE_SIZE),
+      );
+      if (spot !== null) {
+        player.x = (spot.tx + 0.5) * TILE_SIZE;
+        player.y = (spot.ty + 0.9) * TILE_SIZE;
+      }
     }
 
     // A character that was stored dead comes back on his feet at the spawn.
@@ -340,11 +361,13 @@ export class World {
         player.hp = Math.min(player.maxHp, player.hp + PLAYER_REGEN_HP);
       }
 
-      if (!player.moving) continue;
+      if (player.moving) {
+        const next = moveWithCollision(this.map, player.x, player.y, player.dir, TICK_SECONDS);
+        player.x = next.x;
+        player.y = next.y;
+      }
 
-      const next = moveWithCollision(this.map, player.x, player.y, player.dir, TICK_SECONDS);
-      player.x = next.x;
-      player.y = next.y;
+      this.checkPortal(player);
     }
 
     for (const monster of this.monstersById.values()) {
@@ -357,6 +380,45 @@ export class World {
     }
 
     this.collectGroundItems();
+  }
+
+  /** Takes a player out of this world without touching his state. */
+  detachPlayer(id: number): Player | undefined {
+    const player = this.playersById.get(id);
+    if (player === undefined) return undefined;
+
+    this.playersById.delete(id);
+    for (const monster of this.monstersById.values()) {
+      if (monster.targetId === id) monster.targetId = null;
+    }
+    return player;
+  }
+
+  attachPlayer(player: Player): void {
+    this.playersById.set(player.id, player);
+  }
+
+  /** Portals this tick; the realm carries them out. */
+  drainWarps(): Warp[] {
+    const list = [...this.warps];
+    this.warps.length = 0;
+    return list;
+  }
+
+  private checkPortal(player: Player): void {
+    const tx = Math.floor(player.x / TILE_SIZE);
+    const ty = Math.floor(player.y / TILE_SIZE);
+    if (tileAt(this.map, tx, ty) !== TILE.PORTAL) return;
+
+    const portal = this.map.portals.find((entry) => entry.tx === tx && entry.ty === ty);
+    if (portal === undefined) return;
+
+    this.warps.push({
+      playerId: player.id,
+      to: portal.to,
+      x: (portal.spawnX + 0.5) * TILE_SIZE,
+      y: (portal.spawnY + 0.9) * TILE_SIZE,
+    });
   }
 
   /** Weapon, armour and health bonus follow what is equipped. */

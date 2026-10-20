@@ -149,21 +149,94 @@ for (const [key, x, y] of WANTED) {
   if (spot !== null) spawns.push({ kind: 'mob', key, tx: spot.x, ty: spot.y });
 }
 
-// One row per line keeps the file diffable.
-const rows = [];
-for (let y = 0; y < HEIGHT; y += 1) {
-  rows.push(`    ${tiles.slice(y * WIDTH, (y + 1) * WIDTH).join(',')}`);
+// A second, small map to show that maps can be more than one.
+const GROVE_W = 24;
+const GROVE_H = 24;
+const grove = new Array(GROVE_W * GROVE_H).fill(T.GRASS);
+const gset = (x, y, t) => {
+  if (x >= 0 && y >= 0 && x < GROVE_W && y < GROVE_H) grove[y * GROVE_W + x] = t;
+};
+
+for (let i = 0; i < GROVE_W; i += 1) {
+  gset(i, 0, T.TREE);
+  gset(i, GROVE_H - 1, T.TREE);
+  gset(0, i, T.TREE);
+  gset(GROVE_W - 1, i, T.TREE);
+}
+for (let y = 2; y < GROVE_H - 2; y += 1) {
+  for (let x = 2; x < GROVE_W - 2; x += 1) {
+    const roll = random();
+    if (roll < 0.08) gset(x, y, T.TREE);
+    else if (roll < 0.1) gset(x, y, T.FLOWERS);
+  }
+}
+// A ring of stones with a clearing in the middle.
+for (let step = 0; step < 16; step += 1) {
+  const angle = (step / 16) * Math.PI * 2;
+  gset(Math.round(12 + Math.cos(angle) * 5), Math.round(12 + Math.sin(angle) * 5), T.ROCK);
+}
+for (let y = 10; y <= 15; y += 1) {
+  for (let x = 10; x <= 14; x += 1) gset(x, y, T.PATH);
 }
 
-const spawnLines = spawns
-  .map((s) => `    { "kind": "mob", "key": "${s.key}", "tx": ${s.tx}, "ty": ${s.ty} }`)
-  .join(',\n');
+const testmap = {
+  id: 'testmap',
+  width: WIDTH,
+  height: HEIGHT,
+  spawn: SPAWN,
+  portals: [{ tx: 36, ty: 32, to: 'grove', spawnX: 12, spawnY: 15 }],
+  tiles,
+  spawns,
+};
 
-const json = `{
-  "id": "testmap",
-  "width": ${WIDTH},
-  "height": ${HEIGHT},
-  "spawn": { "x": ${SPAWN.x}, "y": ${SPAWN.y} },
+set(36, 32, T.PORTAL);
+testmap.tiles = tiles;
+
+// Keep the spawn square and the way to the portal clear.
+for (let y = 15; y <= 17; y += 1) {
+  for (let x = 11; x <= 13; x += 1) gset(x, y, T.PATH);
+}
+for (let y = 13; y <= 15; y += 1) gset(12, y, T.PATH);
+gset(12, 13, T.PORTAL);
+
+const groveMap = {
+  id: 'grove',
+  width: GROVE_W,
+  height: GROVE_H,
+  spawn: { x: 12, y: 16 },
+  portals: [{ tx: 12, ty: 13, to: 'testmap', spawnX: 36, spawnY: 33 }],
+  tiles: grove,
+  spawns: [
+    { kind: 'mob', key: 'wolf', tx: 8, ty: 8 },
+    { kind: 'mob', key: 'wolf', tx: 16, ty: 9 },
+    { kind: 'mob', key: 'boar', tx: 14, ty: 17 },
+  ],
+};
+
+const formatMap = (map) => {
+  const rows = [];
+  for (let y = 0; y < map.height; y += 1) {
+    rows.push(`    ${map.tiles.slice(y * map.width, (y + 1) * map.width).join(',')}`);
+  }
+
+  const spawnLines = map.spawns
+    .map((entry) => `    { "kind": "mob", "key": "${entry.key}", "tx": ${entry.tx}, "ty": ${entry.ty} }`)
+    .join(',\n');
+  const portalLines = map.portals
+    .map(
+      (entry) =>
+        `    { "tx": ${entry.tx}, "ty": ${entry.ty}, "to": "${entry.to}", "spawnX": ${entry.spawnX}, "spawnY": ${entry.spawnY} }`,
+    )
+    .join(',\n');
+
+  return `{
+  "id": "${map.id}",
+  "width": ${map.width},
+  "height": ${map.height},
+  "spawn": { "x": ${map.spawn.x}, "y": ${map.spawn.y} },
+  "portals": [
+${portalLines}
+  ],
   "tiles": [
 ${rows.join(',\n')}
   ],
@@ -172,19 +245,14 @@ ${spawnLines}
   ]
 }
 `;
+};
 
 const here = dirname(fileURLToPath(import.meta.url));
-const target = resolve(here, '../packages/shared/maps/testmap.json');
-mkdirSync(dirname(target), { recursive: true });
-writeFileSync(target, json, 'utf8');
+const target = resolve(here, '../packages/shared/maps');
+mkdirSync(target, { recursive: true });
 
-const counts = new Map();
-for (const tile of tiles) counts.set(tile, (counts.get(tile) ?? 0) + 1);
-const names = Object.fromEntries(Object.entries(T).map(([name, id]) => [id, name]));
-const summary = [...counts.entries()]
-  .sort((a, b) => b[1] - a[1])
-  .map(([tile, count]) => `${names[tile]} ${count}`)
-  .join(', ');
-
-console.log(`wrote ${target}`);
-console.log(summary);
+for (const map of [testmap, groveMap]) {
+  const file = resolve(target, `${map.id}.json`);
+  writeFileSync(file, formatMap(map), 'utf8');
+  console.log(`wrote ${file} (${map.width}x${map.height})`);
+}

@@ -79,6 +79,8 @@ export type ViewState = {
   authError: string | null;
   /** Characters of the logged in account, null until the server sent them. */
   characters: CharacterSummary[] | null;
+  /** Map the player is standing on, sent with the welcome. */
+  mapId: string | null;
   characterMax: number;
   /** When the current notice stops being shown, in performance.now() ms. */
   noticeUntil: number;
@@ -114,6 +116,7 @@ export const view: ViewState = {
   notice: null,
   authError: null,
   characters: null,
+  mapId: null,
   characterMax: 4,
   noticeUntil: 0,
   zoom: 1,

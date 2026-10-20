@@ -40,6 +40,12 @@ npm run typecheck
 To try it on a phone in the same network, open `http://<your-ip>:3000`. The
 server binds to `0.0.0.0` by default; set `HOST` to narrow that.
 
+## Maps
+
+Two maps ship with the project: `testmap` (64x64) and `grove` (24x24), linked by
+portals in both directions. The map a character stands on is part of his save,
+so logging in puts him back where he left.
+
 ## Map editor
 
 Open <http://localhost:3000/editor.html> while the server runs. Paint tiles,
