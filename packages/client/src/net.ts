@@ -24,6 +24,8 @@ const PING_INTERVAL_MS = 2000;
 const MAX_RECONNECT_DELAY_MS = 10000;
 /** No message for this long while in the world means the connection is dead. */
 const STALL_MS = 7000;
+/** Close code the server uses when the same character signs in elsewhere. */
+const SIGNED_IN_ELSEWHERE = 4000;
 
 type Credentials = { name: string; password: string; mode: 'login' | 'register' };
 
@@ -78,10 +80,22 @@ export class Connection {
       view.monsters.clear();
       view.ground.clear();
       this.socket = null;
-      logEvent(
-        'warn',
-        `connection closed (code ${event.code}${event.reason ? `: ${event.reason}` : ''})`,
-      );
+
+      if (event.code === SIGNED_IN_ELSEWHERE) {
+        // Another session took this character. Jumping straight back in would
+        // make the two kick each other forever, so stop auto-selecting and just
+        // show the character list again.
+        this.lastCharacterId = null;
+        view.notice = 'Signed in elsewhere';
+        view.noticeUntil = performance.now() + 5000;
+        logEvent('warn', 'character is in use by another session; pick it again to take it back');
+      } else {
+        logEvent(
+          'warn',
+          `connection closed (code ${event.code}${event.reason ? `: ${event.reason}` : ''})`,
+        );
+      }
+
       if (!this.closedByUser) this.scheduleReconnect();
     });
 
@@ -138,7 +152,9 @@ export class Connection {
 
   /** Mirrors one client log line to the server terminal. */
   sendClientLog(level: 'info' | 'warn' | 'error', text: string): void {
-    this.send({ t: 'log', level, text });
+    // Keep it well under the protocol limit: an over-long line would make the
+    // server reject the message and close the connection.
+    this.send({ t: 'log', level, text: text.slice(0, 400) });
   }
 
   pickup(target: number): void {

@@ -120,6 +120,25 @@ export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store
       return;
     }
 
+    // One character can only be in the world once. A connection that died
+    // without closing leaves a body behind, so a reconnect would otherwise
+    // create a twin. Save the old body, remove it, then load the fresh save.
+    const stale = [...sessions].find(
+      (entry) => entry !== session && entry.player?.characterId === characterId,
+    );
+    if (stale !== undefined && stale.player !== null) {
+      const old = stale.player;
+      note(`replacing a lingering session for "${old.name}"`);
+      savePlayer(old);
+      realm.leave(old.id);
+      stale.player = null;
+      try {
+        stale.socket.close(4000, 'Signed in elsewhere');
+      } catch {
+        // The socket is already gone.
+      }
+    }
+
     const save = store.loadCharacter(characterId);
     if (save === null) {
       send(session, { t: 'authError', reason: 'That character no longer exists.' });

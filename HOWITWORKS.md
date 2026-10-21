@@ -246,6 +246,14 @@ Hinweis: Zeilen, die **vor** dem Verbindungsaufbau entstehen (z. B.
 `client started`) oder **während** des Schließens (`connection closed`), kommen
 nicht mehr durch — dafür steht dann die `[ws] closed …`-Zeile des Servers da.
 
+**Ein Charakter kann nur einmal in der Welt sein.** Meldet sich derselbe
+Charakter ein zweites Mal an (z. B. derselbe Account auf zwei PCs), speichert
+der Server die alte Figur, nimmt sie aus der Welt und schließt die alte
+Verbindung mit Code **4000 „Signed in elsewhere"**. Der andere Client springt
+dann **nicht** automatisch wieder hinein (sonst würden sich beide endlos
+gegenseitig rauswerfen) — er landet auf der Charakterauswahl, mit Hinweis
+„Signed in elsewhere". Wer den Charakter zuletzt anklickt, hat ihn.
+
 **Wenn ein Client „einfriert"** (laufen geht, Monster stehen, treffen geht nicht):
 1. Log-Fenster öffnen und den letzten Block lesen.
 2. `no traffic` → die Leitung war tot; der Client verbindet sich selbst neu und
