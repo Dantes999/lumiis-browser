@@ -19,7 +19,14 @@ import {
   type MapData,
 } from '@lumiis/shared';
 import { sfx } from '../audio';
-import { PlayerView, readTables, spriteSheets, type ArtTables } from '../art';
+import {
+  PlayerView,
+  activePack,
+  readTables,
+  spriteSheets,
+  type ArtTables,
+  type StylePack,
+} from '../art';
 import { attackPose, heldAttack } from '../combat';
 import { MOB_CELL_H, MOB_CELL_W, MonsterView } from '../mobart';
 import { renderedSelfPosition, stepLocal } from '../sim';
@@ -67,6 +74,7 @@ const OTHERS_TAU_MS = 60;
 
 export class WorldScene extends Phaser.Scene {
   private tables: ArtTables | null = null;
+  private pack: StylePack | null = null;
   private readonly views = new Map<number, PlayerView>();
   private readonly monsterViews = new Map<number, MonsterView>();
   private readonly groundViews = new Map<number, Phaser.GameObjects.Container>();
@@ -113,9 +121,15 @@ export class WorldScene extends Phaser.Scene {
     this.load.json('rows_hair', '/assets/haare/haare.json');
     this.load.json('rows_weapon', '/assets/waffen/waffen.json');
 
-    // Every player sheet uses the same 48x48 grid; only the row tables differ.
-    const grid = { frameWidth: 48, frameHeight: 48 };
-    for (const sheet of spriteSheets()) this.load.spritesheet(sheet.key, sheet.path, grid);
+    // The graphic style decides the cell size and the sheet paths.
+    const chosen = activePack();
+    this.pack = chosen.pack;
+    if (chosen.id !== 'krieger_m') console.info(`style pack: ${chosen.id} (${chosen.pack.name})`);
+
+    const grid = { frameWidth: chosen.pack.cell, frameHeight: chosen.pack.cell };
+    for (const sheet of spriteSheets(chosen.pack)) {
+      this.load.spritesheet(sheet.key, sheet.path, grid);
+    }
 
     // One sheet per monster type, 40x32 cells, four views of five frames.
     for (const key of MONSTER_KEYS) {
@@ -128,7 +142,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.tables = readTables(this);
+    this.tables = readTables(this, this.pack ?? undefined);
     this.cameras.main.setBackgroundColor('#0b0f13');
     buildTilesetTexture(this);
 
@@ -637,7 +651,7 @@ export class WorldScene extends Phaser.Scene {
     const existing = this.views.get(id);
     if (existing !== undefined) return existing;
 
-    const created = new PlayerView(this, tables);
+    const created = new PlayerView(this, tables, this.pack ?? undefined);
     this.views.set(id, created);
     return created;
   }

@@ -82,6 +82,22 @@ Wolves and boars drop materials and low-level gear; see `drops` in
 `packages/shared/src/monsters.ts`. The item table lives in
 `packages/shared/src/items.ts`.
 
+## Graphics: style packs
+
+Player art lives in a **style pack**, not in the code: `packages/client/src/styles.json`
+names the sheet paths, the cell size (48 px), the nine columns and the foot
+anchor. Open the game with `?style=<id>` to try another pack (or set
+`lumiis.style` in the browser).
+
+- `node tools/check-art.mjs` checks every sheet of every pack (exists, width =
+  cell × columns, height a multiple of the cell; `node tools/check-art.mjs
+  bild.png --cell=48 --columns=9` for a single file).
+- `http://localhost:3000/sheet.html` is a **preview**: load a sheet (URL or drag
+  a PNG in), see the grid, play a row as an animation.
+- To make your own characters: render a 3D model (Blender + Mixamo) from the
+  three views (down/right/up) into a 48 px sheet with nine columns, drop it in
+  `public/assets/styles/<id>/` and add the pack to `styles.json`.
+
 ## Map editor
 
 Open <http://localhost:3000/editor.html> while the server runs. Paint tiles,

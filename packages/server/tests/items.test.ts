@@ -2,12 +2,12 @@
 // data complete enough to describe every item a player can hold.
 
 import { describe, expect, it } from 'vitest';
-import { ITEMS, ITEM_KEYS, describeItem, isEquippable, requiredLevel } from '@lumiis/shared';
+import { ITEMS, ITEM_KEYS, describeItem, isEquippable, itemDef, requiredLevel } from '@lumiis/shared';
 
 describe('items', () => {
   it('gives every item a name, a type and a colour', () => {
     for (const key of ITEM_KEYS) {
-      const def = ITEMS[key];
+      const def = itemDef(key);
       expect(def.name.length, key).toBeGreaterThan(0);
       expect(['weapon', 'armor', 'material'], key).toContain(def.type);
       expect(def.color, key).toMatch(/^#[0-9a-f]{6}$/i);
@@ -17,7 +17,7 @@ describe('items', () => {
 
   it('gives every wearable item a slot, an icon and a level', () => {
     for (const key of ITEM_KEYS) {
-      const def = ITEMS[key];
+      const def = itemDef(key);
       if (!isEquippable(key)) continue;
 
       expect(def.slot, key).toBeDefined();

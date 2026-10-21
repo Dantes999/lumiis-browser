@@ -10,9 +10,66 @@
 import Phaser from 'phaser';
 import { ITEM_KEYS, itemDef, type ItemKey } from '@lumiis/shared';
 import type { Direction } from '@lumiis/shared';
+import stylesFile from './styles.json';
 
 /** Column order inside every sheet: stand, step 1, step 2, breathe, attack 1-3, hit, dead. */
 export const COLUMNS = 9;
+
+/**
+ * One graphic style: where its sheets live and how they are cut. A pack can be
+ * a class/sex of the old asset pack, or a freshly rendered set (see
+ * HOWITWORKS "Grafik-Pakete"). Paths are templates:
+ * `{file}` = armor file, `{art}` = weapon art, `{stage2}` = zero-padded stage.
+ */
+export type StylePack = {
+  name: string;
+  /** Side of one cell, in pixels. */
+  cell: number;
+  /** Animation columns per row (9 in the old asset pack). */
+  columns: number;
+  /** Foot position inside a cell; the sprite is anchored there. */
+  footX: number;
+  footY: number;
+  /** Sheet used when nothing is worn, and the fixed head/hair. */
+  body: string;
+  head: string;
+  hair: string;
+  armor: string;
+  weapon: string;
+  /** Which row set of ruestungen.json describes the body poses. */
+  armorRows: string;
+};
+
+const STYLES = stylesFile as { default: string; packs: Record<string, StylePack> };
+
+/** Ids of every style pack the client knows. */
+export const STYLE_IDS = Object.keys(STYLES.packs);
+
+const defaultPack = (): StylePack => STYLES.packs[STYLES.default] as StylePack;
+
+/**
+ * The pack to draw with: `?style=<id>` wins, then the one remembered in this
+ * browser, then the default. An unknown id falls back to the default.
+ */
+export function activePack(): { id: string; pack: StylePack } {
+  let asked: string | null = null;
+  try {
+    asked =
+      new URLSearchParams(window.location.search).get('style') ??
+      window.localStorage.getItem('lumiis.style');
+  } catch {
+    asked = null;
+  }
+
+  if (asked !== null && STYLES.packs[asked] !== undefined) {
+    return { id: asked, pack: STYLES.packs[asked] as StylePack };
+  }
+  return { id: STYLES.default, pack: defaultPack() };
+}
+
+/** The sheet path of one weapon in a pack. */
+export const weaponSheetPath = (pack: StylePack, art: string, stage: number): string =>
+  pack.weapon.replace('{art}', art).replace('{stage2}', String(stage).padStart(2, '0'));
 
 /** Health bar above a player's head. */
 const PLAYER_BAR_WIDTH = 30;
@@ -55,40 +112,37 @@ const rowsFor = (rows: string[], names: readonly string[]): number[] =>
   names.map((name) => rowIndex(rows, name));
 
 /** Reads the row tables that ship next to the images. */
-export function readTables(scene: Phaser.Scene): ArtTables {
+export function readTables(scene: Phaser.Scene, pack: StylePack = defaultPack()): ArtTables {
   const armor = scene.cache.json.get('rows_armor') as { zeilen: Record<string, string[]> };
   const head = scene.cache.json.get('rows_head') as { zeilen: string[] };
   const hair = scene.cache.json.get('rows_hair') as { zeilen: string[] };
   const weapon = scene.cache.json.get('rows_weapon') as { zeilen: string[] };
 
   return {
-    armor: armor.zeilen['warrior'] ?? [],
+    armor: armor.zeilen[pack.armorRows] ?? [],
     head: head.zeilen,
     hair: hair.zeilen,
     weapon: weapon.zeilen,
   };
 }
 
-/** Every texture key the scene has to load for the current item table. */
-export function spriteSheets(): Array<{ key: string; path: string }> {
+/** Every texture key the scene has to load for one style pack. */
+export function spriteSheets(pack: StylePack = defaultPack()): Array<{ key: string; path: string }> {
   const sheets = [
-    { key: 'body', path: '/assets/ruestungen/krieger_m/00_ohne_ruestung.png' },
-    { key: 'head', path: '/assets/modelle/spieler/krieger_m.png' },
-    { key: 'hair', path: '/assets/haare/krieger_m_1.png' },
+    { key: 'body', path: pack.body },
+    { key: 'head', path: pack.head },
+    { key: 'hair', path: pack.hair },
   ];
 
   for (const key of ITEM_KEYS) {
     const def = itemDef(key);
     if (def.armorFile !== undefined) {
-      sheets.push({
-        key: `armor_${def.armorFile}`,
-        path: `/assets/ruestungen/krieger_m/${def.armorFile}.png`,
-      });
+      sheets.push({ key: `armor_${def.armorFile}`, path: pack.armor.replace('{file}', def.armorFile) });
     }
     if (def.weaponArt !== undefined && def.stage !== undefined) {
       sheets.push({
         key: `weapon_${def.weaponArt}_${def.stage}`,
-        path: `/assets/waffen/${def.weaponArt}/${String(def.stage).padStart(2, '0')}.png`,
+        path: weaponSheetPath(pack, def.weaponArt, def.stage),
       });
     }
   }
@@ -96,7 +150,8 @@ export function spriteSheets(): Array<{ key: string; path: string }> {
   return sheets;
 }
 
-export const frameFor = (row: number, column: number): number => row * COLUMNS + column;
+export const frameFor = (row: number, column: number, columns = COLUMNS): number =>
+  row * columns + column;
 
 export type Look = {
   weapon: ItemKey | null;
@@ -124,8 +179,14 @@ export class PlayerView {
   private headRows: number[] = [0, 0, 0];
   private hairRows: number[] = [0, 0, 0];
 
-  constructor(scene: Phaser.Scene, tables: ArtTables) {
-    const origin = { x: FOOT_X / CELL, y: FOOT_Y / CELL };
+  private readonly columns: number;
+
+  constructor(scene: Phaser.Scene, tables: ArtTables, pack: StylePack = defaultPack()) {
+    this.columns = pack.columns;
+    const origin = {
+      x: (pack.footX ?? FOOT_X) / pack.cell,
+      y: (pack.footY ?? FOOT_Y) / pack.cell,
+    };
 
     this.weaponBack = scene.add.image(0, 0, 'body').setOrigin(origin.x, origin.y);
     this.body = scene.add.image(0, 0, 'body').setOrigin(origin.x, origin.y);
@@ -213,13 +274,17 @@ export class PlayerView {
     const view = viewOf(dir);
     const flip = flipOf(dir);
 
-    this.body.setFrame(frameFor(this.bodyRows[view] ?? 0, column)).setFlipX(flip);
-    this.head.setFrame(frameFor(this.headRows[view] ?? 0, column)).setFlipX(flip);
-    this.hair.setFrame(frameFor(this.hairRows[view] ?? 0, column)).setFlipX(flip);
+    this.body.setFrame(frameFor(this.bodyRows[view] ?? 0, column, this.columns)).setFlipX(flip);
+    this.head.setFrame(frameFor(this.headRows[view] ?? 0, column, this.columns)).setFlipX(flip);
+    this.hair.setFrame(frameFor(this.hairRows[view] ?? 0, column, this.columns)).setFlipX(flip);
 
     if (this.hasWeapon) {
-      this.weaponBack.setFrame(frameFor(this.backRows[view] ?? 0, column)).setFlipX(flip);
-      this.weaponFront.setFrame(frameFor(this.frontRows[view] ?? 0, column)).setFlipX(flip);
+      this.weaponBack
+        .setFrame(frameFor(this.backRows[view] ?? 0, column, this.columns))
+        .setFlipX(flip);
+      this.weaponFront
+        .setFrame(frameFor(this.frontRows[view] ?? 0, column, this.columns))
+        .setFlipX(flip);
     }
   }
 

@@ -1,0 +1,18 @@
+{
+  "default": "krieger_m",
+  "packs": {
+    "krieger_m": {
+      "name": "Krieger (männlich)",
+      "cell": 48,
+      "columns": 9,
+      "footX": 24,
+      "footY": 44,
+      "body": "/assets/ruestungen/krieger_m/00_ohne_ruestung.png",
+      "head": "/assets/modelle/spieler/krieger_m.png",
+      "hair": "/assets/haare/krieger_m_1.png",
+      "armor": "/assets/ruestungen/krieger_m/{file}.png",
+      "weapon": "/assets/waffen/{art}/{stage2}.png",
+      "armorRows": "warrior"
+    }
+  }
+}

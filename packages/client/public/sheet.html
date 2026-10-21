@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sprite-Sheet-Vorschau</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0f13;
+        --panel: #151d25;
+        --line: #2b3947;
+        --text: #e6eef6;
+        --muted: #93a4b5;
+        --accent: #d8b45a;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 16px;
+        font: 13px/1.5 ui-monospace, monospace;
+        color: var(--text);
+        background: var(--bg);
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 16px;
+        color: var(--accent);
+      }
+      p.hint {
+        margin: 0 0 12px;
+        color: var(--muted);
+      }
+      .panel {
+        padding: 10px;
+        margin-bottom: 12px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      input[type='text'] {
+        flex: 1 1 320px;
+        min-width: 160px;
+      }
+      input[type='number'] {
+        width: 80px;
+      }
+      input,
+      button {
+        padding: 4px 8px;
+        font: inherit;
+        color: var(--text);
+        background: #232d37;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+      }
+      button {
+        cursor: pointer;
+      }
+      button:active {
+        background: #2d3a46;
+      }
+      canvas {
+        display: block;
+        max-width: 100%;
+        image-rendering: pixelated;
+        background: #10161c;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+      }
+      #sheet-wrap {
+        overflow: auto;
+      }
+      .grid-info {
+        margin-top: 6px;
+        color: var(--muted);
+      }
+      .player {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        flex-wrap: wrap;
+      }
+      #preview {
+        background: #1a2430;
+      }
+      .label {
+        color: var(--muted);
+      }
+      .bad {
+        color: #e07a7a;
+      }
+      .ok {
+        color: #9fe0a8;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Sprite-Sheet-Vorschau</h1>
+    <p class="hint">
+      Ein Sheet laden, Raster prüfen, eine Zeile als Animation abspielen. Ziehen
+      einer PNG auf die Seite geht auch. Kachelgröße und Spalten stehen in
+      <code>packages/client/src/styles.json</code>.
+    </p>
+
+    <div class="panel">
+      <div class="row">
+        <input id="url" type="text" value="/assets/ruestungen/krieger_m/00_ohne_ruestung.png" spellcheck="false" />
+        <label class="label">Kachel <input id="cell" type="number" value="48" min="8" max="256" /></label>
+        <label class="label">Spalten <input id="columns" type="number" value="9" min="1" max="32" /></label>
+        <button id="load" type="button">Laden</button>
+        <input id="file" type="file" accept="image/png" />
+      </div>
+      <div class="grid-info" id="info"></div>
+    </div>
+
+    <div class="panel">
+      <div class="player">
+        <div>
+          <canvas id="preview" width="96" height="96"></canvas>
+          <div class="row" style="margin-top: 6px">
+            <label class="label">Zeile <input id="row" type="number" value="0" min="0" /></label>
+            <button id="play" type="button">Abspielen</button>
+            <button id="stop" type="button">Stopp</button>
+          </div>
+        </div>
+        <div class="hint" id="status"></div>
+      </div>
+    </div>
+
+    <div class="panel" id="sheet-wrap">
+      <canvas id="sheet"></canvas>
+    </div>
+
+    <script>
+      const SCALE = 2;
+      const urlInput = document.getElementById('url');
+      const cellInput = document.getElementById('cell');
+      const columnsInput = document.getElementById('columns');
+      const rowInput = document.getElementById('row');
+      const info = document.getElementById('info');
+      const status = document.getElementById('status');
+      const sheetCanvas = document.getElementById('sheet');
+      const sheetContext = sheetCanvas.getContext('2d');
+      const previewCanvas = document.getElementById('preview');
+      const previewContext = previewCanvas.getContext('2d');
+
+      let image = null;
+      let timer = null;
+      let column = 0;
+
+      const cell = () => Math.max(8, Number(cellInput.value) || 48);
+      const columns = () => Math.max(1, Number(columnsInput.value) || 1);
+
+      const loadImage = (src, label) => {
+        const next = new Image();
+        next.onload = () => {
+          image = next;
+          stop();
+          rowInput.max = String(Math.max(0, Math.floor(next.height / cell()) - 1));
+          rowInput.value = rowInput.value < 0 ? '0' : rowInput.value;
+          drawSheet();
+          setStatus(`${label}: ${next.width}×${next.height}px`, 'ok');
+        };
+        next.onerror = () => setStatus(`konnte ${label} nicht laden`, 'bad');
+        next.src = src;
+      };
+
+      const setStatus = (text, kind) => {
+        status.textContent = text;
+        status.className = kind === 'bad' ? 'bad' : kind === 'ok' ? 'ok' : 'hint';
+      };
+
+      const drawSheet = () => {
+        if (image === null) return;
+        const size = cell();
+        const cols = columns();
+
+        sheetCanvas.width = image.width * SCALE;
+        sheetCanvas.height = image.height * SCALE + 18;
+        sheetContext.imageSmoothingEnabled = false;
+        sheetContext.clearRect(0, 0, sheetCanvas.width, sheetCanvas.height);
+        sheetContext.drawImage(image, 0, 18, image.width * SCALE, image.height * SCALE);
+
+        // Column numbers above the sheet.
+        sheetContext.font = '11px ui-monospace, monospace';
+        sheetContext.fillStyle = '#93a4b5';
+        for (let c = 0; c < cols; c += 1) {
+          sheetContext.fillText(String(c), c * size * SCALE + 4, 12);
+        }
+
+        // Grid.
+        sheetContext.strokeStyle = 'rgb(216 180 90 / 35%)';
+        sheetContext.lineWidth = 1;
+        for (let c = 0; c <= cols; c += 1) {
+          const x = Math.round(c * size * SCALE) + 0.5;
+          sheetContext.beginPath();
+          sheetContext.moveTo(x, 18);
+          sheetContext.lineTo(x, sheetCanvas.height);
+          sheetContext.stroke();
+        }
+        for (let y = 0; y * size * SCALE <= image.height * SCALE; y += 1) {
+          const py = Math.round(18 + y * size * SCALE) + 0.5;
+          sheetContext.beginPath();
+          sheetContext.moveTo(0, py);
+          sheetContext.lineTo(sheetCanvas.width, py);
+          sheetContext.stroke();
+        }
+
+        const rows = Math.floor(image.height / size);
+        const fits = image.width === size * cols && image.height % size === 0;
+        info.innerHTML =
+          `${image.width}×${image.height}px · ${rows} Zeilen · ${cols} Spalten ` +
+          `<span class="${fits ? 'ok' : 'bad'}">${fits ? 'Raster passt' : 'Raster passt NICHT'}</span>` +
+          (fits ? '' : ` — erwartet ${size * cols}px Breite, Höhe als Vielfaches von ${size}`);
+        drawPreview();
+      };
+
+      const drawPreview = () => {
+        if (image === null) return;
+        const size = cell();
+        const row = Math.max(0, Number(rowInput.value) || 0);
+        const col = column % columns();
+
+        previewCanvas.width = size * SCALE;
+        previewCanvas.height = size * SCALE;
+        previewContext.imageSmoothingEnabled = false;
+        previewContext.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+        previewContext.drawImage(
+          image,
+          col * size,
+          row * size,
+          size,
+          size,
+          0,
+          0,
+          size * SCALE,
+          size * SCALE,
+        );
+      };
+
+      const stop = () => {
+        if (timer !== null) window.clearInterval(timer);
+        timer = null;
+      };
+
+      const play = () => {
+        stop();
+        timer = window.setInterval(() => {
+          column += 1;
+          drawPreview();
+        }, 120);
+      };
+
+      document.getElementById('load').addEventListener('click', () => {
+        loadImage(urlInput.value, urlInput.value.split('/').pop());
+      });
+
+      document.getElementById('file').addEventListener('change', (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        loadImage(URL.createObjectURL(file), file.name);
+      });
+
+      document.getElementById('play').addEventListener('click', play);
+      document.getElementById('stop').addEventListener('click', stop);
+      rowInput.addEventListener('change', drawPreview);
+      cellInput.addEventListener('change', drawSheet);
+      columnsInput.addEventListener('change', drawSheet);
+
+      sheetCanvas.addEventListener('click', (event) => {
+        const size = cell();
+        const box = sheetCanvas.getBoundingClientRect();
+        const y = (event.clientY - box.top) * (sheetCanvas.height / box.height) - 18;
+        const row = Math.floor(y / (size * SCALE));
+        if (row >= 0) {
+          rowInput.value = String(row);
+          drawPreview();
+        }
+      });
+
+      window.addEventListener('dragover', (event) => event.preventDefault());
+      window.addEventListener('drop', (event) => {
+        event.preventDefault();
+        const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+        if (!file) return;
+        loadImage(URL.createObjectURL(file), file.name);
+      });
+
+      loadImage(urlInput.value, urlInput.value.split('/').pop());
+    </script>
+  </body>
+</html>

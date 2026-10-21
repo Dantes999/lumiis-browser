@@ -360,6 +360,63 @@ schon definiert und warten auf stärkere Monster oder einen Händler.
 **Tests:** `packages/server/tests/items.test.ts` (jeder Gegenstand hat Name,
 Typ, Icon; Tooltip-Inhalte) und der Level-Test in `world.test.ts`.
 
+## 7g. Grafik-Pakete (Style Packs)
+
+Die Spieler-Grafik steckt in **Paketen**, nicht im Code. Ein Paket sagt, wo
+seine Sheets liegen und wie sie geschnitten sind
+(`packages/client/src/styles.json`):
+
+| Feld | Bedeutung |
+|---|---|
+| `cell` / `columns` | Kachelgröße (48 px) und Spalten je Zeile (9) |
+| `footX` / `footY` | Fußpunkt in der Kachel (24/44) — daran wird die Figur verankert |
+| `body` | Sheet ohne Rüstung |
+| `head` / `hair` | Kopf und Haare |
+| `armor` | Pfad-Vorlage, `{file}` = `armorFile` aus der Item-Tabelle |
+| `weapon` | Pfad-Vorlage, `{art}` = `schwert`/`zweihand`/`faust`, `{stage2}` = `05` |
+| `armorRows` | welche Zeilen-Gruppe in `ruestungen.json` die Körperposen beschreibt |
+
+**Aktives Paket:** `?style=<id>` in der URL, sonst das zuletzt gemerkte
+(`localStorage` `lumiis.style`), sonst `default` aus der Datei.
+
+**Ein neues Paket anlegen** (z. B. ein gerendertes 3D-Set):
+
+1. Ordner `packages/client/public/assets/styles/<id>/` mit `body.png`,
+   `head.png`, `hair.png`, `armor/<file>.png`, `weapon/<art>/<stage>.png`.
+2. Eintrag in `styles.json` mit den Pfaden (`/assets/styles/<id>/…`).
+3. `node tools/check-art.mjs` prüfen: jede Kachel muss `cell × columns` breit
+   und ein Vielfaches von `cell` hoch sein.
+4. `http://localhost:3000/?style=<id>` öffnen.
+
+Die **Zeilennamen** müssen dieselben bleiben wie im alten Asset-Pack
+(`koerper/<art>/<unten|rechts|oben>`, `hinten/…`, `vorne/…`, `kopf/…`,
+`oben/…`), dann reichen die vorhandenen Tabellen (`ruestungen.json`,
+`spieler.json`, `haare.json`, `waffen.json`). Die **Spalten** sind fest:
+0 stehen, 1/2 laufen, 3 atmen, 4–6 Angriff, 7 Treffer, 8 tot. Benutzt werden
+heute 0, 1, 2 und 4–6.
+
+### Sheets selbst prüfen und ansehen
+
+```bash
+node tools/check-art.mjs                         # alle Pakete
+node tools/check-art.mjs krieger_m               # ein Paket
+node tools/check-art.mjs bild.png --cell=48 --columns=9
+```
+
+`http://localhost:3000/sheet.html` ist eine **Vorschau**: Sheet laden (URL oder
+PNG auf die Seite ziehen), Raster mit Spaltennummern ansehen, eine Zeile als
+Animation abspielen. Damit siehst du sofort, ob ein neues Sheet passt.
+
+### Eigene Figuren rendern (3D → Sprites)
+
+Blender (kostenlos), Basismodell + Animationen (z. B. Mixamo), dann aus **3
+Ansichten** (unten/rechts/oben) je 9 Spalten rendern; die drei linken
+Richtungen spiegelt der Client (`flipX`). Kachel 48 px, Fußpunkt 24/44, Kamera
+fest. Danach als Paket eintragen — die Engine bleibt unverändert.
+
+**Test:** `packages/server/tests/art.test.ts` prüft alle Sheets der Pakete
+(Existenz, Raster, Zeilenzahl).
+
 ## 7a. Last beobachten: `/status`
 
 `GET /status` liefert JSON für Messungen:
