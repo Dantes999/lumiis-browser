@@ -21,7 +21,7 @@ describe('graphic style packs', () => {
 
   it('has a body sheet with the three views (down, right, up)', () => {
     for (const report of reports) {
-      const body = report.sheets.find((sheet) => sheet.key === 'body');
+      const body = report.sheets.find((sheet) => sheet.key.startsWith('body'));
       // The old pack has many more rows; a static placeholder needs three.
       expect(body?.rows ?? 0, report.id).toBeGreaterThanOrEqual(3);
     }

@@ -1,0 +1,108 @@
+# Grafik: modulare Pixelart
+
+Jede Figur besteht aus **getrennten PNG-Ebenen**, die im Spiel übereinander
+gelegt werden. Du zeichnest in Paint/Aseprite eine Ebene, legst sie ab, fertig.
+
+```
+packages/client/public/assets/styles/pixel/
+  body/     default.png          ← Körper ohne Rüstung, ohne Haare
+  head/     default.png          ← Kopf/Gesicht, ohne Haare
+  hair/     short.png  long.png  ← Haare/Helm
+  armor/    01_… 02_… 03_… 04_…  ← nur die Rüstungsteile (sonst transparent)
+  weapon/   schwert_00.png …     ← nur die Waffe
+  rows.json                      ← Zeilen-Zuordnung (nicht ändern)
+```
+
+## Das Raster (verbindlich)
+
+| | |
+|---|---|
+| Kachel | **48 × 48 px** |
+| Spalten | **9** (siehe unten) |
+| Zeilen | **3** Ansichten: 0 unten, 1 rechts, 2 oben (hinten) |
+| Blattgröße | **432 × 144 px** (Körper/Kopf/Haare/Rüstung) |
+| Waffe | **432 × 288 px** (6 Zeilen: oben 3 leere „hinten", unten 3 „vorne") |
+| Anker | **Füße bei (24, 44)** in **jeder** Kachel |
+| Figur | etwa 40 px hoch, Kopf ca. y 7–21 |
+
+**Alle Ebenen benutzen dieselben Kachel-Koordinaten.** Wenn die Hand in Spalte 5
+bei (27, 41) ist, muss die Waffe dort ansetzen — dann passt sie automatisch.
+
+## Die Spalten
+
+| Spalte | Bedeutung |
+|---|---|
+| 0 | stehen |
+| 1 | Laufen, Schritt 1 |
+| 2 | Laufen, Schritt 2 |
+| 3 | atmen (frei, wird nicht benutzt) |
+| 4 | Angriff: ausholen |
+| 5 | Angriff: durchziehen |
+| 6 | Angriff: zurück |
+| 7 | Treffer |
+| 8 | tot |
+
+Das Spiel zeigt 0, 1/2 im 180-ms-Takt, 4–6 über die Schwertdauer (500/600/800 ms),
+7 und 8. Die linke Blickrichtung spiegelt der Client selbst — du zeichnest nur
+**unten, rechts, oben**.
+
+## Was auf welche Ebene gehört
+
+| Ebene | Inhalt | Nicht darauf |
+|---|---|---|
+| `body` | Torso, Arme, Beine, Stiefel, Hose | Kopf, Haare, Rüstung, Waffe |
+| `armor` | Brust, Schultern, Helm **falls** Teil der Rüstung; Rest transparent | Körper, Kopf, Haare |
+| `head` | Gesicht/Kopf | Haare, Helm |
+| `hair` | Haare oder Helm | Gesicht |
+| `weapon` | nur die Klinge/Griff | Körper |
+
+Reihenfolge im Spiel: Waffe hinten → Körper → Rüstung → Kopf → Haare → Waffe
+vorne. Die Rüstung liegt **über** dem Körper und ist außerhalb der Teile
+transparent — deshalb kannst du jede Rüstung mit jedem Körper kombinieren.
+
+## Dateinamen
+
+- Körper: `body/<id>.png` (z. B. `body/human_m.png`)
+- Kopf: `head/<id>.png`
+- Haare/Helm: `hair/<id>.png`
+- Rüstung: `armor/<armorFile>.png` — der Wert `armorFile` aus
+  `packages/shared/src/items.ts`, z. B. `03_tiger_plattenpanzer`
+- Waffe: `weapon/<weaponArt>_<stage>.png` — `weaponArt` und `stage` aus dem Item,
+  `stage` **zweistellig**, z. B. `schwert_02.png`, `zweihand_03.png`
+
+## Neues Teil einbauen
+
+1. PNG im richtigen Ordner ablegen (Raster wie oben).
+2. Nur bei **Körper/Kopf/Haaren** einen Eintrag im Manifest ergänzen:
+   `packages/client/src/styles.json` → Pack `pixel` → `bodies` / `heads` / `hairs`:
+   ```json
+   { "id": "human_m", "name": "Mensch (m)", "sheet": "/assets/styles/pixel/body/human_m.png" }
+   ```
+   Rüstungen und Waffen brauchen **keinen** Manifest-Eintrag — sie hängen an den
+   Items (`armorFile`, `weaponArt`/`stage`).
+3. Prüfen: `node tools/check-art.mjs` (Raster) und `/look.html` (Ebenen
+   übereinander). Danach im Spiel: `?style=pixel`.
+
+## Im Spiel
+
+- Beim Anlegen eines Charakters wählst du **Body** und **Kopf/Haare**.
+- Rüstung und Waffe erscheinen, sobald du sie anlegst.
+- Ein Klick auf ein Item legt es an; die Ebenen wechseln sofort.
+
+## Werkzeuge
+
+| Befehl / Seite | Zweck |
+|---|---|
+| `node tools/check-art.mjs` | prüft alle Sheets aller Pakete (Raster, Existenz) |
+| `node tools/check-art.mjs pixel` | nur das Paket `pixel` |
+| `/look.html` | Ebenen + Pose + Ansicht übereinander ansehen |
+| `/sheet.html` | eine einzelne Sheet-Datei mit Raster und Animation |
+| `python3 tools/make-template-pack.py` | erzeugt die Platzhalter neu (überschreibt!) |
+
+## Tipps
+
+- In Aseprite: Sprite-Größe **48×48**, Raster an, dann als **Streifen** mit 9
+  Spalten und 3 Zeilen exportieren (432×144).
+- Transparenter Hintergrund; keine Ränder über die Kachel hinaus.
+- Die Füße immer auf y = 44, sonst schwebt die Figur über dem Boden.
+- Erst **eine** Pose zeichnen und im Spiel ansehen, dann die anderen acht.

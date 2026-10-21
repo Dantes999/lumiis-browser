@@ -30,10 +30,18 @@ export type StylePack = {
   /** Foot position inside a cell; the sprite is anchored there. */
   footX: number;
   footY: number;
-  /** Sheet used when nothing is worn, and the fixed head/hair. */
-  body: string;
-  head: string;
-  hair: string;
+  /**
+   * Modular layers: one entry per body, head and hairstyle. The old packs only
+   * had a single sheet each; those are read as the entry "default".
+   */
+  bodies?: LookPart[];
+  heads?: LookPart[];
+  hairs?: LookPart[];
+  /** Legacy single sheets (used when the lists above are missing). */
+  body?: string;
+  head?: string;
+  hair?: string;
+  /** Path templates: {file} = armor file, {art}/{stage2} = weapon sheet. */
   armor: string;
   weapon: string;
   /** Which row set of ruestungen.json describes the body poses. */
@@ -51,6 +59,29 @@ export type StylePack = {
 };
 
 const STYLES = stylesFile as { default: string; packs: Record<string, StylePack> };
+
+/** One pickable layer sheet (a body, a head or a hairstyle). */
+export type LookPart = { id: string; name: string; sheet: string };
+
+const legacyList = (
+  list: LookPart[] | undefined,
+  single: string | undefined,
+  name: string,
+): LookPart[] => {
+  if (list !== undefined && list.length > 0) return list;
+  return single !== undefined && single !== '' ? [{ id: 'default', name, sheet: single }] : [];
+};
+
+export const packBodies = (pack: StylePack): LookPart[] =>
+  legacyList(pack.bodies, pack.body, 'Basis');
+export const packHeads = (pack: StylePack): LookPart[] => legacyList(pack.heads, pack.head, 'Kopf');
+export const packHairs = (pack: StylePack): LookPart[] => legacyList(pack.hairs, pack.hair, 'Haare');
+
+/** Bodies and hairstyles of the pack the game is drawn with, for the picker. */
+export function lookOptions(): { bodies: LookPart[]; hairs: LookPart[] } {
+  const { pack } = activePack();
+  return { bodies: packBodies(pack), hairs: packHairs(pack) };
+}
 
 /** Ids of every style pack the client knows. */
 export const STYLE_IDS = Object.keys(STYLES.packs);
@@ -151,11 +182,10 @@ export function readTables(scene: Phaser.Scene, pack: StylePack = defaultPack())
 
 /** Every texture key the scene has to load for one style pack. */
 export function spriteSheets(pack: StylePack = defaultPack()): Array<{ key: string; path: string }> {
-  const sheets = [
-    { key: 'body', path: pack.body },
-    { key: 'head', path: pack.head },
-    { key: 'hair', path: pack.hair },
-  ];
+  const sheets: Array<{ key: string; path: string }> = [];
+  for (const part of packBodies(pack)) sheets.push({ key: `body_${part.id}`, path: part.sheet });
+  for (const part of packHeads(pack)) sheets.push({ key: `head_${part.id}`, path: part.sheet });
+  for (const part of packHairs(pack)) sheets.push({ key: `hair_${part.id}`, path: part.sheet });
 
   for (const key of ITEM_KEYS) {
     const def = itemDef(key);
@@ -177,6 +207,10 @@ export const frameFor = (row: number, column: number, columns = COLUMNS): number
   row * columns + column;
 
 export type Look = {
+  /** Look ids from the pack manifest. */
+  body: string;
+  hair: string;
+  head?: string;
   weapon: ItemKey | null;
   armor: ItemKey | null;
 };
@@ -186,6 +220,8 @@ export class PlayerView {
   readonly container: Phaser.GameObjects.Container;
   private readonly weaponBack: Phaser.GameObjects.Image;
   private readonly body: Phaser.GameObjects.Image;
+  /** Armour drawn over the body; transparent except the pieces. */
+  private readonly armorOverlay: Phaser.GameObjects.Image;
   private readonly head: Phaser.GameObjects.Image;
   private readonly hair: Phaser.GameObjects.Image;
   private readonly weaponFront: Phaser.GameObjects.Image;
@@ -204,23 +240,39 @@ export class PlayerView {
 
   private readonly columns: number;
   private readonly bodyArt: string | undefined;
+  private readonly bodies: LookPart[];
+  private readonly heads: LookPart[];
+  private readonly hairs: LookPart[];
 
   constructor(scene: Phaser.Scene, tables: ArtTables, pack: StylePack = defaultPack()) {
     this.columns = pack.columns;
     this.bodyArt = pack.bodyArt;
+    this.bodies = packBodies(pack);
+    this.heads = packHeads(pack);
+    this.hairs = packHairs(pack);
     const origin = {
       x: (pack.footX ?? FOOT_X) / pack.cell,
       y: (pack.footY ?? FOOT_Y) / pack.cell,
     };
 
-    this.weaponBack = scene.add.image(0, 0, 'body').setOrigin(origin.x, origin.y);
-    this.body = scene.add.image(0, 0, 'body').setOrigin(origin.x, origin.y);
-    this.head = scene.add.image(0, 0, 'head').setOrigin(origin.x, origin.y);
-    this.hair = scene.add.image(0, 0, 'hair').setOrigin(origin.x, origin.y);
-    this.weaponFront = scene.add.image(0, 0, 'body').setOrigin(origin.x, origin.y);
+    const first = (list: LookPart[]): string => list[0]?.id ?? 'default';
+
+    this.weaponBack = scene.add
+      .image(0, 0, `body_${first(this.bodies)}`)
+      .setOrigin(origin.x, origin.y);
+    this.body = scene.add.image(0, 0, `body_${first(this.bodies)}`).setOrigin(origin.x, origin.y);
+    this.armorOverlay = scene.add
+      .image(0, 0, `body_${first(this.bodies)}`)
+      .setOrigin(origin.x, origin.y);
+    this.head = scene.add.image(0, 0, `head_${first(this.heads)}`).setOrigin(origin.x, origin.y);
+    this.hair = scene.add.image(0, 0, `hair_${first(this.hairs)}`).setOrigin(origin.x, origin.y);
+    this.weaponFront = scene.add
+      .image(0, 0, `body_${first(this.bodies)}`)
+      .setOrigin(origin.x, origin.y);
 
     this.weaponBack.setVisible(false);
     this.weaponFront.setVisible(false);
+    this.armorOverlay.setVisible(false);
 
     this.headRows = rowsFor(tables.head, VIEW_NAMES.map((view) => `kopf/${view}`));
     this.hairRows = rowsFor(tables.hair, VIEW_NAMES.map((view) => `oben/${view}`));
@@ -240,6 +292,7 @@ export class PlayerView {
     this.container = scene.add.container(0, 0, [
       this.weaponBack,
       this.body,
+      this.armorOverlay,
       this.head,
       this.hair,
       this.weaponFront,
@@ -247,7 +300,7 @@ export class PlayerView {
       this.nameText,
     ]);
 
-    this.applyLook(tables, { weapon: null, armor: null }, true);
+    this.applyLook(tables, { body: '', hair: '', weapon: null, armor: null }, true);
   }
 
   /** A slight forward/backward tilt of the whole figure while swinging. */
@@ -300,6 +353,9 @@ export class PlayerView {
     const flip = flipOf(dir);
 
     this.body.setFrame(frameFor(this.bodyRows[view] ?? 0, column, this.columns)).setFlipX(flip);
+    this.armorOverlay
+      .setFrame(frameFor(this.bodyRows[view] ?? 0, column, this.columns))
+      .setFlipX(flip);
     this.head.setFrame(frameFor(this.headRows[view] ?? 0, column, this.columns)).setFlipX(flip);
     this.hair.setFrame(frameFor(this.hairRows[view] ?? 0, column, this.columns)).setFlipX(flip);
 
@@ -315,7 +371,14 @@ export class PlayerView {
 
   /** Red flash while a monster is biting. */
   setTint(color: number | null): void {
-    for (const layer of [this.weaponBack, this.body, this.head, this.hair, this.weaponFront]) {
+    for (const layer of [
+      this.weaponBack,
+      this.body,
+      this.armorOverlay,
+      this.head,
+      this.hair,
+      this.weaponFront,
+    ]) {
       if (color === null) layer.clearTint();
       else layer.setTint(color);
     }
@@ -326,17 +389,32 @@ export class PlayerView {
   }
 
   private applyLook(tables: ArtTables, look: Look, force: boolean): void {
-    const signature = `${look.weapon ?? '-'}|${look.armor ?? '-'}`;
+    const signature = `${look.body}|${look.hair}|${look.weapon ?? '-'}|${look.armor ?? '-'}`;
     if (!force && signature === this.lookSignature) return;
     this.lookSignature = signature;
+
+    const resolve = (list: LookPart[], id: string | undefined): string => {
+      if (id !== undefined && list.some((part) => part.id === id)) return id;
+      return list[0]?.id ?? 'default';
+    };
 
     const armorDef = look.armor === null ? null : itemDef(look.armor);
     const weaponDef = look.weapon === null ? null : itemDef(look.weapon);
 
-    this.body.setTexture(armorDef?.armorFile ? `armor_${armorDef.armorFile}` : 'body');
+    this.body.setTexture(`body_${resolve(this.bodies, look.body)}`);
+    this.head.setTexture(`head_${resolve(this.heads, look.head)}`);
+    this.hair.setTexture(`hair_${resolve(this.hairs, look.hair)}`);
+
+    // The armour is its own transparent layer over the body; without it the
+    // layer stays hidden.
+    if (armorDef?.armorFile !== undefined) {
+      this.armorOverlay.setTexture(`armor_${armorDef.armorFile}`).setVisible(true);
+    } else {
+      this.armorOverlay.setVisible(false);
+    }
 
     // The pose of the arms depends on what is held (unless the pack says it
-    // does not, as a single-mesh 3D character).
+    // does not, as a single-mesh render).
     const art = this.bodyArt ?? weaponDef?.weaponArt ?? 'faust';
     this.bodyRows = rowsFor(
       tables.armor,

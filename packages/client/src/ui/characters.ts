@@ -2,6 +2,7 @@
 // one. It appears right after the login and disappears once the world loads.
 
 import type { ChannelInfo, CharacterSummary } from '@lumiis/shared';
+import { lookOptions } from '../art';
 
 const mustFind = (id: string): HTMLElement => {
   const element = document.getElementById(id);
@@ -23,7 +24,7 @@ export function createCharacterScreen(
   onPick: (id: number) => void,
   /** A channel was chosen: enter the world there. */
   onSelect: (id: number, channel: number) => void,
-  onCreate: (name: string) => void,
+  onCreate: (name: string, body: string, hair: string) => void,
 ): CharacterScreen {
   const overlay = mustFind('characters');
   const list = mustFind('character-list');
@@ -31,6 +32,18 @@ export function createCharacterScreen(
   const error = mustFind('character-error');
   const createButton = mustFind('character-create') as HTMLButtonElement;
   const picker = mustFind('channel-picker');
+  const bodySelect = mustFind('character-body') as HTMLSelectElement;
+  const hairSelect = mustFind('character-hair') as HTMLSelectElement;
+  let lookFilled = false;
+
+  /** Bodies and hairstyles come from the active style pack. */
+  const fillLooks = (): void => {
+    if (lookFilled) return;
+    lookFilled = true;
+    const { bodies, hairs } = lookOptions();
+    for (const part of bodies) bodySelect.append(new Option(part.name, part.id));
+    for (const part of hairs) hairSelect.append(new Option(part.name, part.id));
+  };
 
   let shownList = '';
   let shownError = '';
@@ -46,7 +59,7 @@ export function createCharacterScreen(
     error.textContent = '';
     shownError = '';
     nameInput.value = '';
-    onCreate(name);
+    onCreate(name, bodySelect.value, hairSelect.value);
   };
 
   createButton.addEventListener('click', submit);
@@ -56,6 +69,7 @@ export function createCharacterScreen(
 
   return {
     show(next: CharacterSummary[], max: number): void {
+      fillLooks();
       const signature = `${max}|${next.map((entry) => `${entry.id}:${entry.name}:${entry.level}`).join('|')}`;
       if (signature === shownList) return;
       shownList = signature;

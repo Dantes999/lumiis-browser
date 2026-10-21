@@ -1,5 +1,5 @@
 {
-  "default": "krieger_m",
+  "default": "pixel",
   "packs": {
     "krieger_m": {
       "name": "Krieger (männlich)",
@@ -28,34 +28,42 @@
       "armorRows": "any",
       "rows": "/assets/styles/gemini_warrior/rows.json"
     },
-    "demo3d": {
-      "name": "Demo-Held (3D-Render)",
+    "pixel": {
+      "name": "Pixel-Vorlage (modular)",
       "cell": 48,
       "columns": 9,
       "footX": 24,
       "footY": 44,
-      "body": "/assets/styles/demo3d/body.png",
-      "head": "/assets/styles/demo3d/head.png",
-      "hair": "/assets/styles/demo3d/hair.png",
-      "armor": "/assets/styles/demo3d/armor.png",
-      "weapon": "/assets/styles/demo3d/weapon.png",
+      "bodies": [
+        {
+          "id": "default",
+          "name": "Basis",
+          "sheet": "/assets/styles/pixel/body/default.png"
+        }
+      ],
+      "heads": [
+        {
+          "id": "default",
+          "name": "Kopf",
+          "sheet": "/assets/styles/pixel/head/default.png"
+        }
+      ],
+      "hairs": [
+        {
+          "id": "short",
+          "name": "Kurz",
+          "sheet": "/assets/styles/pixel/hair/short.png"
+        },
+        {
+          "id": "long",
+          "name": "Lang",
+          "sheet": "/assets/styles/pixel/hair/long.png"
+        }
+      ],
+      "armor": "/assets/styles/pixel/armor/{file}.png",
+      "weapon": "/assets/styles/pixel/weapon/{art}_{stage2}.png",
       "armorRows": "any",
-      "rows": "/assets/styles/demo3d/rows.json",
-      "bodyArt": "faust"
-    },
-    "kaykit_knight": {
-      "name": "Ritter (KayKit, 3D-Render)",
-      "cell": 48,
-      "columns": 9,
-      "footX": 24,
-      "footY": 44,
-      "body": "/assets/styles/kaykit_knight/body.png",
-      "head": "/assets/styles/kaykit_knight/head.png",
-      "hair": "/assets/styles/kaykit_knight/hair.png",
-      "armor": "/assets/styles/kaykit_knight/armor.png",
-      "weapon": "/assets/styles/kaykit_knight/weapon.png",
-      "armorRows": "any",
-      "rows": "/assets/styles/kaykit_knight/rows.json",
+      "rows": "/assets/styles/pixel/rows.json",
       "bodyArt": "faust"
     }
   }

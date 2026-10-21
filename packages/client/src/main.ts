@@ -76,7 +76,7 @@ const login = createLogin((name, password, mode) => {
 const characters = createCharacterScreen(
   (id) => connection.requestChannels(id),
   (id, channel) => connection.selectCharacter(id, channel),
-  (name) => connection.createCharacter(name),
+  (name, body, hair) => connection.createCharacter(name, hair, body),
 );
 const channelUi = createChannelUi(
   () => connection.requestChannels(),

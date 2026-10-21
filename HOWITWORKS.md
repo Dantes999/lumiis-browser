@@ -360,143 +360,50 @@ schon definiert und warten auf stärkere Monster oder einen Händler.
 **Tests:** `packages/server/tests/items.test.ts` (jeder Gegenstand hat Name,
 Typ, Icon; Tooltip-Inhalte) und der Level-Test in `world.test.ts`.
 
-## 7g. Grafik-Pakete (Style Packs)
+## 7g. Grafik: modulare Ebenen
 
-Die Spieler-Grafik steckt in **Paketen**, nicht im Code. Ein Paket sagt, wo
-seine Sheets liegen und wie sie geschnitten sind
-(`packages/client/src/styles.json`):
+Jede Figur besteht aus **getrennten PNG-Ebenen** (Körper, Kopf, Haare, Rüstung,
+Waffe), die der Client übereinanderlegt:
 
-| Feld | Bedeutung |
+```
+Waffe hinten · Körper · Rüstung · Kopf · Haare · Waffe vorne
+```
+
+Die Rüstung ist eine **transparente Ebene über dem Körper** (nicht mehr „Körper-
+Textur ersetzen"), deshalb passen alle Rüstungen zu allen Körpern. Das Raster,
+die Spalten, die Anker und die Dateinamen stehen in **`ART.md`** — die kurze
+Fassung:
+
+| | |
 |---|---|
-| `cell` / `columns` | Kachelgröße (48 px) und Spalten je Zeile (9) |
-| `footX` / `footY` | Fußpunkt in der Kachel (24/44) — daran wird die Figur verankert |
-| `body` | Sheet ohne Rüstung |
-| `head` / `hair` | Kopf und Haare |
-| `armor` | Pfad-Vorlage, `{file}` = `armorFile` aus der Item-Tabelle |
-| `weapon` | Pfad-Vorlage, `{art}` = `schwert`/`zweihand`/`faust`, `{stage2}` = `05` |
-| `armorRows` | welche Zeilen-Gruppe in `ruestungen.json` die Körperposen beschreibt |
-| `rows` | optional: eigene Zeilen-Tabelle des Pakets (`{ armor: [...], head: [...], hair: [...], weapon: [...] }`); ohne sie gelten die alten Tabellen |
+| Kachel | 48 × 48 px, Füße bei (24, 44) |
+| Spalten | 9 (stehen, Schritt 1/2, atmen, Angriff 1–3, Treffer, tot) |
+| Zeilen | 3 Ansichten (unten, rechts, oben); links spiegelt der Client |
+| Blatt | 432 × 144 px (Waffe 432 × 288, oben 3 leere „hinten") |
+| Ordner | `public/assets/styles/<paket>/{body,head,hair,armor,weapon}/` |
+| Manifest | `packages/client/src/styles.json` (`bodies`, `heads`, `hairs`; Rüstung/Waffe über die Items) |
 
-**Aktives Paket:** `?style=<id>` in der URL, sonst das zuletzt gemerkte
-(`localStorage` `lumiis.style`), sonst `default` aus der Datei.
+**Was wo hängt:** `armor/<armorFile>.png` und `weapon/<art>_<stage>.png` ergeben
+sich aus der Item-Tabelle; neue Körper/Köpfe/Haare brauchen eine Zeile im
+Manifest (`id`, `name`, `sheet`). Der Charakter speichert `body` und `hair` als
+Ids (Spielstand + Snapshot), der Picker bei der Charaktererstellung liest sie
+aus dem Manifest.
 
-**Ein neues Paket anlegen** (z. B. ein gerendertes 3D-Set):
+**Werkzeuge**
 
-1. Ordner `packages/client/public/assets/styles/<id>/` mit `body.png`,
-   `head.png`, `hair.png`, `armor/<file>.png`, `weapon/<art>/<stage>.png`.
-2. Eintrag in `styles.json` mit den Pfaden (`/assets/styles/<id>/…`).
-3. `node tools/check-art.mjs` prüfen: jede Kachel muss `cell × columns` breit
-   und ein Vielfaches von `cell` hoch sein.
-4. `http://localhost:3000/?style=<id>` öffnen.
+| Befehl / Seite | Zweck |
+|---|---|
+| `node tools/check-art.mjs` | alle Sheets aller Pakete prüfen (Existenz, Raster) |
+| `node tools/check-art.mjs pixel` | nur ein Paket |
+| `/look.html` | Ebenen + Pose + Ansicht übereinander ansehen |
+| `/sheet.html` | eine Sheet-Datei mit Raster/Animation |
+| `python3 tools/make-template-pack.py` | Platzhalter neu erzeugen (überschreibt die Vorlage) |
 
-Die **Zeilennamen** müssen dieselben bleiben wie im alten Asset-Pack
-(`koerper/<art>/<unten|rechts|oben>`, `hinten/…`, `vorne/…`, `kopf/…`,
-`oben/…`), dann reichen die vorhandenen Tabellen (`ruestungen.json`,
-`spieler.json`, `haare.json`, `waffen.json`). Die **Spalten** sind fest:
-0 stehen, 1/2 laufen, 3 atmen, 4–6 Angriff, 7 Treffer, 8 tot. Benutzt werden
-heute 0, 1, 2 und 4–6.
+**Alte Pakete** (`krieger_m`, `gemini_warrior`) sind Ein-Blatt-Pakete: dort ist
+`body` die fertige Figur und `armor` das volle Rüstungsblatt; sie funktionieren
+weiter, sind aber nicht modular.
 
-### Sheets selbst prüfen und ansehen
-
-```bash
-node tools/check-art.mjs                         # alle Pakete
-node tools/check-art.mjs krieger_m               # ein Paket
-node tools/check-art.mjs bild.png --cell=48 --columns=9
-```
-
-`http://localhost:3000/sheet.html` ist eine **Vorschau**: Sheet laden (URL oder
-PNG auf die Seite ziehen), Raster mit Spaltennummern ansehen, eine Zeile als
-Animation abspielen. Damit siehst du sofort, ob ein neues Sheet passt.
-
-### Eigene Figuren rendern (3D → Sprites)
-
-Blender (kostenlos), Basismodell + Animationen (z. B. Mixamo), dann aus **3
-Ansichten** (unten/rechts/oben) je 9 Spalten rendern; die drei linken
-Richtungen spiegelt der Client (`flipX`). Kachel 48 px, Fußpunkt 24/44, Kamera
-fest. Danach als Paket eintragen — die Engine bleibt unverändert.
-
-### Statisches Paket aus zwei Bildern (Test)
-
-`tools/make-style-pack.py` macht aus zwei Gemini-/Konzeptbildern (vorn, hinten)
-sofort ein spielbares **Platzhalter-Paket**: Hintergrund weg, Figur
-zugeschnitten, auf 48 px skaliert, alle 9 Spalten dasselbe Bild, die
-Rückansicht für „oben".
-
-```bash
-python3 tools/make-style-pack.py \
-  --front ~/Downloads/images/chars/warrior/1/front.jpeg \
-  --back  ~/Downloads/images/chars/warrior/1/back.jpeg \
-  --id gemini_warrior
-```
-
-Dann den ausgegebenen Eintrag in `styles.json` legen und
-`?style=gemini_warrior` öffnen. Das Paket steht im Spiel, aber ohne
-Lauf-/Schlag-Animation — es zeigt nur, ob Stil und Größe passen. Im Repo liegt
-es als Beispiel (`gemini_warrior`).
-
-### 3D-Modell → Sprite-Sheet (der eigentliche Weg)
-
-Drei Werkzeuge, ein Ablauf:
-
-1. `tools/blender/build-demo-hero.py` — baut das Demo-Modell (nur zum Testen).
-2. `tools/blender/render-pack.py` — öffnet ein `.blend`, rendert 3 Ansichten × 9 Spalten.
-3. `tools/assemble-3d-pack.py` — verkleinert auf 48 px, legt Sheet, `rows.json`
-   und den `styles.json`-Eintrag an.
-
-```bash
-blender -b -noaudio --python tools/blender/render-pack.py -- \
-  --blend tools/blender/demo_hero.blend --out build/demo3d --size 192
-python3 tools/assemble-3d-pack.py --frames build/demo3d --id demo3d
-```
-
-**Was ein echtes Modell mitbringen muss:** eine Armatur mit **9 Actions**
-`col0`..`col8` (stehen, Schritt 1/2, atmen, Angriff 1–3, Treffer, tot) — oder
-ein Mapping-JSON (`--map`), das je Spalte Action und Frame nennt. Die drei
-Ansichten macht die Kamera (vorn/rechts/hinten); die linken Richtungen spiegelt
-der Client.
-
-**Render-Einstellungen** (im Skript): orthografisch, `ortho_scale` 2,2, Ziel bei
-z = 1,0, 192 px gerendert und auf 48 px heruntergerechnet, transparenter Film,
-Cycles (CPU, 12 Samples), Ansicht `Standard` statt AgX (sonst blasse Farben).
-
-**Grenze dieses ersten Pakets:** Rüstung und Waffe sind ins Modell gebacken —
-es gibt **einen Look**. Für Ausrüstungs-Wechsel rendert man je Rüstung/Waffe
-ein eigenes Sheet; die Paket-Vorlagen (`armor`, `weapon`) sind schon da.
-
-### Fertiges Modell: KayKit (CC0)
-
-Die Free-Version der „KayKit Adventurers" (CC0, kommerziell frei) bringt 5
-geriggte Charaktere (`Characters/gltf/*.glb`), Animationen
-(`Animations/gltf/Rig_Medium/*.glb`) und Waffen (`Assets/gltf/*.gltf`).
-**Angriffe fehlen in der Free-Version** — die drei Schwung-Posen werden im
-Build-Skript auf die Idle-Pose gesetzt.
-
-```bash
-blender -b -noaudio --python tools/blender/build-kaykit-hero.py -- \
-  --character ~/Downloads/kaykit_adventurers/Characters/gltf/Knight.glb \
-  --animations ~/Downloads/kaykit_adventurers/Animations/gltf/Rig_Medium \
-  --weapon ~/Downloads/kaykit_adventurers/Assets/gltf/sword_1handed.gltf \
-  --out tools/blender/knight.blend
-
-blender -b -noaudio --python tools/blender/render-pack.py -- \
-  --blend tools/blender/knight.blend --out build/knight \
-  --map tools/blender/knight.columns.json
-
-python3 tools/assemble-3d-pack.py --frames build/knight --id kaykit_knight
-```
-
-Dabei gelernt (steht auch im Skript):
-
-- Der glTF-Importer hängt an Aktionsnamen `.001`, weil er eine eigene Armatur
-  mitbringt — Aktionen werden deshalb über den **Präfix** gesucht.
-- Die Waffe wird per Bone-Parent an `handslot.r` gehängt; ohne Waffe wäre der
-  Ritter ein Faustkämpfer.
-- Die Kamera **fitet sich** an die skinned Meshes (Höhe/Breite), damit ein
-  anderes Modell keine Zahlen braucht.
-- Die Free-Version hat **einen Look** (Rüstung/Waffe im Mesh). Mehr Looks und
-  Rüstungs-Teile gibt es in den EXTRA-/SOURCE-Stufen.
-
-**Test:** `packages/server/tests/art.test.ts` prüft alle Sheets der Pakete
+**Test:** `packages/server/tests/art.test.ts` prüft alle Sheets aller Pakete
 (Existenz, Raster, Zeilenzahl).
 
 ## 7a. Last beobachten: `/status`

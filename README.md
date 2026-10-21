@@ -82,26 +82,21 @@ Wolves and boars drop materials and low-level gear; see `drops` in
 `packages/shared/src/monsters.ts`. The item table lives in
 `packages/shared/src/items.ts`.
 
-## Graphics: style packs
+## Graphics: modular pixel art
 
-Player art lives in a **style pack**, not in the code: `packages/client/src/styles.json`
-names the sheet paths, the cell size (48 px), the nine columns and the foot
-anchor. Open the game with `?style=<id>` to try another pack (or set
-`lumiis.style` in the browser).
+Characters are made of separate PNG layers — body, head, hair, armour, weapon —
+that the game stacks. You draw in Paint/Aseprite, drop the file in, done. The
+grid, columns, anchors and file names are in **`ART.md`**:
 
-- `node tools/check-art.mjs` checks every sheet of every pack (exists, width =
-  cell × columns, height a multiple of the cell; `node tools/check-art.mjs
-  bild.png --cell=48 --columns=9` for a single file).
-- `http://localhost:3000/sheet.html` is a **preview**: load a sheet (URL or drag
-  a PNG in), see the grid, play a row as an animation.
-- To make your own characters: render a 3D model (Blender + Mixamo) from the
-  three views (down/right/up) into a 48 px sheet with nine columns, drop it in
-  `public/assets/styles/<id>/` and add the pack to `styles.json`.
-- The 3D route ships as three tools: `tools/blender/build-demo-hero.py` (a
-  rigged demo), `tools/blender/render-pack.py` (3 views × 9 columns) and
-  `tools/assemble-3d-pack.py` (downscale, lay out the sheet, print the pack
-  entry). `?style=demo3d` shows the blocky demo, `?style=kaykit_knight` the
-  rendered KayKit knight (`tools/blender/build-kaykit-hero.py`).
+- cell **48×48**, **9 columns**, **3 views**; 432×144 px per layer
+  (weapon 432×288, the top three rows are the empty "behind" pass)
+- feet at **(24, 44)** in every cell
+- folders: `packages/client/public/assets/styles/pixel/{body,head,hair,armor,weapon}/`
+- armour is a transparent layer over the body, so every armour fits every body
+
+Tools: `node tools/check-art.mjs` (checks the grid), `/look.html` (stack the
+layers and pick a pose), `/sheet.html` (a single sheet with the grid). Open the
+game with `?style=pixel`.
 
 ## Map editor
 

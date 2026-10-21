@@ -210,8 +210,13 @@ export class Connection {
     this.send({ t: 'switchChannel', channel });
   }
 
-  createCharacter(name: string, hair?: string): void {
-    this.send(hair === undefined ? { t: 'createCharacter', name } : { t: 'createCharacter', name, hair });
+  createCharacter(name: string, hair?: string, body?: string): void {
+    this.send({
+      t: 'createCharacter',
+      name,
+      ...(hair !== undefined ? { hair } : {}),
+      ...(body !== undefined ? { body } : {}),
+    });
   }
 
   /** Sends a login attempt, connecting first if needed. */

@@ -52,11 +52,17 @@ export function checkSheet(file, cell, columns) {
 
 /** Every sheet a pack needs for the current item table. */
 export function styleSheets(pack) {
-  const sheets = [
-    { key: 'body', path: pack.body },
-    { key: 'head', path: pack.head },
-    { key: 'hair', path: pack.hair },
-  ];
+  const sheets = [];
+  const add = (list, single, prefix) => {
+    if (Array.isArray(list) && list.length > 0) {
+      for (const part of list) sheets.push({ key: `${prefix}_${part.id}`, path: part.sheet });
+    } else if (typeof single === 'string' && single !== '') {
+      sheets.push({ key: `${prefix}_default`, path: single });
+    }
+  };
+  add(pack.bodies, pack.body, 'body');
+  add(pack.heads, pack.head, 'head');
+  add(pack.hairs, pack.hair, 'hair');
 
   for (const key of ITEM_KEYS) {
     const def = itemDef(key);

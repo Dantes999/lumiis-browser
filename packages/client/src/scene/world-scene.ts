@@ -555,6 +555,8 @@ export class WorldScene extends Phaser.Scene {
       const playerView = this.viewFor(player.id, tables);
       playerView.setPosition(player.renderX, player.renderY);
       playerView.setLook(tables, {
+        body: player.body,
+        hair: player.hair,
         weapon: isItemKey(player.weapon) ? player.weapon : null,
         armor: isItemKey(player.armor) ? player.armor : null,
       });
@@ -595,7 +597,12 @@ export class WorldScene extends Phaser.Scene {
       const drawn = renderedSelfPosition();
       const selfView = this.viewFor(selfId, tables);
       selfView.setPosition(drawn.x, drawn.y);
-      selfView.setLook(tables, view.equipment);
+      selfView.setLook(tables, {
+        body: view.self.body,
+        hair: view.self.hair,
+        weapon: view.equipment.weapon,
+        armor: view.equipment.armor,
+      });
       selfView.setPose(self.dir, this.selfColumn(column));
       selfView.setHealth(self.hp, self.maxHp, true);
       selfView.setName(self.name);

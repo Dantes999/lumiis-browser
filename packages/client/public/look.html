@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ebenen-Vorschau</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0f13;
+        --panel: #151d25;
+        --line: #2b3947;
+        --text: #e6eef6;
+        --muted: #93a4b5;
+        --accent: #d8b45a;
+      }
+      body {
+        margin: 0;
+        padding: 16px;
+        font: 13px/1.5 ui-monospace, monospace;
+        color: var(--text);
+        background: var(--bg);
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 16px;
+        color: var(--accent);
+      }
+      p.hint {
+        margin: 0 0 12px;
+        color: var(--muted);
+      }
+      .panel {
+        padding: 10px;
+        margin-bottom: 12px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 70px 1fr;
+        gap: 6px 10px;
+        align-items: center;
+      }
+      input[type='text'] {
+        width: 100%;
+      }
+      input,
+      select,
+      button {
+        padding: 4px 8px;
+        font: inherit;
+        color: var(--text);
+        background: #232d37;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+      }
+      canvas {
+        display: block;
+        image-rendering: pixelated;
+        background: #1a2430;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+      }
+      .row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Ebenen-Vorschau</h1>
+    <p class="hint">
+      Körper, Rüstung, Kopf, Haare und Waffe übereinanderlegen, Pose und Ansicht
+      wählen. Alle Dateien liegen im Paket unter
+      <code>packages/client/public/assets/styles/pixel/</code>.
+    </p>
+
+    <div class="panel">
+      <div class="grid">
+        <label for="body">Körper</label>
+        <input id="body" type="text" value="/assets/styles/pixel/body/default.png" />
+        <label for="armor">Rüstung</label>
+        <input id="armor" type="text" value="/assets/styles/pixel/armor/03_tiger_plattenpanzer.png" />
+        <label for="head">Kopf</label>
+        <input id="head" type="text" value="/assets/styles/pixel/head/default.png" />
+        <label for="hair">Haare</label>
+        <input id="hair" type="text" value="/assets/styles/pixel/hair/short.png" />
+        <label for="weapon">Waffe</label>
+        <input id="weapon" type="text" value="/assets/styles/pixel/weapon/schwert_02.png" />
+      </div>
+      <div class="row" style="margin-top: 10px">
+        <label class="hint">Ansicht
+          <select id="view">
+            <option value="0">unten</option>
+            <option value="1">rechts</option>
+            <option value="2">oben</option>
+          </select>
+        </label>
+        <label class="hint">Spalte
+          <select id="pose">
+            <option value="0">0 stehen</option>
+            <option value="1">1 Schritt 1</option>
+            <option value="2">2 Schritt 2</option>
+            <option value="3">3 atmen</option>
+            <option value="4">4 Angriff 1</option>
+            <option value="5">5 Angriff 2</option>
+            <option value="6">6 Angriff 3</option>
+            <option value="7">7 Treffer</option>
+            <option value="8">8 tot</option>
+          </select>
+        </label>
+        <label class="hint">Zoom
+          <select id="zoom">
+            <option value="4">4x</option>
+            <option value="6">6x</option>
+            <option value="8" selected>8x</option>
+          </select>
+        </label>
+        <button id="reload" type="button">Neu laden</button>
+      </div>
+    </div>
+
+    <canvas id="stage" width="384" height="384"></canvas>
+
+    <script>
+      const CELL = 48;
+      const inputs = ['body', 'armor', 'head', 'hair', 'weapon'].map((id) => document.getElementById(id));
+      const viewSelect = document.getElementById('view');
+      const poseSelect = document.getElementById('pose');
+      const zoomSelect = document.getElementById('zoom');
+      const canvas = document.getElementById('stage');
+      const context = canvas.getContext('2d');
+      const cache = new Map();
+
+      const load = (src) =>
+        new Promise((resolve) => {
+          if (src === '') return resolve(null);
+          if (cache.has(src)) return resolve(cache.get(src));
+          const image = new Image();
+          image.onload = () => {
+            cache.set(src, image);
+            resolve(image);
+          };
+          image.onerror = () => resolve(null);
+          image.src = src;
+        });
+
+      const draw = async () => {
+        const zoom = Number(zoomSelect.value) || 8;
+        canvas.width = CELL * zoom;
+        canvas.height = CELL * zoom;
+        context.imageSmoothingEnabled = false;
+        context.fillStyle = '#1a2430';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+
+        const view = Number(viewSelect.value) || 0;
+        const column = Number(poseSelect.value) || 0;
+        const images = await Promise.all(inputs.map((input) => load(input.value.trim())));
+
+        // Order: body, armour, head, hair, weapon (front rows).
+        const order = [images[0], images[1], images[2], images[3]];
+        for (const image of order) {
+          if (image === null) continue;
+          context.drawImage(
+            image,
+            column * CELL,
+            view * CELL,
+            CELL,
+            CELL,
+            0,
+            0,
+            CELL * zoom,
+            CELL * zoom,
+          );
+        }
+
+        // The weapon has three back rows first (usually empty), then the front.
+        const weapon = images[4];
+        if (weapon !== null) {
+          context.drawImage(
+            weapon,
+            column * CELL,
+            (view + 3) * CELL,
+            CELL,
+            CELL,
+            0,
+            0,
+            CELL * zoom,
+            CELL * zoom,
+          );
+        }
+      };
+
+      for (const input of inputs) input.addEventListener('change', draw);
+      viewSelect.addEventListener('change', draw);
+      poseSelect.addEventListener('change', draw);
+      zoomSelect.addEventListener('change', draw);
+      document.getElementById('reload').addEventListener('click', () => {
+        cache.clear();
+        draw();
+      });
+
+      draw();
+    </script>
+  </body>
+</html>
