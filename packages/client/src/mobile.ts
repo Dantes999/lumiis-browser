@@ -28,4 +28,14 @@ export function initMobile(): void {
   };
 
   document.addEventListener('pointerdown', tryLock, { once: true });
+
+  // Hide the dashboard when it is in the way; the button stays reachable.
+  const toggle = document.getElementById('hud-toggle');
+  const hud = document.getElementById('hud');
+  if (toggle !== null && hud !== null) {
+    toggle.addEventListener('click', () => {
+      const hidden = hud.classList.toggle('hidden');
+      toggle.textContent = hidden ? '☰' : '✕';
+    });
+  }
 }

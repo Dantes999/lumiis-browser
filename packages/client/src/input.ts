@@ -255,6 +255,17 @@ export function initInput(options: InputOptions): void {
   const distance = (a: Point, b: Point): number => Math.hypot(a.x - b.x, a.y - b.y);
 
   window.addEventListener('pointerdown', (event) => {
+    // Presses on the interface must never count as a second finger: the attack
+    // button would otherwise look like a pinch and stop the walk.
+    const pressedTarget = event.target;
+    if (
+      pressedTarget instanceof Node &&
+      ((hud !== null && hud.contains(pressedTarget)) ||
+        (touch !== null && touch.contains(pressedTarget)))
+    ) {
+      return;
+    }
+
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
 
     // Second finger: stop walking and start pinching instead.
@@ -273,15 +284,6 @@ export function initInput(options: InputOptions): void {
     }
 
     if (pointers.size > 2 || ignoreStickUntilRelease) return;
-    // Events can also arrive from the window itself, so only test for the HUD
-    // when the target really is a node.
-    const target = event.target;
-    if (
-      target instanceof Node &&
-      ((hud !== null && hud.contains(target)) || (touch !== null && touch.contains(target)))
-    ) {
-      return;
-    }
 
     const isMouse = event.pointerType === 'mouse';
     if (isMouse && event.button !== 0) return;

@@ -95,7 +95,7 @@ Der **Client** läuft im `dev`-Modus direkt aus dem Quellcode (Vite).
 | `art.ts` | Spieler aus Ebenen zusammensetzen (Rüstung, Kopf, Haare, Waffe) |
 | `mobart.ts` | Monster-Sprites + Lebensbalken |
 | `audio.ts` | Töne im Code erzeugt (Web Audio), kein Ton-Asset |
-| `mobile.ts` | Handy-Erkennung, Querformat-Hinweis, Landscape-Sperre |
+| `mobile.ts` | Handy-Erkennung, Querformat-Hinweis, Landscape-Sperre, HUD ausblenden |
 | `ui/hud.ts` | HUD: Status, TP, EXP, Yang, Angriff, Skills |
 | `ui/bag.ts`, `ui/characters.ts`, `ui/login.ts`, `ui/settings.ts` | Fenster |
 | `editor/main.ts` | Karten-Editor |
