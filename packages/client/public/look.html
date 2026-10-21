@@ -133,6 +133,11 @@
 
     <canvas id="stage" width="384" height="384"></canvas>
 
+    <h2 style="margin: 18px 0 4px; font-size: 14px; color: var(--accent)">Streifen</h2>
+    <p class="hint">Alle 9 Posen × 3 Ansichten, gestapelt wie im Spiel — zum Prüfen der Animation.</p>
+    <canvas id="strip"></canvas>
+    <p><button id="save-strip" type="button">Streifen als PNG speichern</button></p>
+
     <script>
       const CELL = 48;
       const inputs = ['body', 'armor', 'head', 'hair', 'weapon'].map((id) => document.getElementById(id));
@@ -141,7 +146,10 @@
       const zoomSelect = document.getElementById('zoom');
       const canvas = document.getElementById('stage');
       const context = canvas.getContext('2d');
+      const strip = document.getElementById('strip');
+      const stripContext = strip.getContext('2d');
       const cache = new Map();
+      const STRIP_ZOOM = 3;
 
       const load = (src) =>
         new Promise((resolve) => {
@@ -207,13 +215,89 @@
         }
       };
 
-      for (const input of inputs) input.addEventListener('change', draw);
-      viewSelect.addEventListener('change', draw);
-      poseSelect.addEventListener('change', draw);
-      zoomSelect.addEventListener('change', draw);
+      /** The whole sheet: 3 views × 9 columns, weapon back and front. */
+      const drawStrip = async () => {
+        const width = CELL * 9 * STRIP_ZOOM;
+        const height = CELL * 3 * STRIP_ZOOM;
+        strip.width = width;
+        strip.height = height;
+        stripContext.imageSmoothingEnabled = false;
+        stripContext.fillStyle = '#1a2430';
+        stripContext.fillRect(0, 0, width, height);
+        for (let y = 0; y < height; y += 16) {
+          for (let x = 0; x < width; x += 16) {
+            if ((x / 16 + y / 16) % 2 === 0) {
+              stripContext.fillStyle = '#222d39';
+              stripContext.fillRect(x, y, 16, 16);
+            }
+          }
+        }
+
+        const images = await Promise.all(inputs.map((input) => load(input.value.trim())));
+        const [body, armor, head, hair, weapon] = images;
+        const cell = (image, row, column, x, y) => {
+          stripContext.drawImage(
+            image,
+            column * CELL,
+            row * CELL,
+            CELL,
+            CELL,
+            x,
+            y,
+            CELL * STRIP_ZOOM,
+            CELL * STRIP_ZOOM,
+          );
+        };
+
+        for (let view = 0; view < 3; view += 1) {
+          for (let column = 0; column < 9; column += 1) {
+            const x = column * CELL * STRIP_ZOOM;
+            const y = view * CELL * STRIP_ZOOM;
+            const front = weapon !== null && weapon.height >= CELL * 6 ? view + 3 : view;
+            if (weapon !== null) cell(weapon, view, column, x, y);
+            for (const image of [body, armor, head, hair]) {
+              if (image !== null) cell(image, view, column, x, y);
+            }
+            if (weapon !== null) cell(weapon, front, column, x, y);
+
+            // Grid, ground line and anchor, so a floating figure stands out.
+            stripContext.strokeStyle = 'rgba(120, 150, 175, 0.35)';
+            stripContext.strokeRect(x, y, CELL * STRIP_ZOOM, CELL * STRIP_ZOOM);
+            stripContext.strokeStyle = 'rgba(90, 130, 105, 0.8)';
+            stripContext.beginPath();
+            stripContext.moveTo(x, y + 44 * STRIP_ZOOM);
+            stripContext.lineTo(x + CELL * STRIP_ZOOM, y + 44 * STRIP_ZOOM);
+            stripContext.stroke();
+            stripContext.strokeStyle = '#e05a5a';
+            stripContext.beginPath();
+            stripContext.moveTo(x + 22 * STRIP_ZOOM, y + 44 * STRIP_ZOOM);
+            stripContext.lineTo(x + 26 * STRIP_ZOOM, y + 44 * STRIP_ZOOM);
+            stripContext.moveTo(x + 24 * STRIP_ZOOM, y + 42 * STRIP_ZOOM);
+            stripContext.lineTo(x + 24 * STRIP_ZOOM, y + 46 * STRIP_ZOOM);
+            stripContext.stroke();
+          }
+        }
+      };
+
+      const refresh = () => {
+        draw();
+        drawStrip();
+      };
+
+      for (const input of inputs) input.addEventListener('change', refresh);
+      viewSelect.addEventListener('change', refresh);
+      poseSelect.addEventListener('change', refresh);
+      zoomSelect.addEventListener('change', refresh);
       document.getElementById('reload').addEventListener('click', () => {
         cache.clear();
-        draw();
+        refresh();
+      });
+
+      document.getElementById('save-strip').addEventListener('click', () => {
+        const link = document.createElement('a');
+        link.href = strip.toDataURL('image/png');
+        link.download = 'streifen.png';
+        link.click();
       });
 
       // Suggestions for the fields: bodies/heads/hairs from styles.json (dev server), armour and weapons from the items.
@@ -233,7 +317,7 @@
         })
         .catch(() => {});
 
-      draw();
+      refresh();
     </script>
   </body>
 </html>

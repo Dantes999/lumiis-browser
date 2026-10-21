@@ -9,11 +9,6 @@
       "footY": 44,
       "bodies": [
         {
-          "id": "default",
-          "name": "Basis",
-          "sheet": "/assets/body/default.png"
-        },
-        {
           "id": "warrior_m",
           "name": "Krieger (Mann)",
           "sheet": "/assets/body/warrior_m.png"
@@ -56,11 +51,6 @@
       ],
       "heads": [
         {
-          "id": "default",
-          "name": "Kopf",
-          "sheet": "/assets/head/default.png"
-        },
-        {
           "id": "warrior_m",
           "name": "Krieger (Mann)",
           "sheet": "/assets/head/warrior_m.png"
@@ -102,16 +92,6 @@
         }
       ],
       "hairs": [
-        {
-          "id": "short",
-          "name": "Kurz",
-          "sheet": "/assets/hair/short.png"
-        },
-        {
-          "id": "long",
-          "name": "Lang",
-          "sheet": "/assets/hair/long.png"
-        },
         {
           "id": "warrior_m_1",
           "name": "Krieger (Mann) 1",

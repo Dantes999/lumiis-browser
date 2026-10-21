@@ -395,13 +395,15 @@ aus dem Manifest.
 |---|---|
 | `node tools/check-art.mjs` | alle Sheets aller Pakete prüfen (Existenz, Raster) |
 | `node tools/check-art.mjs pixel` | nur ein Paket |
+| `node tools/watch-art.mjs` | prüft nach jedem Speichern (zweites Terminal) |
+| `python3 tools/contact-sheet.py` | Kontaktbogen + Streifen nach `build/contact/` |
 | `/look.html` | Ebenen + Pose + Ansicht übereinander ansehen |
 | `/sheet.html` | eine Sheet-Datei mit Raster/Animation |
-| `python3 tools/make-template-pack.py` | Platzhalter neu erzeugen (überschreibt Vorlage/Rüstungen/Waffen) |
+| `python3 tools/make-template-pack.py` | Platzhalter neu erzeugen (nicht im Manifest) |
 | `node tools/bake-lumiis2d.mjs` | die 8 Körper und 16 Haare aus der alten Zeichenroutine neu backen |
 
-**Test:** `packages/server/tests/art.test.ts` prüft alle Sheets aller Pakete
-(Existenz, Raster, Zeilenzahl).
+**Test:** `packages/server/tests/art.test.ts` prüft alle Sheets (Existenz,
+Raster, Zeilenzahl, lesbare Pixel) und die Monster-Sheets (200 × 128).
 
 ## 7a. Last beobachten: `/status`
 

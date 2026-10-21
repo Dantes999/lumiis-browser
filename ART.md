@@ -95,11 +95,52 @@ transparent — deshalb kannst du jede Rüstung mit jedem Körper kombinieren.
 
 | Befehl / Seite | Zweck |
 |---|---|
-| `node tools/check-art.mjs` | prüft alle Sheets aller Pakete (Raster, Existenz) |
-| `node tools/check-art.mjs pixel` | nur das Paket `pixel` |
-| `/look.html` | Ebenen + Pose + Ansicht übereinander ansehen |
+| `node tools/check-art.mjs` | prüft alle Sheets (Raster, Anker, leere Frames, Ebenen-Kontakt) und die Monster |
+| `node tools/check-art.mjs pixel` | nur das Paket (ohne Monster) |
+| `node tools/watch-art.mjs` | prüft nach jedem Speichern, für ein zweites Terminal |
+| `python3 tools/contact-sheet.py` | Kontaktbogen je Ebene + Streifen je Körper nach `build/contact/` |
+| `/look.html` | Ebenen + Pose + Ansicht, dazu der ganze Streifen, als PNG speicherbar |
 | `/sheet.html` | eine einzelne Sheet-Datei mit Raster und Animation |
-| `python3 tools/make-template-pack.py` | erzeugt die Platzhalter neu (überschreibt!) |
+| `python3 tools/make-template-pack.py` | Platzhalter-Ebenen neu zeichnen (nicht im Manifest) |
+| `python3 tools/draw-pixel-hero.py` | Vorlage mit Schattierung neu zeichnen (nicht im Manifest) |
+
+## Was der Prüfer meldet
+
+`check-art` liest die Pixel (kein Python nötig) und unterscheidet:
+
+**Fehler** (rot, lassen den Test scheitern): Datei fehlt, kein PNG, Breite ≠
+Kachel × Spalten, Höhe kein Vielfaches der Kachel, ein Body-Frame ist leer.
+
+**Hinweise** (ändern nichts, zeigen aber, was beim Zeichnen schiefging):
+
+- Füße nicht auf der Bodenlinie (mit y-Wert und Frame),
+- ein Frame berührt den Kachelrand (abgeschnitten?),
+- eine Ebene berührt ihren Partner nicht (Haare → Kopf, Kopf/Rüstung → Körper,
+  Waffe → Körper), mit Anzahl und Beispiel-Frame,
+- die neun Spalten eines Körpers sind identisch (keine Animation),
+- ein Monster-Frame schwebt über dem Boden.
+
+Der Kontaktbogen (`build/contact/`) zeigt dasselbe visuell: Raster,
+Spaltennummern, Bodenlinie, Ankerkreuz — pro Ebene und als gestapelter Streifen.
+
+## Monster
+
+Monster sind eigene Sheets, unabhängig von den Spieler-Ebenen:
+
+| | |
+|---|---|
+| Kachel | **40 × 32 px** |
+| Ansichten | **4**, in dieser Reihenfolge: unten · links · rechts · oben |
+| Bilder | **5** je Ansicht (stehen + 4 Laufbilder) |
+| Blatt | **200 × 128 px** |
+| Anker | Füße bei **(20, 29)** |
+| Datei | `assets/monster/<look>.png` |
+| Eintrag | `look` in `tools`-frei: `packages/shared/src/monsters.ts` → `MONSTER_TYPES` |
+
+Ein neues Monster: PNG ablegen, in `MONSTER_TYPES` einen Eintrag mit `look`
+(Dateiname ohne `.png`), Werten (TP, Tempo, Schaden, EXP, Beute) und `name`
+anlegen; das Spiel lädt das Blatt automatisch. `check-art` prüft Raster und
+Anker, `contact-sheet` prüft es nicht (Monster haben einen eigenen Aufbau).
 
 ## Tipps
 

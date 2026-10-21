@@ -8,7 +8,8 @@ game stacks them (weapon back, body, armour, head, hair, weapon front):
     sheet = 432 x 144 px per layer (weapon: 432 x 288, back rows on top)
 
 The figures are deliberately simple: they are the template the artist draws
-over. Replace one file, the game picks it up.
+over. The layers it writes (body/default, head/default, hair/short, hair/long)
+are not in the manifest — add them there if you want to see them in the game.
 
     python3 tools/make-template-pack.py
 """

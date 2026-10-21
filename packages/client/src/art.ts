@@ -406,11 +406,17 @@ export class PlayerView {
     const armorDef = look.armor === null ? null : itemDef(look.armor);
     const weaponDef = look.weapon === null ? null : itemDef(look.weapon);
 
-    this.body.setTexture(`body_${resolve(this.bodies, look.body)}`);
     // The head belongs to the body (same id) unless one is named explicitly.
-    const headId = look.head ?? (this.heads.some((part) => part.id === look.body) ? look.body : undefined);
+    const bodyId = resolve(this.bodies, look.body);
+    this.body.setTexture(`body_${bodyId}`);
+    const headId = look.head ?? (this.heads.some((part) => part.id === bodyId) ? bodyId : undefined);
     this.head.setTexture(`head_${resolve(this.heads, headId)}`);
-    this.hair.setTexture(`hair_${resolve(this.hairs, look.hair)}`);
+    const hairId = this.hairs.some((part) => part.id === look.hair)
+      ? look.hair
+      : this.hairs.some((part) => part.id === `${bodyId}_1`)
+        ? `${bodyId}_1`
+        : undefined;
+    this.hair.setTexture(`hair_${resolve(this.hairs, hairId)}`);
 
     // The armour is its own transparent layer over the body; without it the
     // layer stays hidden.

@@ -95,9 +95,11 @@ grid, columns, anchors and file names are in **`ART.md`**:
   (monsters: `assets/monster/`, icons: `assets/icons/`)
 - armour is a transparent layer over the body, so every armour fits every body
 
-Tools: `node tools/check-art.mjs` (checks the grid), `/look.html` (stack the
-layers and pick a pose), `/sheet.html` (a single sheet with the grid). Open the
-game with `?style=pixel`.
+Tools: `node tools/check-art.mjs` (grid, anchor, empty frames, layer contact,
+monster sheets), `node tools/watch-art.mjs` (re-check on every save),
+`python3 tools/contact-sheet.py` (sheets and strips into `build/contact/`),
+`/look.html` (stack layers, pose, whole strip) and `/sheet.html` (single sheet
+with the grid). Open the game with `?style=pixel`.
 
 ## Map editor
 
