@@ -10,6 +10,8 @@ export type PickupSettings = {
   types: string[];
   sound: boolean;
   volume: number;
+  /** Attack towards the mouse instead of the walking direction. */
+  aimAtMouse: boolean;
 };
 
 const STORAGE_KEY = 'lumiis.pickup';
@@ -24,10 +26,16 @@ const load = (): PickupSettings => {
   try {
     const raw = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? 'null') as unknown;
     if (typeof raw !== 'object' || raw === null) {
-      return { autoPickup: false, types: [...ITEM_KEYS], sound: true, volume: 0.5 };
+      return { autoPickup: false, types: [...ITEM_KEYS], sound: true, volume: 0.5, aimAtMouse: false };
     }
 
-    const stored = raw as { autoPickup?: unknown; types?: unknown; sound?: unknown; volume?: unknown };
+    const stored = raw as {
+      autoPickup?: unknown;
+      types?: unknown;
+      sound?: unknown;
+      volume?: unknown;
+      aimAtMouse?: unknown;
+    };
     const types = Array.isArray(stored.types)
       ? stored.types.filter((entry): entry is string => typeof entry === 'string')
       : [...ITEM_KEYS];
@@ -37,9 +45,10 @@ const load = (): PickupSettings => {
       types,
       sound: stored.sound !== false,
       volume: typeof stored.volume === 'number' ? Math.min(1, Math.max(0, stored.volume)) : 0.5,
+      aimAtMouse: stored.aimAtMouse === true,
     };
   } catch {
-    return { autoPickup: false, types: [...ITEM_KEYS], sound: true, volume: 0.5 };
+    return { autoPickup: false, types: [...ITEM_KEYS], sound: true, volume: 0.5, aimAtMouse: false };
   }
 };
 
@@ -54,6 +63,7 @@ export function createSettings(onChange: (settings: PickupSettings) => void): Se
   const filter = mustFind('pickup-filter');
   const soundOn = mustFind('sound-on') as HTMLInputElement;
   const soundVolume = mustFind('sound-volume') as HTMLInputElement;
+  const aimMouse = mustFind('aim-mouse') as HTMLInputElement;
 
   let settings = load();
 
@@ -92,6 +102,7 @@ export function createSettings(onChange: (settings: PickupSettings) => void): Se
 
   auto.checked = settings.autoPickup;
   soundOn.checked = settings.sound;
+  aimMouse.checked = settings.aimAtMouse;
   soundVolume.value = String(Math.round(settings.volume * 100));
   setAudioSettings(settings.sound, settings.volume);
 
@@ -109,6 +120,11 @@ export function createSettings(onChange: (settings: PickupSettings) => void): Se
 
   auto.addEventListener('change', () => {
     settings = { ...settings, autoPickup: auto.checked };
+    push();
+  });
+
+  aimMouse.addEventListener('change', () => {
+    settings = { ...settings, aimAtMouse: aimMouse.checked };
     push();
   });
 

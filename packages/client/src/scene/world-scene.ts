@@ -8,6 +8,7 @@ import {
   MONSTER_KEYS,
   MONSTER_TYPES,
   TILE_SIZE,
+  DIR_VECTORS,
   mapPixelHeight,
   mapPixelWidth,
   swingFor,
@@ -28,6 +29,7 @@ import { setWorldMap } from '../world-map';
 import { SwingTrail } from './swing-trail';
 import { WhirlwindEffect } from './skill-effects';
 import { setSkillVisual } from '../skill';
+import { aimDirection, aimPoint, setAimPointer } from '../aim';
 
 /** Milliseconds per walking frame. */
 const STEP_FRAME_MS = 180;
@@ -77,6 +79,8 @@ export class WorldScene extends Phaser.Scene {
   private readonly whirlwinds: WhirlwindEffect[] = [];
   /** The pulsing ring at the feet while the aura buff is up. */
   private auraRing: Phaser.GameObjects.Graphics | null = null;
+  /** The ground arrow that shows where a mouse-aimed swing will go. */
+  private aimArrow: Phaser.GameObjects.Graphics | null = null;
   private readonly trails: SwingTrail[] = [];
   /** For other players: when their last seen swing ended, and how many they did. */
   private readonly seenSwings = new Map<number, number>();
@@ -124,6 +128,13 @@ export class WorldScene extends Phaser.Scene {
 
     this.auraRing = this.add.graphics();
     this.auraRing.setDepth(1);
+
+    this.aimArrow = this.add.graphics();
+    this.aimArrow.setDepth(1);
+    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      const point = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+      setAimPointer(point.x, point.y);
+    });
 
     setSkillVisual((key) => {
       if (key === 'whirlwind') this.spawnWhirlwind();
@@ -177,8 +188,44 @@ export class WorldScene extends Phaser.Scene {
     this.renderPlayers(delta);
     this.renderTrails(delta);
     this.updateWhirlwinds(delta);
+    this.drawAimArrow();
     this.updateShake();
     this.watchInventory();
+  }
+
+  /** A small arrow at the feet pointing where the next mouse-aimed swing goes. */
+  private drawAimArrow(): void {
+    const arrow = this.aimArrow;
+    if (arrow === null) return;
+    arrow.clear();
+
+    const point = aimPoint();
+    const dir = aimDirection();
+    if (point === null || dir === null) return;
+
+    const vector = DIR_VECTORS[dir];
+    if (vector === undefined) return;
+
+    const feet = renderedSelfPosition();
+    const angle = Math.atan2(vector[1], vector[0]);
+    const length = 26;
+    const baseLength = length - 12;
+    const side = 8;
+
+    const tipX = feet.x + Math.cos(angle) * length;
+    const tipY = feet.y + Math.sin(angle) * length - 2;
+    const baseX = feet.x + Math.cos(angle) * baseLength;
+    const baseY = feet.y + Math.sin(angle) * baseLength - 2;
+    const leftX = baseX + Math.cos(angle - Math.PI / 2) * side;
+    const leftY = baseY + Math.sin(angle - Math.PI / 2) * side;
+    const rightX = baseX + Math.cos(angle + Math.PI / 2) * side;
+    const rightY = baseY + Math.sin(angle + Math.PI / 2) * side;
+
+    arrow.setDepth(Math.round(feet.y) - 1);
+    arrow.lineStyle(2, 0xffd479, 0.5);
+    arrow.lineBetween(feet.x, feet.y - 2, baseX, baseY);
+    arrow.fillStyle(0xffd479, 0.8);
+    arrow.fillTriangle(tipX, tipY, leftX, leftY, rightX, rightY);
   }
 
   /** A pulsing ring at the feet while the aura buff is up. */

@@ -5,6 +5,7 @@
 
 import { dirFromInput, swingFor, swingMs, type Direction } from '@lumiis/shared';
 import { sfx } from './audio';
+import { aimDirection } from './aim';
 import { view, type MonsterState } from './state';
 
 /** How close to the pointer a monster has to be to count as clicked. */
@@ -79,9 +80,9 @@ const begin = (target: MonsterState | null, fallback: Direction): boolean => {
   return true;
 };
 
-/** Space bar: swing straight ahead, wherever the body is facing. */
+/** Space bar: swing where the mouse points, or straight ahead. */
 export function swingForward(): void {
-  begin(null, view.self.dir);
+  begin(null, aimDirection() ?? view.self.dir);
 }
 
 /** Whether the attack key is being held down. */

@@ -9,6 +9,7 @@ import { audioState, sfx } from './audio';
 import { initInput } from './input';
 import { attackAt, setAttackHeld, setAttackSender, swingForward } from './combat';
 import { cast, setSkillSender } from './skill';
+import { setAimEnabled } from './aim';
 import { initAudio, resumeAudio, unlockAudioOnFirstGesture } from './audio';
 import { initController } from './controller';
 import { itemNear, orderPickup, pickupNearestInRange, setPickupSender, tickPickup } from './loot';
@@ -51,7 +52,11 @@ initController((dx, dy) => connection.setInput(dx, dy));
 
 const settings = createSettings((value) => {
   connection.setPickupSettings(value.autoPickup, value.types);
+  setAimEnabled(value.aimAtMouse);
 });
+
+// Apply the stored aim setting right away, before the first click.
+setAimEnabled(settings.current().aimAtMouse);
 
 // The browser only allows sound after a gesture; the login click is one, and
 // this listener is the safety net for every other first interaction.
