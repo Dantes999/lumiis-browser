@@ -17,6 +17,7 @@ import os
 import sys
 
 import bpy
+from mathutils import Vector
 
 
 def parse_args():
@@ -62,14 +63,38 @@ def main():
         background.inputs["Color"].default_value = (0.55, 0.6, 0.7, 1.0)
         background.inputs["Strength"].default_value = 0.3
 
-    # Camera on a pivot that looks at the middle of the figure.
+    # Fit the camera to the skinned meshes (the character, not the weapon), so
+    # a different model only needs its own blend file, no numbers.
+    lo = [1e9, 1e9, 1e9]
+    hi = [-1e9, -1e9, -1e9]
+    found = False
+    for obj in bpy.data.objects:
+        if obj.type != "MESH":
+            continue
+        if not any(m.type == "ARMATURE" and m.object is rig for m in obj.modifiers):
+            continue
+        found = True
+        for corner in obj.bound_box:
+            point = obj.matrix_world @ Vector(corner)
+            for axis in range(3):
+                lo[axis] = min(lo[axis], point[axis])
+                hi[axis] = max(hi[axis], point[axis])
+
+    if found:
+        height = hi[2] - lo[2]
+        width = hi[0] - lo[0]
+        centre_z = (hi[2] + lo[2]) / 2
+    else:
+        height, width, centre_z = 2.2, 1.0, 1.0
+    print(f"fit: height {height:.2f}, width {width:.2f}, centre z {centre_z:.2f}")
+
     target = bpy.data.objects.new("look_at", None)
     bpy.context.collection.objects.link(target)
-    target.location = (0, 0, 1.0)
+    target.location = (0, 0, centre_z)
 
     camera_data = bpy.data.cameras.new("shot")
     camera_data.type = "ORTHO"
-    camera_data.ortho_scale = 2.2
+    camera_data.ortho_scale = max(height, width) * 1.06
     camera = bpy.data.objects.new("shot", camera_data)
     bpy.context.collection.objects.link(camera)
     scene.camera = camera

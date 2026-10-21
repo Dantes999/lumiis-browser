@@ -463,6 +463,39 @@ Cycles (CPU, 12 Samples), Ansicht `Standard` statt AgX (sonst blasse Farben).
 es gibt **einen Look**. Für Ausrüstungs-Wechsel rendert man je Rüstung/Waffe
 ein eigenes Sheet; die Paket-Vorlagen (`armor`, `weapon`) sind schon da.
 
+### Fertiges Modell: KayKit (CC0)
+
+Die Free-Version der „KayKit Adventurers" (CC0, kommerziell frei) bringt 5
+geriggte Charaktere (`Characters/gltf/*.glb`), Animationen
+(`Animations/gltf/Rig_Medium/*.glb`) und Waffen (`Assets/gltf/*.gltf`).
+**Angriffe fehlen in der Free-Version** — die drei Schwung-Posen werden im
+Build-Skript auf die Idle-Pose gesetzt.
+
+```bash
+blender -b -noaudio --python tools/blender/build-kaykit-hero.py -- \
+  --character ~/Downloads/kaykit_adventurers/Characters/gltf/Knight.glb \
+  --animations ~/Downloads/kaykit_adventurers/Animations/gltf/Rig_Medium \
+  --weapon ~/Downloads/kaykit_adventurers/Assets/gltf/sword_1handed.gltf \
+  --out tools/blender/knight.blend
+
+blender -b -noaudio --python tools/blender/render-pack.py -- \
+  --blend tools/blender/knight.blend --out build/knight \
+  --map tools/blender/knight.columns.json
+
+python3 tools/assemble-3d-pack.py --frames build/knight --id kaykit_knight
+```
+
+Dabei gelernt (steht auch im Skript):
+
+- Der glTF-Importer hängt an Aktionsnamen `.001`, weil er eine eigene Armatur
+  mitbringt — Aktionen werden deshalb über den **Präfix** gesucht.
+- Die Waffe wird per Bone-Parent an `handslot.r` gehängt; ohne Waffe wäre der
+  Ritter ein Faustkämpfer.
+- Die Kamera **fitet sich** an die skinned Meshes (Höhe/Breite), damit ein
+  anderes Modell keine Zahlen braucht.
+- Die Free-Version hat **einen Look** (Rüstung/Waffe im Mesh). Mehr Looks und
+  Rüstungs-Teile gibt es in den EXTRA-/SOURCE-Stufen.
+
 **Test:** `packages/server/tests/art.test.ts` prüft alle Sheets der Pakete
 (Existenz, Raster, Zeilenzahl).
 

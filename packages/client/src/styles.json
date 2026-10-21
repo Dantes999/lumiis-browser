@@ -42,6 +42,21 @@
       "armorRows": "any",
       "rows": "/assets/styles/demo3d/rows.json",
       "bodyArt": "faust"
+    },
+    "kaykit_knight": {
+      "name": "Ritter (KayKit, 3D-Render)",
+      "cell": 48,
+      "columns": 9,
+      "footX": 24,
+      "footY": 44,
+      "body": "/assets/styles/kaykit_knight/body.png",
+      "head": "/assets/styles/kaykit_knight/head.png",
+      "hair": "/assets/styles/kaykit_knight/hair.png",
+      "armor": "/assets/styles/kaykit_knight/armor.png",
+      "weapon": "/assets/styles/kaykit_knight/weapon.png",
+      "armorRows": "any",
+      "rows": "/assets/styles/kaykit_knight/rows.json",
+      "bodyArt": "faust"
     }
   }
 }

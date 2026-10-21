@@ -100,7 +100,8 @@ anchor. Open the game with `?style=<id>` to try another pack (or set
 - The 3D route ships as three tools: `tools/blender/build-demo-hero.py` (a
   rigged demo), `tools/blender/render-pack.py` (3 views × 9 columns) and
   `tools/assemble-3d-pack.py` (downscale, lay out the sheet, print the pack
-  entry). `?style=demo3d` shows the result.
+  entry). `?style=demo3d` shows the blocky demo, `?style=kaykit_knight` the
+  rendered KayKit knight (`tools/blender/build-kaykit-hero.py`).
 
 ## Map editor
 

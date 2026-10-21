@@ -7,3 +7,4 @@ data/
 .DS_Store
 coverage/
 build/
+tools/blender/*.blend
