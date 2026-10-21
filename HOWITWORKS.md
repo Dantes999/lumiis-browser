@@ -375,6 +375,7 @@ seine Sheets liegen und wie sie geschnitten sind
 | `armor` | Pfad-Vorlage, `{file}` = `armorFile` aus der Item-Tabelle |
 | `weapon` | Pfad-Vorlage, `{art}` = `schwert`/`zweihand`/`faust`, `{stage2}` = `05` |
 | `armorRows` | welche Zeilen-Gruppe in `ruestungen.json` die Körperposen beschreibt |
+| `rows` | optional: eigene Zeilen-Tabelle des Pakets (`{ armor: [...], head: [...], hair: [...], weapon: [...] }`); ohne sie gelten die alten Tabellen |
 
 **Aktives Paket:** `?style=<id>` in der URL, sonst das zuletzt gemerkte
 (`localStorage` `lumiis.style`), sonst `default` aus der Datei.
@@ -413,6 +414,25 @@ Blender (kostenlos), Basismodell + Animationen (z. B. Mixamo), dann aus **3
 Ansichten** (unten/rechts/oben) je 9 Spalten rendern; die drei linken
 Richtungen spiegelt der Client (`flipX`). Kachel 48 px, Fußpunkt 24/44, Kamera
 fest. Danach als Paket eintragen — die Engine bleibt unverändert.
+
+### Statisches Paket aus zwei Bildern (Test)
+
+`tools/make-style-pack.py` macht aus zwei Gemini-/Konzeptbildern (vorn, hinten)
+sofort ein spielbares **Platzhalter-Paket**: Hintergrund weg, Figur
+zugeschnitten, auf 48 px skaliert, alle 9 Spalten dasselbe Bild, die
+Rückansicht für „oben".
+
+```bash
+python3 tools/make-style-pack.py \
+  --front ~/Downloads/images/chars/warrior/1/front.jpeg \
+  --back  ~/Downloads/images/chars/warrior/1/back.jpeg \
+  --id gemini_warrior
+```
+
+Dann den ausgegebenen Eintrag in `styles.json` legen und
+`?style=gemini_warrior` öffnen. Das Paket steht im Spiel, aber ohne
+Lauf-/Schlag-Animation — es zeigt nur, ob Stil und Größe passen. Im Repo liegt
+es als Beispiel (`gemini_warrior`).
 
 **Test:** `packages/server/tests/art.test.ts` prüft alle Sheets der Pakete
 (Existenz, Raster, Zeilenzahl).

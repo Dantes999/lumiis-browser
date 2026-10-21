@@ -38,6 +38,11 @@ export type StylePack = {
   weapon: string;
   /** Which row set of ruestungen.json describes the body poses. */
   armorRows: string;
+  /**
+   * Optional row table of the pack itself: names per layer, in the order of the
+   * sheet's rows. Without it the old asset tables are used.
+   */
+  rows?: string;
 };
 
 const STYLES = stylesFile as { default: string; packs: Record<string, StylePack> };
@@ -113,6 +118,19 @@ const rowsFor = (rows: string[], names: readonly string[]): number[] =>
 
 /** Reads the row tables that ship next to the images. */
 export function readTables(scene: Phaser.Scene, pack: StylePack = defaultPack()): ArtTables {
+  // A pack can name its own rows; then the old asset tables are not needed.
+  const own = scene.cache.json.get('rows_style') as
+    | { armor?: string[]; head?: string[]; hair?: string[]; weapon?: string[] }
+    | undefined;
+  if (own !== undefined && Array.isArray(own.armor)) {
+    return {
+      armor: own.armor,
+      head: own.head ?? [],
+      hair: own.hair ?? [],
+      weapon: own.weapon ?? [],
+    };
+  }
+
   const armor = scene.cache.json.get('rows_armor') as { zeilen: Record<string, string[]> };
   const head = scene.cache.json.get('rows_head') as { zeilen: string[] };
   const hair = scene.cache.json.get('rows_hair') as { zeilen: string[] };

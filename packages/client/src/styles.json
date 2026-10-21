@@ -13,6 +13,20 @@
       "armor": "/assets/ruestungen/krieger_m/{file}.png",
       "weapon": "/assets/waffen/{art}/{stage2}.png",
       "armorRows": "warrior"
+    },
+    "gemini_warrior": {
+      "name": "Gemini-Krieger (statischer Test)",
+      "cell": 48,
+      "columns": 9,
+      "footX": 24,
+      "footY": 44,
+      "body": "/assets/styles/gemini_warrior/body.png",
+      "head": "/assets/styles/gemini_warrior/head.png",
+      "hair": "/assets/styles/gemini_warrior/hair.png",
+      "armor": "/assets/styles/gemini_warrior/armor.png",
+      "weapon": "/assets/styles/gemini_warrior/weapon.png",
+      "armorRows": "any",
+      "rows": "/assets/styles/gemini_warrior/rows.json"
     }
   }
 }

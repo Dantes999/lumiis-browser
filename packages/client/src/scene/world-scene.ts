@@ -126,6 +126,8 @@ export class WorldScene extends Phaser.Scene {
     this.pack = chosen.pack;
     if (chosen.id !== 'krieger_m') console.info(`style pack: ${chosen.id} (${chosen.pack.name})`);
 
+    if (chosen.pack.rows !== undefined) this.load.json('rows_style', chosen.pack.rows);
+
     const grid = { frameWidth: chosen.pack.cell, frameHeight: chosen.pack.cell };
     for (const sheet of spriteSheets(chosen.pack)) {
       this.load.spritesheet(sheet.key, sheet.path, grid);
