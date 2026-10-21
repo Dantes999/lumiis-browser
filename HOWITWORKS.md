@@ -115,8 +115,10 @@ Reihenfolge in `step()`:
    Schaden, Tötungen, Beute.
 3. **Spieler**: tot? wiederbeleben. Sonst: TP-Regeneration, Buffs ablaufen,
    Bewegung (`moveWithCollision`), Portal prüfen.
-4. **Monster**: tot? wiederbeleben. Sonst: Kampf (`stepMonsterCombat`) oder
-   Wandern (`stepMonsterWander`).
+4. **Monster**: tot? wiederbeleben. Sonst: **nur wenn ein Spieler in der Nähe
+   ist** (oder es bereits jagt) → Kampf (`stepMonsterCombat`) oder Wandern
+   (`stepMonsterWander`). Weit entfernte Monster **schlafen** und kosten fast
+   nichts.
 5. **Boden-Items einsammeln** (Auto-Pickup).
 
 Danach im Hauptthread (`index.ts`):

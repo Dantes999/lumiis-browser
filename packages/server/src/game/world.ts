@@ -27,6 +27,7 @@ import {
   TILE_SIZE,
   TILE,
   SKILLS,
+  encode,
   dirFromInput,
   expForNextLevel,
   facingTowards,
@@ -74,6 +75,11 @@ const WANDER_MAX_TICKS = 60;
 const PAUSE_CHANCE = 0.25;
 const PAUSE_MIN_TICKS = 20;
 const PAUSE_MAX_TICKS = 50;
+/** Side of one interest cell in pixels; players share a snapshot per cell. */
+const CELL_SIZE = 256;
+/** How many cells around a player are visible: 1 means a 3x3 block. */
+const VIEW_CELLS = 1;
+
 /** After bumping into something, a monster waits this long before turning. */
 const BLOCKED_PAUSE_TICKS = 5;
 /** A chasing monster that cannot get closer for this long loses interest. */
@@ -252,10 +258,15 @@ export class World {
     return this.monstersById.get(id);
   }
 
-  addPlayer(seed: PlayerSeed): Player {
+  addPlayer(seed: PlayerSeed, id?: number): Player {
     const spawn = spawnPosition(this.map);
+    // The realm hands out ids that are unique across all maps; a bare world
+    // (tests) still numbers its own players.
+    const playerId = id ?? this.nextPlayerId++;
+    if (id !== undefined) this.nextPlayerId = Math.max(this.nextPlayerId, id + 1);
+
     const player: Player = {
-      id: this.nextPlayerId++,
+      id: playerId,
       accountId: seed.accountId,
       characterId: seed.characterId,
       name: seed.name,
@@ -444,9 +455,15 @@ export class World {
       this.checkPortal(player);
     }
 
+    // Monsters sleep unless a player is nearby or they are already chasing one.
+    const active = this.activeCells();
+
     for (const monster of this.monstersById.values()) {
       if (monster.respawnAt > 0) {
         if (this.tickCount >= monster.respawnAt) this.reviveMonster(monster);
+        continue;
+      }
+      if (monster.targetId === null && !active.has(this.cellId(monster.x, monster.y))) {
         continue;
       }
       if (this.stepMonsterCombat(monster)) continue;
@@ -681,14 +698,82 @@ export class World {
     return { ok: true };
   }
 
-  /** Everything a client needs to draw the world right now. */
+  /** The whole world; used by tests and for debugging. */
   snapshot(): {
+    players: PlayerSnapshot[];
+    monsters: MonsterSnapshot[];
+    ground: GroundItemSnapshot[];
+  } {
+    return this.buildSnapshot(() => true);
+  }
+
+  /** What one player would see: entities inside the 3x3 cells around him. */
+  visibleSnapshot(x: number, y: number): {
+    players: PlayerSnapshot[];
+    monsters: MonsterSnapshot[];
+    ground: GroundItemSnapshot[];
+  } {
+    return this.visibleInCell(this.cellX(x), this.cellY(y));
+  }
+
+  /**
+   * One encoded snapshot per player. Players standing in the same cell share the
+   * same string, so a busy cell is encoded once, not once per player.
+   */
+  cellSnapshots(): Map<number, string> {
+    const perCell = new Map<number, string>();
+    const result = new Map<number, string>();
+
+    for (const player of this.playersById.values()) {
+      const cell = this.cellId(player.x, player.y);
+      let json = perCell.get(cell);
+      if (json === undefined) {
+        json = encode({
+          t: 'snapshot',
+          tick: this.tickCount,
+          map: this.map.id,
+          ...this.visibleInCell(this.cellX(player.x), this.cellY(player.y)),
+        });
+        perCell.set(cell, json);
+      }
+      result.set(player.id, json);
+    }
+
+    return result;
+  }
+
+  private cellX(x: number): number {
+    return Math.floor(x / CELL_SIZE);
+  }
+
+  private cellY(y: number): number {
+    return Math.floor(y / CELL_SIZE);
+  }
+
+  private cellId(x: number, y: number): number {
+    // Cell coordinates are small (a map is at most 256 tiles), so this cannot collide.
+    return this.cellY(y) * 10000 + this.cellX(x);
+  }
+
+  /** Entities inside the 3x3 cells around one cell. */
+  private visibleInCell(cx: number, cy: number): {
+    players: PlayerSnapshot[];
+    monsters: MonsterSnapshot[];
+    ground: GroundItemSnapshot[];
+  } {
+    return this.buildSnapshot(
+      (x, y) => Math.abs(this.cellX(x) - cx) <= VIEW_CELLS && Math.abs(this.cellY(y) - cy) <= VIEW_CELLS,
+    );
+  }
+
+  private buildSnapshot(inView: (x: number, y: number) => boolean): {
     players: PlayerSnapshot[];
     monsters: MonsterSnapshot[];
     ground: GroundItemSnapshot[];
   } {
     const players: PlayerSnapshot[] = [];
     for (const player of this.playersById.values()) {
+      if (!inView(player.x, player.y)) continue;
       players.push({
         id: player.id,
         name: player.name,
@@ -711,6 +796,7 @@ export class World {
 
     const monsters: MonsterSnapshot[] = [];
     for (const monster of this.monstersById.values()) {
+      if (!inView(monster.x, monster.y)) continue;
       // A slain monster stays visible for a moment so the death reads on screen.
       const dead = monster.deadAt !== 0;
       if (dead && this.tickCount - monster.deadAt >= MONSTER_DEATH_TICKS) continue;
@@ -727,13 +813,10 @@ export class World {
       });
     }
 
-    return { players, monsters, ground: this.groundSnapshot() };
-  }
-
-  private groundSnapshot(): GroundItemSnapshot[] {
-    const items: GroundItemSnapshot[] = [];
+    const ground: GroundItemSnapshot[] = [];
     for (const item of this.groundItems.values()) {
-      items.push({
+      if (!inView(item.x, item.y)) continue;
+      ground.push({
         id: item.id,
         key: item.key,
         x: Math.round(item.x * 10) / 10,
@@ -741,7 +824,8 @@ export class World {
         count: item.count,
       });
     }
-    return items;
+
+    return { players, monsters, ground };
   }
 
   /** The inventory of one player, for the first message after the handshake. */
@@ -1019,6 +1103,24 @@ export class World {
       });
       this.nextMonsterId += 1;
     }
+  }
+
+  /** Cells within view of at least one living player; monsters there stay awake. */
+  private activeCells(): Set<number> {
+    const cells = new Set<number>();
+
+    for (const player of this.playersById.values()) {
+      if (player.deadUntil > 0) continue;
+      const cx = this.cellX(player.x);
+      const cy = this.cellY(player.y);
+      for (let dx = -VIEW_CELLS; dx <= VIEW_CELLS; dx += 1) {
+        for (let dy = -VIEW_CELLS; dy <= VIEW_CELLS; dy += 1) {
+          cells.add((cy + dy) * 10000 + (cx + dx));
+        }
+      }
+    }
+
+    return cells;
   }
 
   /** Returns true when the monster spent the tick on a target. */

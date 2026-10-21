@@ -477,8 +477,7 @@ export function attachGateway(
         if (session.player === null) continue;
         if (session.socket.readyState !== WebSocket.OPEN) continue;
 
-        const worldId = realm.worldIdOf(session.player.id);
-        const message = worldId === null ? undefined : snapshots.get(worldId);
+        const message = snapshots.get(session.player.id);
         if (message !== undefined) session.socket.send(message);
       }
     },

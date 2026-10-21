@@ -21,6 +21,8 @@ export type JoinSeed = PlayerSeed & { map: string };
 export class Realm {
   private readonly worlds = new Map<string, World>();
   private readonly worldIdByPlayer = new Map<number, string>();
+  /** Player ids must be unique across maps; the gateway looks players up by id. */
+  private nextPlayerId = 1;
 
   constructor(maps: MapData[]) {
     for (const map of maps) this.worlds.set(map.id, new WorldClass(map));
@@ -49,7 +51,8 @@ export class Realm {
     const world = this.worlds.get(seed.map) ?? this.worlds.values().next().value;
     if (world === undefined) return null;
 
-    const player = world.addPlayer(seed);
+    const player = world.addPlayer(seed, this.nextPlayerId);
+    this.nextPlayerId += 1;
     this.worldIdByPlayer.set(player.id, world.map.id);
     return player;
   }
@@ -67,24 +70,17 @@ export class Realm {
     }
   }
 
-  /** One encoded snapshot per world, sent once to everyone standing in it. */
-  snapshotJson(): Map<string, string> {
-    const encoded = new Map<string, string>();
+  /**
+   * One encoded snapshot per player, already cut to what that player can see.
+   * Players in the same cell share the same string.
+   */
+  snapshotJson(): Map<number, string> {
+    const encoded = new Map<number, string>();
 
-    for (const [id, world] of this.worlds) {
-      const snapshot = world.snapshot();
-      encoded.set(
-        id,
-        encode({
-          t: 'snapshot',
-          tick: world.tick,
-          map: id,
-          players: snapshot.players,
-          monsters: snapshot.monsters,
-          ground: snapshot.ground,
-        }),
-      );
+    for (const world of this.worlds.values()) {
+      for (const [playerId, json] of world.cellSnapshots()) encoded.set(playerId, json);
     }
+
     return encoded;
   }
 

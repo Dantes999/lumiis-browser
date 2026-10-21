@@ -78,16 +78,17 @@ describe('the realm', () => {
     const realm = new Realm([a, b]);
 
     const first = realm.join({ map: 'a', accountId: 1, characterId: 1, name: 'One' });
-    realm.join({ map: 'b', accountId: 2, characterId: 2, name: 'Two' });
+    const second = realm.join({ map: 'b', accountId: 2, characterId: 2, name: 'Two' });
+    if (first === null || second === null) throw new Error('join failed');
 
+    // One snapshot per player, already cut to what he can see.
     const snapshots = realm.snapshotJson();
-    expect([...snapshots.keys()].sort()).toEqual(['a', 'b']);
+    expect([...snapshots.keys()].sort()).toEqual([first.id, second.id].sort());
 
-    const onA = JSON.parse(snapshots.get('a') ?? '{}') as { players: Array<{ name: string }> };
-    const onB = JSON.parse(snapshots.get('b') ?? '{}') as { players: Array<{ name: string }> };
+    const onA = JSON.parse(snapshots.get(first.id) ?? '{}') as { players: Array<{ name: string }> };
+    const onB = JSON.parse(snapshots.get(second.id) ?? '{}') as { players: Array<{ name: string }> };
 
     expect(onA.players.map((entry) => entry.name)).toEqual(['One']);
     expect(onB.players.map((entry) => entry.name)).toEqual(['Two']);
-    expect(first).not.toBeNull();
   });
 });

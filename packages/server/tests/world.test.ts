@@ -317,20 +317,31 @@ describe('monsters', () => {
   });
 
   it('keeps wandering monsters near their spawn', () => {
-    const world = new World(withWolf(4, 4));
-    const home = { x: 4.5 * 32, y: 4.9 * 32 };
+    // Aggro off: this test is about wandering and the leash, not chasing.
+    const wolf = MONSTER_TYPES.wolf as { aggro: number };
+    const { aggro } = wolf;
+    wolf.aggro = 0;
 
-    let furthest = 0;
-    for (let tick = 0; tick < 600; tick += 1) {
-      world.step();
-      const monster = world.getMonster(1);
-      if (monster === undefined) continue;
-      furthest = Math.max(furthest, Math.hypot(monster.x - home.x, monster.y - home.y));
+    try {
+      const world = new World(withWolf(4, 4));
+      // Monsters sleep without a player nearby, so watch from the spawn.
+      world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
+      const home = { x: 4.5 * 32, y: 4.9 * 32 };
+
+      let furthest = 0;
+      for (let tick = 0; tick < 600; tick += 1) {
+        world.step();
+        const monster = world.getMonster(1);
+        if (monster === undefined) continue;
+        furthest = Math.max(furthest, Math.hypot(monster.x - home.x, monster.y - home.y));
+      }
+
+      // One step beyond the leash is allowed: the turn happens after the step.
+      expect(furthest).toBeGreaterThan(0);
+      expect(furthest).toBeLessThanOrEqual(MONSTER_TYPES.wolf.leash + 8);
+    } finally {
+      wolf.aggro = aggro;
     }
-
-    // One step beyond the leash is allowed: the turn happens after the step.
-    expect(furthest).toBeGreaterThan(0);
-    expect(furthest).toBeLessThanOrEqual(MONSTER_TYPES.wolf.leash + 8);
   });
 });
 
@@ -978,5 +989,60 @@ describe('walking and attacking at once', () => {
     world.setInput(player.id, 0, -1); // the periodic resend
 
     expect(player.dir).toBe(0);
+  });
+});
+
+describe('view and sleep', () => {
+  /** A map big enough that 256 px cells really separate things. */
+  const bigMap = (): MapData => ({
+    id: 'big',
+    width: 48,
+    height: 48,
+    spawn: { x: 4, y: 4 },
+    tiles: new Array(48 * 48).fill(TILE.GRASS),
+    spawns: [],
+    portals: [],
+  });
+
+  it('leaves distant monsters out of a view but keeps the full snapshot whole', () => {
+    const map = bigMap();
+    map.spawns = [{ kind: 'mob', key: 'wolf', tx: 40, ty: 40 }];
+    const world = new World(map);
+    const player = world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
+
+    expect(world.snapshot().monsters).toHaveLength(1);
+    expect(world.visibleSnapshot(player.x, player.y).monsters).toHaveLength(0);
+  });
+
+  it('keeps a monster with no player anywhere near asleep', () => {
+    const map = bigMap();
+    map.spawns = [{ kind: 'mob', key: 'wolf', tx: 40, ty: 40 }];
+    const world = new World(map);
+    const monster = world.getMonster(1);
+    if (monster === undefined) throw new Error('no monster');
+    const home = { x: monster.x, y: monster.y };
+
+    for (let tick = 0; tick < 300; tick += 1) world.step();
+
+    expect(monster.x).toBe(home.x);
+    expect(monster.y).toBe(home.y);
+  });
+
+  it('wakes a monster once a player is close', () => {
+    const map = bigMap();
+    map.spawns = [{ kind: 'mob', key: 'wolf', tx: 6, ty: 4 }];
+    const world = new World(map);
+    const monster = world.getMonster(1);
+    if (monster === undefined) throw new Error('no monster');
+    const home = { x: monster.x, y: monster.y };
+    world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
+
+    let moved = 0;
+    for (let tick = 0; tick < 300; tick += 1) {
+      world.step();
+      moved = Math.max(moved, Math.hypot(monster.x - home.x, monster.y - home.y));
+    }
+
+    expect(moved).toBeGreaterThan(0);
   });
 });
