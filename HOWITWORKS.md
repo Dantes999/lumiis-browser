@@ -233,6 +233,9 @@ verteilt der Hauptprozess die Karten reihum auf Worker-Threads (`WorkerHost`):
 - **Speichern**: die Worker schicken Spielstände, der Hauptprozess schreibt sie
   (die Datenbank gehört nur ihm). Beim Herunterfahren wird auf alle gewartet.
 
+**Gemessen** (100/300 Bots, dieser Rechner): `PERFORMANCE.md` — dort steht
+auch, wie du die Bots selbst startest (`tools/seed-bots.mjs`, `tools/bots.mjs`).
+
 **Wann sinnvoll?** Erst wenn eine Karte bzw. ein Kern an die Grenze kommt. Jeder
 Worker hat eigene Timer; mehr Shards heißt mehr Kontextwechsel, aber parallele
 Ticks. Die Karten-Zuteilung ist fest (reihum), nicht dynamisch.

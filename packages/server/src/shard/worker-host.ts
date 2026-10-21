@@ -15,6 +15,7 @@ import type {
   JoinedPlayer,
   JoinRequest,
   RewardEvent,
+  ShardStat,
 } from './host.js';
 import type { FromWorker, ToWorker } from './protocol.js';
 
@@ -36,6 +37,8 @@ export class WorkerHost implements GameHost {
   private readonly rewards: RewardEvent[] = [];
   private readonly inventoryUpdates: InventoryUpdate[] = [];
   private readonly flushWaiters: Array<() => void> = [];
+  /** Latest tick load per worker, as reported by the worker itself. */
+  private readonly stats: ShardStat[] = [];
   private nextPlayerId = 1;
   private pendingFlushes = 0;
 
@@ -49,14 +52,15 @@ export class WorkerHost implements GameHost {
     const groups: MapData[][] = Array.from({ length: Math.max(1, shardCount) }, () => []);
     maps.forEach((map, index) => groups[index % groups.length]?.push(map));
 
-    groups.forEach((group, shard) => {
+    groups.forEach((group) => {
       if (group.length === 0) return;
 
+      const shard = this.workers.length;
       const worker = new Worker(new URL('./worker.js', import.meta.url), {
         workerData: { maps: group },
       });
-      worker.on('message', (message: FromWorker) => this.onMessage(message));
-      worker.on('error', (error) => console.error('[shard] worker crashed:', error));
+      worker.on('message', (message: FromWorker) => this.onMessage(shard, message));
+      worker.on('error', (error) => console.error(`[shard ${shard}] worker crashed:`, error));
       this.workers.push(worker);
 
       for (const map of group) this.mapShard.set(map.id, shard);
@@ -149,6 +153,10 @@ export class WorkerHost implements GameHost {
     return this.inventories.get(playerId)?.equipment ?? null;
   }
 
+  shardStats(): ShardStat[] {
+    return this.stats.filter((stat): stat is ShardStat => stat !== undefined);
+  }
+
   /** The workers run their own loops; the main thread only broadcasts. */
   tick(): void {
     // Nothing to do here.
@@ -205,8 +213,16 @@ export class WorkerHost implements GameHost {
     this.workers[shard]?.postMessage(message);
   }
 
-  private onMessage(message: FromWorker): void {
+  private onMessage(shard: number, message: FromWorker): void {
     switch (message.t) {
+      case 'stats':
+        this.stats[shard] = {
+          players: message.players,
+          tickMs: message.tickMs,
+          tickMsMax: message.tickMsMax,
+        };
+        return;
+
       case 'joined':
         this.inventories.set(message.playerId, {
           slots: message.slots,

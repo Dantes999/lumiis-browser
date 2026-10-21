@@ -90,6 +90,15 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
       const times = metrics.tickMs;
       const average = times.length === 0 ? 0 : times.reduce((sum, value) => sum + value, 0) / times.length;
       const worst = times.length === 0 ? 0 : Math.max(...times);
+      const rounded = (value: number): number => Math.round(value * 10) / 10;
+
+      // One process: the loop above is the whole game. Shards: each worker
+      // reports its own tick, and the loop only carries sockets and messages.
+      const perShard = host.shardStats();
+      const shards =
+        perShard.length > 0
+          ? perShard
+          : [{ players: host.playerCount(), tickMs: rounded(average), tickMsMax: rounded(worst) }];
 
       res.writeHead(200, {
         'content-type': 'application/json; charset=utf-8',
@@ -105,6 +114,7 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
           tickMsMax: Math.round(worst * 10) / 10,
           snapshotBytes: metrics.lastSnapshotBytes,
           uptimeSeconds: Math.round((Date.now() - metrics.startedAt) / 1000),
+          shards,
         }),
       );
       return;

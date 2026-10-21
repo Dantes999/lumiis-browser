@@ -27,6 +27,9 @@ export type HostNotice = { playerId: number; text: string };
 
 export type RewardEvent = { map: string; reward: RewardBroadcast };
 
+/** How busy one game thread is; the local host reports none (see index.ts). */
+export type ShardStat = { players: number; tickMs: number; tickMsMax: number };
+
 export type JoinRequest = {
   seed: PlayerSeed;
   map: string;
@@ -64,6 +67,9 @@ export interface GameHost {
 
   /** Steps every world once. The worker host does this inside its threads. */
   tick(): void;
+
+  /** One entry per game thread; empty when everything runs in this process. */
+  shardStats(): ShardStat[];
 
   /** The latest encoded snapshot per player. */
   drainSnapshots(): Array<[number, string]>;
@@ -165,6 +171,10 @@ export class LocalHost implements GameHost {
 
   tick(): void {
     this.realm.tick();
+  }
+
+  shardStats(): ShardStat[] {
+    return [];
   }
 
   drainSnapshots(): Array<[number, string]> {

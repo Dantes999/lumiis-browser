@@ -28,7 +28,11 @@ const saveOne = (playerId: number): void => {
   if (save !== null) post({ t: 'save', characterId, save });
 };
 
+const tickTimes: number[] = [];
+
 const loop = new FixedStepLoop(TICK_MS, (tick) => {
+  const startedAt = performance.now();
+
   realm.tick();
 
   // Portals into another shard: hand the player and his save over.
@@ -69,6 +73,19 @@ const loop = new FixedStepLoop(TICK_MS, (tick) => {
     const ticks: Array<[string, number]> = [];
     for (const map of realm.mapIds) ticks.push([map, realm.worldOfMap(map)?.tick ?? 0]);
     post({ t: 'snapshots', ticks, entries: [...realm.snapshotJson()] });
+  }
+
+  // How long a player can walk into a busy cell is the number that matters.
+  tickTimes.push(performance.now() - startedAt);
+  if (tickTimes.length > TICK_RATE * 2) tickTimes.shift();
+  if (tick % TICK_RATE === 0 && tickTimes.length > 0) {
+    const sum = tickTimes.reduce((total, value) => total + value, 0);
+    post({
+      t: 'stats',
+      players: characters.size,
+      tickMs: Math.round((sum / tickTimes.length) * 10) / 10,
+      tickMsMax: Math.round(Math.max(...tickTimes) * 10) / 10,
+    });
   }
 
   // A slice of the players is saved every tick, never all at once.

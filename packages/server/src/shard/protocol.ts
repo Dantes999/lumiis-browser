@@ -52,4 +52,5 @@ export type FromWorker =
       to: string;
       save: CharacterSave;
     }
+  | { t: 'stats'; players: number; tickMs: number; tickMsMax: number }
   | { t: 'flushed' };
