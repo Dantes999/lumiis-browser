@@ -17,8 +17,12 @@ export type InputOptions = {
   onSkill?: (slot: number) => void;
   /** Y key: pick up the closest item in reach. */
   onPickup?: () => void;
-  /** A short tap or click on the world, in screen pixels. */
+  /** A short tap on the world (touch), in screen pixels. */
   onTap?: (screenX: number, screenY: number) => void;
+  /** The left mouse button went down on the world. */
+  onWorldDown?: (screenX: number, screenY: number) => void;
+  /** The left mouse button came back up. */
+  onWorldUp?: () => void;
 };
 
 type Point = { x: number; y: number };
@@ -77,7 +81,7 @@ const TAP_SLOP = 10;
 const TAP_MAX_MS = 350;
 
 export function initInput(options: InputOptions): void {
-  const { onAttack, onAttackHold, onPickup, onTap, onSkill } = options;
+  const { onAttack, onAttackHold, onPickup, onTap, onSkill, onWorldDown, onWorldUp } = options;
 
   const pressed = new Set<string>();
 
@@ -93,6 +97,8 @@ export function initInput(options: InputOptions): void {
   /** After a pinch, the remaining finger must not start walking. */
   let ignoreStickUntilRelease = false;
   let tapCandidate: { id: number; x: number; y: number; at: number } | null = null;
+  /** True while the left mouse button is held on the world. */
+  let mouseHeld = false;
 
   const base = document.createElement('div');
   base.id = 'stick';
@@ -194,6 +200,10 @@ export function initInput(options: InputOptions): void {
     pressed.clear();
     commit();
     onAttackHold?.(false);
+    if (mouseHeld) {
+      mouseHeld = false;
+      onWorldUp?.();
+    }
   });
 
   window.addEventListener(
@@ -243,8 +253,15 @@ export function initInput(options: InputOptions): void {
     const isMouse = event.pointerType === 'mouse';
     if (isMouse && event.button !== 0) return;
 
-    // A click is a tap, never a movement stick: otherwise a mouse that is held
-    // down (or a lost release) would keep the keyboard locked out.
+    // Mouse: holding the button is attacking, so report it instead of a tap.
+    if (isMouse) {
+      mouseHeld = true;
+      onWorldDown?.(event.clientX, event.clientY);
+      return;
+    }
+
+    // A touch is a tap, never a movement stick: otherwise the whole screen would
+    // keep the keyboard locked out.
     tapCandidate = {
       id: event.pointerId,
       x: event.clientX,
@@ -298,6 +315,11 @@ export function initInput(options: InputOptions): void {
   });
 
   const releasePointer = (event: PointerEvent): void => {
+    if (mouseHeld) {
+      mouseHeld = false;
+      onWorldUp?.();
+    }
+
     // Stop the stick first: the tap below may start a walk, and that direction
     // must survive instead of being overwritten by the "stop" of the release.
     if (event.pointerId === stickPointer) stopStick();

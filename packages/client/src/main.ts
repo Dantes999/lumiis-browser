@@ -7,7 +7,7 @@ import { WorldScene } from './scene/world-scene';
 import { Connection } from './net';
 import { audioState, sfx } from './audio';
 import { initInput } from './input';
-import { attackAt, setAttackHeld, setAttackSender, swingForward } from './combat';
+import { attackAt, isAttackHeld, setAttackHeld, setAttackSender, swingForward } from './combat';
 import { cast, setSkillSender } from './skill';
 import { setAimEnabled } from './aim';
 import { initAudio, resumeAudio, unlockAudioOnFirstGesture } from './audio';
@@ -110,6 +110,24 @@ initInput({
 
     attackAt(point.x, point.y);
   },
+  // Left mouse: holding the button keeps swinging, just like holding Space.
+  onWorldDown: (screenX, screenY) => {
+    const scene = game.scene.getScene('world');
+    if (scene === null || !scene.sys.isActive()) return;
+
+    const point = scene.cameras.main.getWorldPoint(screenX, screenY);
+    const item = itemNear(point.x, point.y);
+    if (item !== null) {
+      orderPickup(item.id);
+      return;
+    }
+
+    setAttackHeld(true);
+    attackAt(point.x, point.y);
+  },
+  onWorldUp: () => {
+    setAttackHeld(false);
+  },
 });
 
 const hud = createHud((slot) => castSlot(slot));
@@ -134,5 +152,11 @@ window.setInterval(() => {
 
 // Handy for poking at the state from the console during development.
 Object.assign(window, {
-  lumiis: { view, connection, game, audio: { state: audioState, sfx } },
+  lumiis: {
+    view,
+    connection,
+    game,
+    audio: { state: audioState, sfx },
+    debug: { isAttackHeld },
+  },
 });

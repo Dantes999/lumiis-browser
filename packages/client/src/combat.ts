@@ -92,6 +92,9 @@ export const setAttackHeld = (held: boolean): void => {
   attackHeld = held;
 };
 
+/** Debug helper: is the attack key/button currently held? */
+export const isAttackHeld = (): boolean => attackHeld;
+
 /**
  * Called every frame: while the key is held, keep swinging at the weapon's own
  * pace. The swing alternates left-right on its own, which makes the combo.
