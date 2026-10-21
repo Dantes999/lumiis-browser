@@ -16,6 +16,13 @@ const MAX_LINES = 300;
 const entries: LogEntry[] = [];
 const listeners = new Set<(entry: LogEntry) => void>();
 
+let forwarder: ((entry: LogEntry) => void) | null = null;
+
+/** Sends every line to the server too, so it shows up in the server terminal. */
+export const setLogForwarder = (fn: ((entry: LogEntry) => void) | null): void => {
+  forwarder = fn;
+};
+
 /** Adds a line to the console and to the in-game log. */
 export function logEvent(level: LogLevel, text: string): void {
   const entry: LogEntry = { at: Date.now(), level, text };
@@ -29,6 +36,7 @@ export function logEvent(level: LogLevel, text: string): void {
   else console.log(line);
 
   for (const listener of listeners) listener(entry);
+  forwarder?.(entry);
 }
 
 /** Everything logged so far, oldest first. */

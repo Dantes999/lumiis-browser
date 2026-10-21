@@ -29,6 +29,8 @@ type Session = {
   loginAttempts: number;
   /** Set after a successful login, before a character is chosen. */
   accountId: number | null;
+  /** Remote address, so two clients can be told apart in the log. */
+  address: string;
 };
 
 export type Gateway = {
@@ -217,6 +219,7 @@ export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store
       tokensAt: performance.now(),
       loginAttempts: 0,
       accountId: null,
+      address,
     };
     sessions.add(session);
 
@@ -333,6 +336,13 @@ export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store
             message.autoPickup,
             message.autoPickupTypes,
           );
+          break;
+        }
+        case 'log': {
+          // Strip control characters so a client cannot paint the terminal.
+          const clean = message.text.replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, 500);
+          const who = session.player?.name ?? 'guest';
+          console.log(`[client ${who} @ ${session.address}] ${message.level}: ${clean}`);
           break;
         }
         case 'ping':

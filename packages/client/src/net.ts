@@ -136,6 +136,11 @@ export class Connection {
     this.send({ t: 'skill', key });
   }
 
+  /** Mirrors one client log line to the server terminal. */
+  sendClientLog(level: 'info' | 'warn' | 'error', text: string): void {
+    this.send({ t: 'log', level, text });
+  }
+
   pickup(target: number): void {
     this.send({ t: 'pickup', target });
   }

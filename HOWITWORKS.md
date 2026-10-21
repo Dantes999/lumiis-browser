@@ -221,6 +221,18 @@ Verbindungs-Ereignisse mit Uhrzeit:
 
 **Copy** kopiert den ganzen Log in die Zwischenablage — gut zum Weiterschicken.
 
+**Dieselben Client-Zeilen erscheinen auch im Server-Terminal** (der Client schickt
+sie an den Server), mit Spieler-Name und IP — so kannst du die zwei PCs
+auseinanderhalten:
+
+```
+[ws] open from 192.168.1.20
+[client guest @ 192.168.1.20] info: connected, logging in
+[client test @ 192.168.1.20] info: in the world on map "testmap"
+[client test @ 192.168.1.20] warn: no traffic for 7s, dropping the connection
+[ws] closed test code=1006 reason=-
+```
+
 Serverseitig schreibt jedes Verbindungs-Ereignis eine Zeile ins Terminal:
 
 ```
@@ -229,6 +241,10 @@ Serverseitig schreibt jedes Verbindungs-Ereignis eine Zeile ins Terminal:
 [ws] refused code=1008 reason=rate limit
 [ws] handler failed for "attack": ...
 ```
+
+Hinweis: Zeilen, die **vor** dem Verbindungsaufbau entstehen (z. B.
+`client started`) oder **während** des Schließens (`connection closed`), kommen
+nicht mehr durch — dafür steht dann die `[ws] closed …`-Zeile des Servers da.
 
 **Wenn ein Client „einfriert"** (laufen geht, Monster stehen, treffen geht nicht):
 1. Log-Fenster öffnen und den letzten Block lesen.

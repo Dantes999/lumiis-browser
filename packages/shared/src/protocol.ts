@@ -64,6 +64,7 @@ export type ClientMessage =
   | { t: 'input'; dx: number; dy: number }
   | { t: 'attack'; target?: number; dir?: number }
   | { t: 'skill'; key: SkillKey }
+  | { t: 'log'; level: 'info' | 'warn' | 'error'; text: string }
   | { t: 'pickup'; target: number }
   | { t: 'equip'; slot: number }
   | { t: 'unequip'; piece: 'weapon' | 'armor' }
@@ -175,6 +176,18 @@ export function parseClientMessage(input: unknown): ParsedMessage {
       const key = message.key;
       if (!isSkillKey(key)) return fail('skill needs a known skill');
       return { ok: true, message: { t: 'skill', key } };
+    }
+
+    case 'log': {
+      const level = message.level;
+      const text = message.text;
+      if (level !== 'info' && level !== 'warn' && level !== 'error') {
+        return fail('log needs a level');
+      }
+      if (typeof text !== 'string' || text.length === 0 || text.length > 500) {
+        return fail('log text must be 1 to 500 characters');
+      }
+      return { ok: true, message: { t: 'log', level, text } };
     }
 
     case 'equip': {
