@@ -49,6 +49,9 @@ context is created when the login button is pressed.
 
 ## Maps
 
+Start with `CHANNELS=2` to run every map twice (CH1/CH2, like Metin2) and
+`SHARDS=2` to spread the worlds over worker threads.
+
 Three maps ship with the project: `testmap` (64x64) and `grove` (24x24), linked
 by portals in both directions, plus `zoned` (96x48): one map split into two
 **zones** that run on separate threads, connected by a gate at (39,24) and

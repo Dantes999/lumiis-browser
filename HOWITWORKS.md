@@ -321,6 +321,41 @@ auf verschiedenen Workern — der Wechsel ist dann eine echte Übergabe.
 
 **Test:** `packages/server/tests/zones.test.ts`.
 
+## 7d. Kanäle: dieselbe Karte mehrfach (CH1/CH2)
+
+```bash
+CHANNELS=2 npm start      # 1–8; 1 ist der Standard (aus)
+```
+
+Jede Karte läuft dann **N-mal**: je Kanal eine eigene `World` mit eigenen
+Monstern, eigenem Tick, eigenem Boden. Welt-Schlüssel: `testmap#ch2`, bei einer
+geteilten Karte `zoned#west#ch2` (Kanal immer zuletzt).
+
+- **Beitritt**: der Server setzt den Spieler in den **leersten** Kanal der Zone,
+  in der er steht. Der Kanal wird **nicht gespeichert** — nach dem nächsten
+  Login geht es in den dann leersten.
+- **Portal**: der Kanal bleibt (`ch2` bleibt `ch2` auf der Zielkarte), damit
+  Gruppe und Umgebung zusammenbleiben.
+- **Sichtbarkeit**: Spieler in verschiedenen Kanälen sehen sich **nicht**. Das
+  ist der Preis und der Sinn (wie Metin2 CH1/CH2): dieselbe Karte, mehr Platz.
+- **Shards**: die Kanäle einer Karte werden reihum verteilt, liegen also auf
+  **verschiedenen Workern** — genau das verteilt eine volle Karte.
+
+**Was ist der Unterschied zu Zonen (7c)?**
+
+| | Zonen | Kanäle |
+|---|---|---|
+| Teilt die Last | ja | ja |
+| Karte muss umgebaut werden | ja (Felsband + Tore) | nein |
+| Spieler sehen sich | innerhalb der Zone | innerhalb des Kanals |
+| Sinnvoll für | große Karten mit Bezirken | eine volle Karte |
+
+Beides lässt sich kombinieren (`zoned` mit `CHANNELS=2` ergibt vier Welten).
+
+**Code**: `Realm` (`leastLoaded`, `transfer` behält den Kanal),
+`WorkerHost` (`worldLoad`, Kanal-Zuteilung), `shared/src/map.ts`
+(`worldKeyOf`, `channelKeysOf`). Tests: `packages/server/tests/channels.test.ts`.
+
 ## 7a. Last beobachten: `/status`
 
 `GET /status` liefert JSON für Messungen:

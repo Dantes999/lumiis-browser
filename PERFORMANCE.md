@@ -75,6 +75,21 @@ vermeidbarer Arbeit. Beides ist jetzt weg — die verbleibende Arbeit ist das
 Schreiben der Snapshots in die Sockets, und die hängt an der **Byte-Menge**,
 nicht an der Spielerzahl.
 
+## Kanäle: dieselbe Karte mehrfach (300 Bots, 2 Shards)
+
+| | `CHANNELS=1` | `CHANNELS=2` |
+|---|---|---|
+| Spieler je Worker | 258 / 43 | 152 / 149 |
+| Tick je Worker | 8,6 / 1,2 ms | **5,0 / 4,4 ms** |
+| Tick-Spitze | 20,8 ms | **11,7 ms** |
+| Verkehr | 3,72 MB/s | **2,06 MB/s** |
+| Snapshot im Schnitt | 1232 B | **681 B** |
+| Server-CPU | 212 % | 214 % |
+
+Mit zwei Kanälen verteilt sich die volle Karte auf beide Worker: halber Tick,
+halbe Spitze. Der Verkehr sinkt zusätzlich, weil in jedem Kanal weniger Spieler
+im Blick sind. Einschalten mit `CHANNELS=2`.
+
 ## 500 Spieler (nur zur Orientierung)
 
 | | 2 Shards (2 Karten) |

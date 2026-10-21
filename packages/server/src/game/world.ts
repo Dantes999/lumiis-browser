@@ -285,13 +285,12 @@ export class World {
     readonly map: MapData,
     /** The part of the map this world owns; null when the map is one zone. */
     readonly zone: MapZone | null = null,
+    /** World key: map, map#zone, map#ch2 or map#zone#ch2. */
+    readonly key: string = map.id,
+    /** Channel number, 1 based; every channel is its own copy of the map. */
+    readonly channel = 1,
   ) {
     this.spawnMonsters();
-  }
-
-  /** World key: the map id, or map#zone when the map is split. */
-  get key(): string {
-    return this.zone === null ? this.map.id : `${this.map.id}#${this.zone.id}`;
   }
 
   /** Players that stepped outside the zone (they should use a portal instead). */

@@ -453,19 +453,53 @@ export function zoneAtPixel(map: MapData, x: number, y: number): MapZone | null 
 }
 
 /**
- * Stable key of the world that runs this zone. A map without zones keeps its
- * map id, so nothing changes for maps that were never split.
+ * Stable key of the world that runs this zone on this channel. A map without
+ * zones and with one channel keeps its map id, so nothing changes for maps
+ * that were never split or copied.
  */
-export const worldKeyOf = (map: MapData, zone: MapZone): string =>
-  map.zones === undefined ? map.id : `${map.id}#${zone.id}`;
+export const worldKeyOf = (
+  map: MapData,
+  zone: MapZone,
+  channel = 1,
+  channelCount = 1,
+): string => {
+  const parts = [map.id];
+  if (map.zones !== undefined) parts.push(zone.id);
+  if (channelCount > 1) parts.push(`ch${channel}`);
+  return parts.join('#');
+};
 
-/** World key at a pixel position, falling back to the map spawn. */
-export function worldKeyAt(map: MapData, x: number, y: number): string {
-  const zone =
+/** The keys of all channels of one zone. */
+export const channelKeysOf = (
+  map: MapData,
+  zone: MapZone,
+  channelCount: number,
+): string[] => {
+  const keys: string[] = [];
+  for (let channel = 1; channel <= channelCount; channel += 1) {
+    keys.push(worldKeyOf(map, zone, channel, channelCount));
+  }
+  return keys;
+};
+
+/** The zone at a pixel position, falling back to the map spawn. */
+export function zoneAtOrSpawn(map: MapData, x: number, y: number): MapZone {
+  return (
     zoneAtPixel(map, x, y) ??
     zoneAtTile(map, map.spawn.x, map.spawn.y) ??
-    zonesOf(map)[0];
-  return worldKeyOf(map, zone as MapZone);
+    (zonesOf(map)[0] as MapZone)
+  );
+}
+
+/** World key at a pixel position, falling back to the map spawn. */
+export function worldKeyAt(
+  map: MapData,
+  x: number,
+  y: number,
+  channel = 1,
+  channelCount = 1,
+): string {
+  return worldKeyOf(map, zoneAtOrSpawn(map, x, y), channel, channelCount);
 }
 
 /** The player's foot box. The sprite is 48 px tall, the feet are what collide. */

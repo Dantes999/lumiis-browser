@@ -3,9 +3,11 @@
 // session; only the world that holds the player changes at a portal.
 
 import {
+  channelKeysOf,
   spawnPosition,
   worldKeyAt,
   worldKeyOf,
+  zoneAtOrSpawn,
   zonesOf,
   type MapData,
   type MapZone,
@@ -38,15 +40,38 @@ export class Realm {
    * Builds the worlds of the given maps. With `only` set, a split map is only
    * built for the zones in that set, so a shard worker can own single zones.
    */
-  constructor(maps: MapData[], only: ReadonlySet<string> | null = null) {
+  constructor(
+    maps: MapData[],
+    only: ReadonlySet<string> | null = null,
+    /** How many copies of each map run side by side (channels). */
+    private readonly channels = 1,
+  ) {
+    this.channels = Math.max(1, channels);
+
     for (const map of maps) {
       this.maps.set(map.id, map);
       for (const zone of zonesOf(map)) {
-        const key = worldKeyOf(map, zone);
-        if (only !== null && !only.has(key)) continue;
-        this.worlds.set(key, new WorldClass(map, map.zones === undefined ? null : zone));
+        for (let channel = 1; channel <= this.channels; channel += 1) {
+          const key = worldKeyOf(map, zone, channel, this.channels);
+          if (only !== null && !only.has(key)) continue;
+          this.worlds.set(
+            key,
+            new WorldClass(map, map.zones === undefined ? null : zone, key, channel),
+          );
+        }
       }
     }
+  }
+
+  /** The channel of this zone with the fewest players. */
+  private leastLoaded(map: MapData, zone: MapZone): World | null {
+    let best: World | null = null;
+    for (const key of channelKeysOf(map, zone, this.channels)) {
+      const world = this.worlds.get(key);
+      if (world === undefined) continue;
+      if (best === null || world.playerCount < best.playerCount) best = world;
+    }
+    return best;
   }
 
   /** Players in the world, across every map. */
@@ -65,10 +90,10 @@ export class Realm {
     return [...this.worlds.keys()];
   }
 
-  /** The world key at a pixel position on a map. */
-  keyAt(mapId: string, x: number, y: number): string | null {
+  /** The world key at a pixel position on a map, on one channel. */
+  keyAt(mapId: string, x: number, y: number, channel = 1): string | null {
     const map = this.maps.get(mapId);
-    return map === undefined ? null : worldKeyAt(map, x, y);
+    return map === undefined ? null : worldKeyAt(map, x, y, channel, this.channels);
   }
 
   /** The first map; used for logging and by tests. */
@@ -105,8 +130,8 @@ export class Realm {
     if (map === undefined) return null;
 
     const spawn = spawnPosition(map);
-    const key = worldKeyAt(map, seed.x ?? spawn.x, seed.y ?? spawn.y);
-    const world = this.worlds.get(key) ?? this.worldOfMap(seed.map);
+    const zone = zoneAtOrSpawn(map, seed.x ?? spawn.x, seed.y ?? spawn.y);
+    const world = this.leastLoaded(map, zone) ?? this.worldOfMap(map.id);
     if (world === null) return null;
 
     return this.joinIn(world.key, seed, id);
@@ -144,7 +169,7 @@ export class Realm {
   private keepPlayersInZone(): void {
     for (const world of this.worlds.values()) {
       for (const player of world.playersOutsideZone()) {
-        const key = this.keyAt(world.map.id, player.x, player.y);
+        const key = this.keyAt(world.map.id, player.x, player.y, world.channel);
         const target = key === null ? undefined : this.worlds.get(key);
 
         if (target === undefined || target === world) {
@@ -281,7 +306,8 @@ export class Realm {
     const from = this.worldOf(warp.playerId);
     if (from === null) return;
 
-    const key = this.keyAt(warp.to, warp.x, warp.y);
+    // A portal keeps the channel: ch2 stays ch2 on the other map.
+    const key = this.keyAt(warp.to, warp.x, warp.y, from.channel);
     const to = key === null ? undefined : this.worlds.get(key);
 
     if (to === undefined) {

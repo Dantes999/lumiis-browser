@@ -130,14 +130,18 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
     void (path.startsWith('/maps/') ? serveShared : serveClient)(req, res);
   });
 
-  const realm = new Realm(maps);
+  // CHANNELS=2..8 gives every map that many copies (Metin2 style CH1/CH2).
+  const channels = Math.max(1, Math.min(8, Number(process.env['CHANNELS'] ?? 1) || 1));
+  // One process by default; SHARDS=2..8 spreads the worlds over worker threads.
+  const shardCount = Math.max(1, Math.min(8, Number(process.env['SHARDS'] ?? 1) || 1));
+
+  const realm = new Realm(maps, null, channels);
   const world = realm.primary;
   if (world === null) throw new Error('no map loaded');
-
-  // One process by default; SHARDS=2..8 spreads the maps over worker threads.
-  const shardCount = Math.max(1, Math.min(8, Number(process.env['SHARDS'] ?? 1) || 1));
   const host: GameHost =
-    shardCount > 1 ? new WorkerHost(maps, store, shardCount) : new LocalHost(realm, store);
+    shardCount > 1
+      ? new WorkerHost(maps, store, shardCount, channels)
+      : new LocalHost(realm, store);
   let currentTick = 0;
 
   const gateway = attachGateway(httpServer, host, store, tokenSecret);

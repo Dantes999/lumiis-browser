@@ -6,9 +6,10 @@
 
 import { Worker } from 'node:worker_threads';
 import {
+  channelKeysOf,
   spawnPosition,
-  worldKeyAt,
   worldKeyOf,
+  zoneAtOrSpawn,
   zonesOf,
   type Direction,
   type Equipment,
@@ -38,6 +39,8 @@ export class WorkerHost implements GameHost {
   private readonly maps = new Map<string, MapData>();
   private readonly playerShard = new Map<number, number>();
   private readonly playerWorld = new Map<number, string>();
+  /** Players per world key, so a join picks the emptiest channel. */
+  private readonly worldLoad = new Map<string, number>();
   private readonly characters = new Map<
     number,
     { characterId: number; name: string; accountId: number }
@@ -60,15 +63,23 @@ export class WorkerHost implements GameHost {
     maps: MapData[],
     private readonly store: Store,
     shardCount: number,
+    private readonly channels = 1,
   ) {
+    this.channels = Math.max(1, channels);
     this.mapIds = maps.map((map) => map.id);
     for (const map of maps) this.maps.set(map.id, map);
 
     // Split by world: a map without zones is one world, a split map is one
     // world per zone. Each worker gets a share, plus the map data it needs.
+    // Channel innermost: the round robin then puts the channels of the SAME map
+    // on different workers, which is what spreads one crowded map.
     const worlds: Array<{ key: string; map: MapData }> = [];
     for (const map of maps) {
-      for (const zone of zonesOf(map)) worlds.push({ key: worldKeyOf(map, zone), map });
+      for (const zone of zonesOf(map)) {
+        for (let channel = 1; channel <= this.channels; channel += 1) {
+          worlds.push({ key: worldKeyOf(map, zone, channel, this.channels), map });
+        }
+      }
     }
 
     const groups = Array.from({ length: Math.max(1, shardCount) }, () => ({
@@ -88,7 +99,11 @@ export class WorkerHost implements GameHost {
 
       const shard = this.workers.length;
       const worker = new Worker(new URL('./worker.js', import.meta.url), {
-        workerData: { maps: [...group.maps.values()], keys: group.keys },
+        workerData: {
+          maps: [...group.maps.values()],
+          keys: group.keys,
+          channels: this.channels,
+        },
       });
       worker.on('message', (message: FromWorker) => this.onMessage(shard, message));
       worker.on('error', (error) => console.error(`[shard ${shard}] worker crashed:`, error));
@@ -107,10 +122,23 @@ export class WorkerHost implements GameHost {
     const map = this.maps.get(request.map);
     if (map === undefined) return null;
 
+    // Pick the emptiest channel of the zone the player stands in.
     const spawn = spawnPosition(map);
-    const world = worldKeyAt(map, request.seed.x ?? spawn.x, request.seed.y ?? spawn.y);
+    const zone = zoneAtOrSpawn(map, request.seed.x ?? spawn.x, request.seed.y ?? spawn.y);
+    const keys = channelKeysOf(map, zone, this.channels);
+    let world = keys[0] ?? request.map;
+    let load = Number.POSITIVE_INFINITY;
+    for (const key of keys) {
+      const count = this.worldLoad.get(key) ?? 0;
+      if (count < load) {
+        load = count;
+        world = key;
+      }
+    }
+
     const shard = this.worldShard.get(world);
     if (shard === undefined) return null;
+    this.addLoad(world, 1);
 
     const id = this.nextPlayerId;
     this.nextPlayerId += 1;
@@ -144,6 +172,9 @@ export class WorkerHost implements GameHost {
   leave(playerId: number): void {
     const shard = this.playerShard.get(playerId);
     if (shard !== undefined) this.post(shard, { t: 'leave', playerId });
+
+    const world = this.playerWorld.get(playerId);
+    if (world !== undefined) this.addLoad(world, -1);
 
     this.playerShard.delete(playerId);
     this.playerWorld.delete(playerId);
@@ -248,6 +279,13 @@ export class WorkerHost implements GameHost {
     this.workers.length = 0;
   }
 
+  /** Keeps the per-world player count that drives the channel choice. */
+  private addLoad(world: string, delta: number): void {
+    const next = (this.worldLoad.get(world) ?? 0) + delta;
+    if (next <= 0) this.worldLoad.delete(world);
+    else this.worldLoad.set(world, next);
+  }
+
   private toPlayer(playerId: number, message: ToWorker): void {
     const shard = this.playerShard.get(playerId);
     if (shard !== undefined) this.post(shard, message);
@@ -334,6 +372,10 @@ export class WorkerHost implements GameHost {
     const target = this.worldShard.get(message.to);
     const stored = this.characters.get(message.playerId);
     if (target === undefined || stored === undefined) return;
+
+    const before = this.playerWorld.get(message.playerId);
+    if (before !== undefined) this.addLoad(before, -1);
+    this.addLoad(message.to, 1);
 
     this.playerShard.set(message.playerId, target);
     this.playerWorld.set(message.playerId, message.to);

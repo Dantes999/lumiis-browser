@@ -14,7 +14,7 @@ const port = parentPort;
 if (port === null) throw new Error('shard worker started without a parent port');
 
 const init = workerData as WorkerInit;
-const realm = new Realm(init.maps, new Set(init.keys));
+const realm = new Realm(init.maps, new Set(init.keys), init.channels);
 /** Character id per player, so saves can be written by the main process. */
 const characters = new Map<number, number>();
 let saveCursor = 0;
