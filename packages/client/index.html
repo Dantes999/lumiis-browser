@@ -89,6 +89,7 @@
       </div>
       <button id="bag-toggle" class="hud-button" type="button">Bag</button>
       <button id="settings-toggle" class="hud-button" type="button">Settings</button>
+      <button id="log-toggle" class="hud-button" type="button">Log</button>
 
       <div class="hud-row">
         <span class="hud-label">Skills</span>
@@ -127,6 +128,15 @@
       <div class="filter-title">Sound</div>
       <label class="filter-row"><input type="checkbox" id="sound-on" /> Sound on</label>
       <input id="sound-volume" type="range" min="0" max="100" value="50" aria-label="volume" />
+    </div>
+
+    <div id="log" class="panel hidden">
+      <div class="panel-title">Log</div>
+      <div class="log-actions">
+        <button id="log-copy" type="button">Copy</button>
+        <button id="log-close" type="button">Close</button>
+      </div>
+      <pre id="log-lines" class="log-lines"></pre>
     </div>
 
     <script type="module" src="/src/main.ts"></script>

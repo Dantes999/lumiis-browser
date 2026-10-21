@@ -10,6 +10,7 @@ import type {
   ServerMessage,
   SkillKey,
 } from '@lumiis/shared';
+import { logEvent } from './log';
 import { applyServerPosition } from './sim';
 import { view } from './state';
 
@@ -21,6 +22,8 @@ const swingEnd = (player: PlayerSnapshot): number => {
 
 const PING_INTERVAL_MS = 2000;
 const MAX_RECONNECT_DELAY_MS = 10000;
+/** No message for this long while in the world means the connection is dead. */
+const STALL_MS = 7000;
 
 type Credentials = { name: string; password: string; mode: 'login' | 'register' };
 
@@ -32,6 +35,10 @@ export class Connection {
   private reconnectDelayMs = 1000;
   private closedByUser = false;
   private onWelcome: (() => void) | null = null;
+  /** When the last frame arrived; a stall is noticed by comparing to now. */
+  private lastMessageAt = 0;
+  /** The character played before a drop, so a reconnect can walk straight in. */
+  private lastCharacterId: number | null = null;
 
   private get url(): string {
     const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -43,31 +50,43 @@ export class Connection {
     view.status = 'connecting';
     view.notice = null;
 
+    logEvent('info', `connecting to ${this.url}`);
+
     const socket = new WebSocket(this.url);
     this.socket = socket;
+    this.lastMessageAt = performance.now();
 
     socket.addEventListener('open', () => {
       this.reconnectDelayMs = 1000;
+      this.lastMessageAt = performance.now();
+      logEvent('info', 'connected, logging in');
       this.sendLogin();
       this.startPinging();
     });
 
     socket.addEventListener('message', (event) => {
       if (typeof event.data !== 'string') return;
+      this.lastMessageAt = performance.now();
       this.handleMessage(decode(event.data));
     });
 
-    socket.addEventListener('close', () => {
+    socket.addEventListener('close', (event) => {
       this.stopPinging();
       view.status = 'offline';
+      view.selfId = null;
       view.others.clear();
       view.monsters.clear();
       view.ground.clear();
       this.socket = null;
+      logEvent(
+        'warn',
+        `connection closed (code ${event.code}${event.reason ? `: ${event.reason}` : ''})`,
+      );
       if (!this.closedByUser) this.scheduleReconnect();
     });
 
     socket.addEventListener('error', () => {
+      logEvent('error', 'socket error');
       socket.close();
     });
   }
@@ -81,6 +100,7 @@ export class Connection {
   }
 
   selectCharacter(id: number): void {
+    this.lastCharacterId = id;
     this.send({ t: 'select', id });
   }
 
@@ -141,15 +161,44 @@ export class Connection {
     if (this.reconnectTimer !== null) return;
     const delay = this.reconnectDelayMs;
     this.reconnectDelayMs = Math.min(this.reconnectDelayMs * 2, MAX_RECONNECT_DELAY_MS);
+    logEvent('info', `reconnecting in ${Math.round(delay / 1000)}s`);
     this.reconnectTimer = window.setTimeout(() => {
       this.reconnectTimer = null;
       this.connect();
     }, delay);
   }
 
+  /**
+   * A dead TCP connection never fires "close": the socket stays OPEN while
+   * nothing arrives. Without this the player keeps walking on a frozen world.
+   * Drop the socket ourselves so the normal close path reconnects.
+   */
+  private checkStall(): void {
+    if (this.socket?.readyState !== WebSocket.OPEN) return;
+    if (view.selfId === null) return;
+    if (performance.now() - this.lastMessageAt < STALL_MS) return;
+
+    logEvent('warn', `no traffic for ${Math.round(STALL_MS / 1000)}s, dropping the connection`);
+    const socket = this.socket;
+    this.socket = null;
+    this.stopPinging();
+    view.status = 'offline';
+    view.selfId = null;
+    view.others.clear();
+    view.monsters.clear();
+    view.ground.clear();
+    try {
+      socket?.close();
+    } catch {
+      // The socket is already gone; nothing to do.
+    }
+    if (!this.closedByUser) this.scheduleReconnect();
+  }
+
   private startPinging(): void {
     this.stopPinging();
     this.pingTimer = window.setInterval(() => {
+      this.checkStall();
       this.send({ t: 'ping', at: performance.now() });
     }, PING_INTERVAL_MS);
   }
@@ -170,6 +219,7 @@ export class Connection {
 
     switch (message.t) {
       case 'welcome':
+        logEvent('info', `in the world on map "${message.map}"`);
         view.status = 'online';
         view.selfId = message.id;
         view.tick = message.tick;
@@ -195,12 +245,21 @@ export class Connection {
         view.noticeUntil = performance.now() + 3000;
         break;
       case 'authError':
+        logEvent('warn', `auth error: ${message.reason}`);
         view.authError = message.reason;
         break;
-      case 'characters':
+      case 'characters': {
         view.characters = message.list;
         view.characterMax = message.max;
+        // After a drop, walk straight back into the same character instead of
+        // making the player pick again.
+        const remembered = this.lastCharacterId;
+        if (remembered !== null && view.selfId === null) {
+          const known = message.list.some((entry) => entry.id === remembered);
+          if (known) this.send({ t: 'select', id: remembered });
+        }
         break;
+      }
     }
   }
 

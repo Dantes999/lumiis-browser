@@ -15,7 +15,7 @@ import {
   encode,
   parseClientMessage,
 } from '@lumiis/shared';
-import type { Direction, InventorySlot } from '@lumiis/shared';
+import type { ClientMessage, Direction, InventorySlot } from '@lumiis/shared';
 import type { Player } from '../game/world.js';
 import type { Realm } from '../game/realm.js';
 import { MAX_CHARACTERS, type Store } from '../store/db.js';
@@ -46,6 +46,7 @@ export type Gateway = {
 };
 
 const refuse = (socket: WebSocket, code: number, reason: string): void => {
+  console.log(`[ws] refused code=${code} reason=${reason}`);
   socket.close(code, reason);
 };
 
@@ -57,6 +58,11 @@ export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store
   });
 
   const sessions = new Set<Session>();
+
+  /** One line per connection event, so a dropped client leaves a trace. */
+  const note = (text: string): void => {
+    console.log(`[ws] ${text}`);
+  };
 
   /** Token bucket: a client gets a burst of MAX_MESSAGES_PER_SECOND and refills over time. */
   const takeToken = (session: Session, now: number): boolean => {
@@ -200,7 +206,10 @@ export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store
     enterWorld(session, result.id);
   };
 
-  wss.on('connection', (socket) => {
+  wss.on('connection', (socket, request) => {
+    const address = request.socket.remoteAddress ?? 'unknown';
+    note(`open from ${address}`);
+
     const session: Session = {
       socket,
       player: null,
@@ -241,22 +250,31 @@ export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store
         return;
       }
 
-      switch (parsed.message.t) {
+      try {
+        dispatch(session, parsed.message);
+      } catch (error) {
+        console.error(`[ws] handler failed for "${parsed.message.t}":`, error);
+        send(session, { t: 'notice', text: 'Server error, please try again.' });
+      }
+    });
+
+    const dispatch = (session: Session, message: ClientMessage): void => {
+      switch (message.t) {
         case 'login':
-          void handleLogin(session, parsed.message);
+          void handleLogin(session, message);
           break;
         case 'select':
-          enterWorld(session, parsed.message.id);
+          enterWorld(session, message.id);
           break;
         case 'createCharacter':
-          handleCreate(session, parsed.message.name);
+          handleCreate(session, message.name);
           break;
         case 'input':
           if (session.player === null) {
             send(session, { t: 'notice', text: 'Log in first.' });
             break;
           }
-          realm.setInput(session.player.id, parsed.message.dx, parsed.message.dy);
+          realm.setInput(session.player.id, message.dx, message.dy);
           break;
         case 'attack': {
           if (session.player === null) {
@@ -266,8 +284,8 @@ export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store
           // The blow lands a few ticks later; rewards follow through the tick loop.
           const result = realm.attack(
             session.player.id,
-            parsed.message.target ?? null,
-            parsed.message.dir ?? null,
+            message.target ?? null,
+            message.dir ?? null,
           );
           if (!result.ok) send(session, { t: 'notice', text: result.reason });
           break;
@@ -277,7 +295,7 @@ export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store
             send(session, { t: 'notice', text: 'Log in first.' });
             break;
           }
-          const result = realm.useSkill(session.player.id, parsed.message.key);
+          const result = realm.useSkill(session.player.id, message.key);
           if (!result.ok) send(session, { t: 'notice', text: result.reason });
           break;
         }
@@ -286,7 +304,7 @@ export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store
             send(session, { t: 'notice', text: 'Log in first.' });
             break;
           }
-          const result = realm.equip(session.player.id, parsed.message.slot);
+          const result = realm.equip(session.player.id, message.slot);
           if (!result.ok) send(session, { t: 'notice', text: result.reason });
           break;
         }
@@ -295,7 +313,7 @@ export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store
             send(session, { t: 'notice', text: 'Log in first.' });
             break;
           }
-          const result = realm.unequip(session.player.id, parsed.message.piece);
+          const result = realm.unequip(session.player.id, message.piece);
           if (!result.ok) send(session, { t: 'notice', text: result.reason });
           break;
         }
@@ -304,7 +322,7 @@ export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store
             send(session, { t: 'notice', text: 'Log in first.' });
             break;
           }
-          const result = realm.pickup(session.player.id, parsed.message.target);
+          const result = realm.pickup(session.player.id, message.target);
           if (!result.ok) send(session, { t: 'notice', text: result.reason });
           break;
         }
@@ -312,19 +330,22 @@ export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store
           if (session.player === null) break;
           realm.setPickupSettings(
             session.player.id,
-            parsed.message.autoPickup,
-            parsed.message.autoPickupTypes,
+            message.autoPickup,
+            message.autoPickupTypes,
           );
           break;
         }
         case 'ping':
-          send(session, { t: 'pong', at: parsed.message.at });
+          send(session, { t: 'pong', at: message.at });
           break;
       }
-    });
+    };
 
-    socket.on('close', () => {
+    socket.on('close', (code, reason) => {
       sessions.delete(session);
+      const who = session.player?.name ?? (session.accountId === null ? 'guest' : 'account');
+      note(`closed ${who} code=${code} reason=${reason.toString() || '-'}`);
+
       const player = session.player;
       if (player === null) return;
       savePlayer(player);

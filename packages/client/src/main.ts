@@ -19,6 +19,8 @@ import { createBag } from './ui/bag';
 import { createCharacterScreen } from './ui/characters';
 import { createLogin } from './ui/login';
 import { createSettings } from './ui/settings';
+import { createLogPanel } from './ui/logpanel';
+import { logEvent } from './log';
 
 const HUD_REFRESH_MS = 100;
 
@@ -129,6 +131,18 @@ initInput({
     setAttackHeld(false);
   },
 });
+
+createLogPanel();
+
+// Anything that escapes a handler or a promise is written to the log window, so
+// a frozen client on another machine still leaves evidence.
+window.addEventListener('error', (event) => {
+  logEvent('error', `script error: ${event.message}`);
+});
+window.addEventListener('unhandledrejection', (event) => {
+  logEvent('error', `unhandled rejection: ${String(event.reason)}`);
+});
+logEvent('info', `client started on ${location.host}`);
 
 const hud = createHud((slot) => castSlot(slot));
 const bag = createBag(

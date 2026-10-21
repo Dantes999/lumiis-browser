@@ -207,6 +207,36 @@ Der Code dafür: `packages/server/src/store/db.ts` (`Store`, `loadCharacter`,
 4. **Test schreiben**: In `packages/server/tests/world.test.ts` (oder passender
    Datei) den Fall nachbauen. Erst rot, dann fixen.
 
+### Das Log-Fenster (für Fehler ohne Dev-Konsole)
+
+Im HUD gibt es den Knopf **Log** (oder Taste **L**). Dort stehen die letzten
+Verbindungs-Ereignisse mit Uhrzeit:
+
+- `connecting to ws://…/ws`, `connected, logging in`, `in the world on map …`
+- `connection closed (code 1006…)` — die Verbindung ist weg
+- `reconnecting in Xs` — der Client versucht es erneut (Wartezeit verdoppelt sich)
+- `no traffic for 7s, dropping the connection` — **die Verbindung war halb tot**
+  und wurde erkannt
+- `auth error: …`, `socket error`, `script error: …`
+
+**Copy** kopiert den ganzen Log in die Zwischenablage — gut zum Weiterschicken.
+
+Serverseitig schreibt jedes Verbindungs-Ereignis eine Zeile ins Terminal:
+
+```
+[ws] open from 127.0.0.1
+[ws] closed test code=1006 reason=-
+[ws] refused code=1008 reason=rate limit
+[ws] handler failed for "attack": ...
+```
+
+**Wenn ein Client „einfriert"** (laufen geht, Monster stehen, treffen geht nicht):
+1. Log-Fenster öffnen und den letzten Block lesen.
+2. `no traffic` → die Leitung war tot; der Client verbindet sich selbst neu und
+   springt automatisch in denselben Charakter zurück.
+3. `code 1008` / `rate limit` → der Client hat zu viele Nachrichten geschickt.
+4. `handler failed` im Server → dort steht die Nachricht, die den Fehler auslöste.
+
 ### Nützliche Debug-Blicke (Browser-Konsole)
 
 ```js
