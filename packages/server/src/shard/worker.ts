@@ -14,7 +14,7 @@ const port = parentPort;
 if (port === null) throw new Error('shard worker started without a parent port');
 
 const init = workerData as WorkerInit;
-const realm = new Realm(init.maps);
+const realm = new Realm(init.maps, new Set(init.keys));
 /** Character id per player, so saves can be written by the main process. */
 const characters = new Map<number, number>();
 let saveCursor = 0;
@@ -53,7 +53,7 @@ const loop = new FixedStepLoop(TICK_MS, (tick) => {
       playerId: warp.playerId,
       characterId,
       name: player.name,
-      to: warp.to,
+      to: warp.world ?? warp.to,
       save: moved,
     });
   }
@@ -62,7 +62,7 @@ const loop = new FixedStepLoop(TICK_MS, (tick) => {
     post({ t: 'notice', playerId: event.playerId, text: event.text });
   }
 
-  for (const { map, reward } of realm.drainRewards()) post({ t: 'reward', map, reward });
+  for (const { worldId, reward } of realm.drainRewards()) post({ t: 'reward', worldId, reward });
 
   for (const update of realm.drainInventoryUpdates()) {
     const equipment = realm.equipmentOf(update.playerId) ?? { weapon: null, armor: null };
@@ -71,7 +71,7 @@ const loop = new FixedStepLoop(TICK_MS, (tick) => {
 
   if (tick % SNAPSHOT_EVERY_TICKS === 0) {
     const ticks: Array<[string, number]> = [];
-    for (const map of realm.mapIds) ticks.push([map, realm.worldOfMap(map)?.tick ?? 0]);
+    for (const world of realm.worldKeys()) ticks.push([world, realm.world(world)?.tick ?? 0]);
     post({ t: 'snapshots', ticks, entries: [...realm.snapshotBuffers()] });
   }
 
@@ -104,7 +104,7 @@ loop.start();
 port.on('message', (message: ToWorker) => {
   switch (message.t) {
     case 'join': {
-      const player = realm.join({ ...message.seed, map: message.map }, message.playerId);
+      const player = realm.joinIn(message.world, message.seed, message.playerId);
       if (player === null) {
         post({ t: 'joinFailed', playerId: message.playerId });
         return;
@@ -114,8 +114,8 @@ port.on('message', (message: ToWorker) => {
       post({
         t: 'joined',
         playerId: player.id,
-        map: message.map,
-        tick: realm.worldOfMap(message.map)?.tick ?? 0,
+        world: message.world,
+        tick: realm.world(message.world)?.tick ?? 0,
         slots: realm.inventoryOf(player.id) ?? [],
         equipment: realm.equipmentOf(player.id) ?? { weapon: null, armor: null },
       });

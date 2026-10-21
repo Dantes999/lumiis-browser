@@ -5,7 +5,17 @@
 // Neither side blocks the other: everything is a message.
 
 import { Worker } from 'node:worker_threads';
-import type { Direction, Equipment, InventorySlot, MapData, SkillKey } from '@lumiis/shared';
+import {
+  spawnPosition,
+  worldKeyAt,
+  worldKeyOf,
+  zonesOf,
+  type Direction,
+  type Equipment,
+  type InventorySlot,
+  type MapData,
+  type SkillKey,
+} from '@lumiis/shared';
 import type { CharacterSave, Store } from '../store/db.js';
 import type { PlayerSeed } from '../game/world.js';
 import type {
@@ -23,16 +33,18 @@ export class WorkerHost implements GameHost {
   readonly mapIds: string[];
 
   private readonly workers: Worker[] = [];
-  private readonly mapShard = new Map<string, number>();
+  /** World key (map id or map#zone) to the worker that runs it. */
+  private readonly worldShard = new Map<string, number>();
+  private readonly maps = new Map<string, MapData>();
   private readonly playerShard = new Map<number, number>();
-  private readonly playerMap = new Map<number, string>();
+  private readonly playerWorld = new Map<number, string>();
   private readonly characters = new Map<
     number,
     { characterId: number; name: string; accountId: number }
   >();
   private readonly snapshots = new Map<number, Uint8Array>();
   private readonly inventories = new Map<number, { slots: InventorySlot[]; equipment: Equipment }>();
-  private readonly mapTicks = new Map<string, number>();
+  private readonly worldTicks = new Map<string, number>();
   private readonly notices: HostNotice[] = [];
   private readonly rewards: RewardEvent[] = [];
   private readonly inventoryUpdates: InventoryUpdate[] = [];
@@ -50,22 +62,40 @@ export class WorkerHost implements GameHost {
     shardCount: number,
   ) {
     this.mapIds = maps.map((map) => map.id);
+    for (const map of maps) this.maps.set(map.id, map);
 
-    const groups: MapData[][] = Array.from({ length: Math.max(1, shardCount) }, () => []);
-    maps.forEach((map, index) => groups[index % groups.length]?.push(map));
+    // Split by world: a map without zones is one world, a split map is one
+    // world per zone. Each worker gets a share, plus the map data it needs.
+    const worlds: Array<{ key: string; map: MapData }> = [];
+    for (const map of maps) {
+      for (const zone of zonesOf(map)) worlds.push({ key: worldKeyOf(map, zone), map });
+    }
+
+    const groups = Array.from({ length: Math.max(1, shardCount) }, () => ({
+      keys: [] as string[],
+      maps: new Map<string, MapData>(),
+    }));
+
+    worlds.forEach((entry, index) => {
+      const group = groups[index % groups.length];
+      if (group === undefined) return;
+      group.keys.push(entry.key);
+      group.maps.set(entry.map.id, entry.map);
+    });
 
     groups.forEach((group) => {
-      if (group.length === 0) return;
+      if (group.keys.length === 0) return;
 
       const shard = this.workers.length;
       const worker = new Worker(new URL('./worker.js', import.meta.url), {
-        workerData: { maps: group },
+        workerData: { maps: [...group.maps.values()], keys: group.keys },
       });
       worker.on('message', (message: FromWorker) => this.onMessage(shard, message));
       worker.on('error', (error) => console.error(`[shard ${shard}] worker crashed:`, error));
       this.workers.push(worker);
+      console.log(`[shard ${shard}] owns ${group.keys.join(', ')}`);
 
-      for (const map of group) this.mapShard.set(map.id, shard);
+      for (const key of group.keys) this.worldShard.set(key, shard);
     });
   }
 
@@ -74,14 +104,19 @@ export class WorkerHost implements GameHost {
   }
 
   join(request: JoinRequest): JoinedPlayer | null {
-    const shard = this.mapShard.get(request.map);
+    const map = this.maps.get(request.map);
+    if (map === undefined) return null;
+
+    const spawn = spawnPosition(map);
+    const world = worldKeyAt(map, request.seed.x ?? spawn.x, request.seed.y ?? spawn.y);
+    const shard = this.worldShard.get(world);
     if (shard === undefined) return null;
 
     const id = this.nextPlayerId;
     this.nextPlayerId += 1;
 
     this.playerShard.set(id, shard);
-    this.playerMap.set(id, request.map);
+    this.playerWorld.set(id, world);
     this.characters.set(id, {
       characterId: request.characterId,
       name: request.name,
@@ -93,11 +128,17 @@ export class WorkerHost implements GameHost {
       playerId: id,
       characterId: request.characterId,
       name: request.name,
-      map: request.map,
+      world,
       seed: request.seed,
     });
 
-    return { id, characterId: request.characterId, name: request.name, map: request.map };
+    return {
+      id,
+      characterId: request.characterId,
+      name: request.name,
+      map: request.map,
+      world,
+    };
   }
 
   leave(playerId: number): void {
@@ -105,18 +146,18 @@ export class WorkerHost implements GameHost {
     if (shard !== undefined) this.post(shard, { t: 'leave', playerId });
 
     this.playerShard.delete(playerId);
-    this.playerMap.delete(playerId);
+    this.playerWorld.delete(playerId);
     this.characters.delete(playerId);
     this.snapshots.delete(playerId);
     this.inventories.delete(playerId);
   }
 
   worldIdOf(playerId: number): string | null {
-    return this.playerMap.get(playerId) ?? null;
+    return this.playerWorld.get(playerId) ?? null;
   }
 
-  tickOf(map: string): number {
-    return this.mapTicks.get(map) ?? 0;
+  tickOf(world: string): number {
+    return this.worldTicks.get(world) ?? 0;
   }
 
   setInput(playerId: number, dx: number, dy: number): void {
@@ -236,7 +277,7 @@ export class WorkerHost implements GameHost {
           slots: message.slots,
           equipment: message.equipment,
         });
-        this.mapTicks.set(message.map, message.tick);
+        this.worldTicks.set(message.world, message.tick);
         return;
 
       case 'joinFailed':
@@ -244,7 +285,7 @@ export class WorkerHost implements GameHost {
         return;
 
       case 'snapshots':
-        for (const [map, tick] of message.ticks) this.mapTicks.set(map, tick);
+        for (const [world, tick] of message.ticks) this.worldTicks.set(world, tick);
         for (const [playerId, json] of message.entries) this.snapshots.set(playerId, json);
         return;
 
@@ -265,7 +306,7 @@ export class WorkerHost implements GameHost {
         return;
 
       case 'reward':
-        this.rewards.push({ map: message.map, reward: message.reward });
+        this.rewards.push({ worldId: message.worldId, reward: message.reward });
         return;
 
       case 'save':
@@ -290,12 +331,12 @@ export class WorkerHost implements GameHost {
 
   /** A player walked through a portal into a map of another shard. */
   private handOver(message: Extract<FromWorker, { t: 'transfer' }>): void {
-    const target = this.mapShard.get(message.to);
+    const target = this.worldShard.get(message.to);
     const stored = this.characters.get(message.playerId);
     if (target === undefined || stored === undefined) return;
 
     this.playerShard.set(message.playerId, target);
-    this.playerMap.set(message.playerId, message.to);
+    this.playerWorld.set(message.playerId, message.to);
 
     const save: CharacterSave = message.save;
     const seed: PlayerSeed = {
@@ -318,7 +359,7 @@ export class WorkerHost implements GameHost {
       playerId: message.playerId,
       characterId: message.characterId,
       name: message.name,
-      map: message.to,
+      world: message.to,
       seed,
     });
   }

@@ -49,9 +49,11 @@ context is created when the login button is pressed.
 
 ## Maps
 
-Two maps ship with the project: `testmap` (64x64) and `grove` (24x24), linked by
-portals in both directions. The map a character stands on is part of his save,
-so logging in puts him back where he left.
+Three maps ship with the project: `testmap` (64x64) and `grove` (24x24), linked
+by portals in both directions, plus `zoned` (96x48): one map split into two
+**zones** that run on separate threads, connected by a gate at (39,24) and
+(56,24). You reach `zoned` from `testmap` at (30,36). The map a character stands
+on is part of his save, so logging in puts him back where he left.
 
 ## Map editor
 

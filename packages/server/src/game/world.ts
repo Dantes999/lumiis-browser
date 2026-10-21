@@ -61,6 +61,7 @@ import {
 import type {
   Direction,
   Equipment,
+  MapZone,
   MoveEntry,
   SnapshotMessage,
   GroundItemSnapshot,
@@ -243,7 +244,15 @@ export type KillReward = {
 };
 
 /** A player walking into a portal; the realm moves him. */
-export type Warp = { playerId: number; to: string; x: number; y: number };
+export type Warp = {
+  playerId: number;
+  /** Target map id. */
+  to: string;
+  x: number;
+  y: number;
+  /** Target world key when the realm does not own it (set by the realm). */
+  world?: string;
+};
 
 export type AttackResult = { ok: true; started: true } | { ok: false; reason: string };
 
@@ -272,8 +281,32 @@ export class World {
   /** Small deterministic generator: the same map always behaves the same way. */
   private rngState = 0x9e3779b9;
 
-  constructor(readonly map: MapData) {
+  constructor(
+    readonly map: MapData,
+    /** The part of the map this world owns; null when the map is one zone. */
+    readonly zone: MapZone | null = null,
+  ) {
     this.spawnMonsters();
+  }
+
+  /** World key: the map id, or map#zone when the map is split. */
+  get key(): string {
+    return this.zone === null ? this.map.id : `${this.map.id}#${this.zone.id}`;
+  }
+
+  /** Players that stepped outside the zone (they should use a portal instead). */
+  playersOutsideZone(): Player[] {
+    if (this.zone === null) return [];
+
+    const outside: Player[] = [];
+    for (const player of this.playersById.values()) {
+      const tx = Math.floor(player.x / TILE_SIZE);
+      const ty = Math.floor(player.y / TILE_SIZE);
+      if (tx < this.zone.x0 || tx > this.zone.x1 || ty < this.zone.y0 || ty > this.zone.y1) {
+        outside.push(player);
+      }
+    }
+    return outside;
   }
 
   /** Ticks simulated since the server started. */
@@ -1375,6 +1408,17 @@ export class World {
 
   private spawnMonsters(): void {
     for (const spawn of this.map.spawns) {
+      // A split map has one world per zone: each spawns only its own monsters.
+      if (
+        this.zone !== null &&
+        (spawn.tx < this.zone.x0 ||
+          spawn.tx > this.zone.x1 ||
+          spawn.ty < this.zone.y0 ||
+          spawn.ty > this.zone.y1)
+      ) {
+        continue;
+      }
+
       const type = MONSTER_TYPES[spawn.key];
       const x = (spawn.tx + 0.5) * TILE_SIZE;
       const y = (spawn.ty + 0.9) * TILE_SIZE;

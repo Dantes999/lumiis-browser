@@ -156,8 +156,8 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
       gateway.notify(note.playerId, note.text);
     }
 
-    for (const { map, reward } of host.drainRewards()) {
-      gateway.broadcastReward(map, reward);
+    for (const { worldId, reward } of host.drainRewards()) {
+      gateway.broadcastReward(worldId, reward);
     }
 
     // A slice of the players is written every tick: no 30 second spike.

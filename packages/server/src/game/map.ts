@@ -3,7 +3,7 @@
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
-import { validateMap, type MapData } from '@lumiis/shared';
+import { TILE, tileAt, validateMap, zoneAtTile, type MapData } from '@lumiis/shared';
 
 export function loadMap(filePath: string): MapData {
   let raw: unknown;
@@ -38,5 +38,37 @@ export function loadMaps(filePath: string): MapData[] {
 
   const maps = names.map((name) => loadMap(join(folder, name)));
   if (maps.length === 0) throw new Error(`no maps in ${folder}`);
+
+  // A player must land in a real world, not in a gap between zones.
+  const byId = new Map(maps.map((map) => [map.id, map]));
+  for (const map of maps) {
+    for (const portal of map.portals) {
+      const target = byId.get(portal.to);
+      if (target === undefined) {
+        throw new Error(`map ${map.id}: portal leads to unknown map "${portal.to}"`);
+      }
+      if (
+        portal.spawnX < 0 ||
+        portal.spawnY < 0 ||
+        portal.spawnX >= target.width ||
+        portal.spawnY >= target.height
+      ) {
+        throw new Error(`map ${map.id}: portal arrives outside ${target.id}`);
+      }
+      if (zoneAtTile(target, portal.spawnX, portal.spawnY) === null) {
+        throw new Error(
+          `map ${map.id}: portal arrives at ${portal.spawnX},${portal.spawnY} on ` +
+            `${target.id}, which is in no zone`,
+        );
+      }
+      if (tileAt(target, portal.spawnX, portal.spawnY) === TILE.PORTAL) {
+        throw new Error(
+          `map ${map.id}: portal arrives on the portal at ${portal.spawnX},${portal.spawnY} ` +
+            `on ${target.id}; the player would bounce straight back`,
+        );
+      }
+    }
+  }
+
   return maps;
 }

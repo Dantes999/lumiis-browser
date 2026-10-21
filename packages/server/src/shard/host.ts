@@ -14,7 +14,10 @@ export type JoinedPlayer = {
   id: number;
   characterId: number;
   name: string;
+  /** Map id, for the client. */
   map: string;
+  /** World key (map id, or map#zone when the map is split). */
+  world: string;
 };
 
 export type InventoryUpdate = {
@@ -25,7 +28,7 @@ export type InventoryUpdate = {
 
 export type HostNotice = { playerId: number; text: string };
 
-export type RewardEvent = { map: string; reward: RewardBroadcast };
+export type RewardEvent = { worldId: string; reward: RewardBroadcast };
 
 /** How busy one game thread is; the local host reports none (see index.ts). */
 export type ShardStat = { players: number; tickMs: number; tickMsMax: number };
@@ -51,8 +54,8 @@ export interface GameHost {
 
   worldIdOf(playerId: number): string | null;
 
-  /** The current tick of one map, for the welcome message. */
-  tickOf(map: string): number;
+  /** The current tick of one world, for the welcome message. */
+  tickOf(world: string): number;
 
   setInput(playerId: number, dx: number, dy: number): void;
   attack(playerId: number, targetId: number | null, direction: number | null): void;
@@ -110,8 +113,15 @@ export class LocalHost implements GameHost {
     const player = this.realm.join({ ...request.seed, map: request.map });
     if (player === null) return null;
 
+    const joined = this.realm.worldOf(player.id);
     this.characters.set(player.id, request.characterId);
-    return { id: player.id, characterId: request.characterId, name: player.name, map: request.map };
+    return {
+      id: player.id,
+      characterId: request.characterId,
+      name: player.name,
+      map: joined?.map.id ?? request.map,
+      world: joined?.key ?? request.map,
+    };
   }
 
   leave(playerId: number): void {
@@ -124,8 +134,8 @@ export class LocalHost implements GameHost {
     return this.realm.worldIdOf(playerId);
   }
 
-  tickOf(map: string): number {
-    return this.realm.worldOfMap(map)?.tick ?? 0;
+  tickOf(world: string): number {
+    return this.realm.world(world)?.tick ?? 0;
   }
 
   setInput(playerId: number, dx: number, dy: number): void {

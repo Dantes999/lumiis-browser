@@ -1,9 +1,15 @@
-// The realm: one world per map, and the players moving between them.
-//
-// A player id and a character stay the same for a whole session; only the
-// world that holds the player changes when he walks through a portal.
+// The realm: one world per map (or per zone of a split map), and the players
+// moving between them. A player id and a character stay the same for a whole
+// session; only the world that holds the player changes at a portal.
 
-import { encode, type MapData } from '@lumiis/shared';
+import {
+  spawnPosition,
+  worldKeyAt,
+  worldKeyOf,
+  zonesOf,
+  type MapData,
+  type MapZone,
+} from '@lumiis/shared';
 import type {
   AttackResult,
   Player,
@@ -19,15 +25,28 @@ import { World as WorldClass } from './world.js';
 export type JoinSeed = PlayerSeed & { map: string };
 
 export class Realm {
+  /** Worlds by key: the map id, or map#zone for a split map. */
   private readonly worlds = new Map<string, World>();
+  private readonly maps = new Map<string, MapData>();
   private readonly worldIdByPlayer = new Map<number, string>();
-  /** Warps to a map this realm does not own; the shard host forwards them. */
+  /** Warps into a world this realm does not own; the shard host forwards them. */
   private readonly outgoingWarps: Warp[] = [];
-  /** Player ids must be unique across maps; the gateway looks players up by id. */
+  /** Player ids must be unique across worlds; the gateway looks players up by id. */
   private nextPlayerId = 1;
 
-  constructor(maps: MapData[]) {
-    for (const map of maps) this.worlds.set(map.id, new WorldClass(map));
+  /**
+   * Builds the worlds of the given maps. With `only` set, a split map is only
+   * built for the zones in that set, so a shard worker can own single zones.
+   */
+  constructor(maps: MapData[], only: ReadonlySet<string> | null = null) {
+    for (const map of maps) {
+      this.maps.set(map.id, map);
+      for (const zone of zonesOf(map)) {
+        const key = worldKeyOf(map, zone);
+        if (only !== null && !only.has(key)) continue;
+        this.worlds.set(key, new WorldClass(map, map.zones === undefined ? null : zone));
+      }
+    }
   }
 
   /** Players in the world, across every map. */
@@ -38,7 +57,18 @@ export class Realm {
   }
 
   get mapIds(): string[] {
+    return [...this.maps.keys()];
+  }
+
+  /** The world keys this realm owns (one per map, or per zone). */
+  worldKeys(): string[] {
     return [...this.worlds.keys()];
+  }
+
+  /** The world key at a pixel position on a map. */
+  keyAt(mapId: string, x: number, y: number): string | null {
+    const map = this.maps.get(mapId);
+    return map === undefined ? null : worldKeyAt(map, x, y);
   }
 
   /** The first map; used for logging and by tests. */
@@ -56,18 +86,40 @@ export class Realm {
     return this.worldIdByPlayer.get(playerId) ?? null;
   }
 
-  /** The world of one map, by map id. */
+  /** One world by its key. */
+  world(key: string): World | null {
+    return this.worlds.get(key) ?? null;
+  }
+
+  /** The first world of a map, by map id. */
   worldOfMap(map: string): World | null {
-    return this.worlds.get(map) ?? null;
+    for (const world of this.worlds.values()) {
+      if (world.map.id === map) return world;
+    }
+    return null;
   }
 
   join(seed: JoinSeed, id?: number): Player | null {
-    const world = this.worlds.get(seed.map) ?? this.worlds.values().next().value;
+    // A deleted map must not lock the character out: use the first map.
+    const map = this.maps.get(seed.map) ?? this.maps.values().next().value;
+    if (map === undefined) return null;
+
+    const spawn = spawnPosition(map);
+    const key = worldKeyAt(map, seed.x ?? spawn.x, seed.y ?? spawn.y);
+    const world = this.worlds.get(key) ?? this.worldOfMap(seed.map);
+    if (world === null) return null;
+
+    return this.joinIn(world.key, seed, id);
+  }
+
+  /** Adds a player to one named world (the shard host resolved the zone). */
+  joinIn(worldKey: string, seed: PlayerSeed, id?: number): Player | null {
+    const world = this.worlds.get(worldKey);
     if (world === undefined) return null;
 
     const player = world.addPlayer(seed, id ?? this.nextPlayerId);
     this.nextPlayerId = Math.max(this.nextPlayerId, player.id + 1);
-    this.worldIdByPlayer.set(player.id, world.map.id);
+    this.worldIdByPlayer.set(player.id, world.key);
     return player;
   }
 
@@ -81,6 +133,38 @@ export class Realm {
     for (const world of this.worlds.values()) {
       world.step();
       for (const warp of world.drainWarps()) this.transfer(warp);
+    }
+    this.keepPlayersInZone();
+  }
+
+  /**
+   * A player can only reach another zone through a portal, so this should never
+   * fire. If it does (a broken map, a push), put him back on solid ground.
+   */
+  private keepPlayersInZone(): void {
+    for (const world of this.worlds.values()) {
+      for (const player of world.playersOutsideZone()) {
+        const key = this.keyAt(world.map.id, player.x, player.y);
+        const target = key === null ? undefined : this.worlds.get(key);
+
+        if (target === undefined || target === world) {
+          const spawn = spawnPosition(world.map);
+          const detached = world.detachPlayer(player.id);
+          if (detached === undefined) continue;
+          detached.x = spawn.x;
+          detached.y = spawn.y;
+          detached.moving = false;
+          world.attachPlayer(detached);
+          this.worldIdByPlayer.set(detached.id, world.key);
+          continue;
+        }
+
+        const detached = world.detachPlayer(player.id);
+        if (detached === undefined) continue;
+        detached.moving = false;
+        target.attachPlayer(detached);
+        this.worldIdByPlayer.set(detached.id, target.key);
+      }
     }
   }
 
@@ -163,10 +247,10 @@ export class Realm {
   }
 
   /** Kill rewards from this tick, tagged with the map they happened on. */
-  drainRewards(): Array<{ map: string; reward: RewardBroadcast }> {
-    const list: Array<{ map: string; reward: RewardBroadcast }> = [];
+  drainRewards(): Array<{ worldId: string; reward: RewardBroadcast }> {
+    const list: Array<{ worldId: string; reward: RewardBroadcast }> = [];
     for (const world of this.worlds.values()) {
-      for (const reward of world.drainRewards()) list.push({ map: world.map.id, reward });
+      for (const reward of world.drainRewards()) list.push({ worldId: world.key, reward });
     }
     return list;
   }
@@ -195,11 +279,14 @@ export class Realm {
 
   private transfer(warp: Warp): void {
     const from = this.worldOf(warp.playerId);
-    const to = this.worlds.get(warp.to);
     if (from === null) return;
+
+    const key = this.keyAt(warp.to, warp.x, warp.y);
+    const to = key === null ? undefined : this.worlds.get(key);
+
     if (to === undefined) {
-      // The map belongs to another shard: hand the player over.
-      this.outgoingWarps.push(warp);
+      // The target zone belongs to another shard: hand the player over.
+      this.outgoingWarps.push({ ...warp, world: key ?? warp.to });
       return;
     }
 
@@ -210,6 +297,6 @@ export class Realm {
     player.y = warp.y;
     player.moving = false;
     to.attachPlayer(player);
-    this.worldIdByPlayer.set(player.id, to.map.id);
+    this.worldIdByPlayer.set(player.id, to.key);
   }
 }

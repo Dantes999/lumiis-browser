@@ -245,15 +245,20 @@ Standard: **ein Prozess**, alle Karten (`LocalHost`). Mit
 SHARDS=2 npm start        # 2–8 Worker-Threads
 ```
 
-verteilt der Hauptprozess die Karten reihum auf Worker-Threads (`WorkerHost`):
+verteilt der Hauptprozess die **Welten** reihum auf Worker-Threads
+(`WorkerHost`). Eine Welt ist eine Karte — oder bei einer geteilten Karte eine
+**Zone** (siehe 7c):
 
 - **Hauptprozess**: Sockets, Login, Accounts, **Datenbank**, Session-Tokens.
-- **Ein Worker je Kartengruppe**: eigene `Realm`, eigener 20-Hz-Tick.
-- Spieler-Absichten (`in`, `atk`, `sk`, …) werden an den Worker der Karte
-  geschickt; Snapshots, Hinweise, Belohnungen und Speicherstände kommen zurück.
-- **Portal in eine andere Karte**: der Worker schickt eine Übergabe samt
-  Spielstand; der Hauptprozess reicht sie an den Ziel-Worker weiter. Die
-  **Spieler-ID bleibt gleich**, der Client merkt nur den Kartenwechsel.
+- **Ein Worker je Gruppe von Welten**: eigene `Realm`, eigener 20-Hz-Tick.
+- Beim Start loggt jeder Worker, was er hat, z. B.
+  `[shard 0] owns testmap, zoned#west`.
+- Spieler-Absichten (`in`, `atk`, `sk`, …) gehen an den Worker der Welt;
+  Snapshots, Hinweise, Belohnungen und Speicherstände kommen zurück.
+- **Portal in eine andere Welt** (andere Karte oder andere Zone): der Worker
+  schickt eine Übergabe samt Spielstand; der Hauptprozess reicht sie an den
+  Ziel-Worker weiter. Die **Spieler-ID bleibt gleich**, der Client merkt nur den
+  Wechsel (bei einer Zone bleibt sogar die Karte dieselbe).
 - **Spieler-IDs** vergibt der Hauptprozess (global eindeutig); jede `World`
   übernimmt die ID beim `addPlayer`.
 - **Speichern**: die Worker schicken Spielstände, der Hauptprozess schreibt sie
@@ -265,6 +270,56 @@ auch, wie du die Bots selbst startest (`tools/seed-bots.mjs`, `tools/bots.mjs`).
 **Wann sinnvoll?** Erst wenn eine Karte bzw. ein Kern an die Grenze kommt. Jeder
 Worker hat eigene Timer; mehr Shards heißt mehr Kontextwechsel, aber parallele
 Ticks. Die Karten-Zuteilung ist fest (reihum), nicht dynamisch.
+
+## 7c. Zonen: eine Karte auf mehreren Threads
+
+Eine große Karte lässt sich in **Zonen** teilen; jede Zone läuft als eigene
+`World` in einem Worker. Im Karten-JSON (`packages/shared/maps/<id>.json`):
+
+```json
+"zones": [
+  { "id": "west", "x0": 0,  "y0": 0, "x1": 39, "y1": 47 },
+  { "id": "east", "x0": 56, "y0": 0, "x1": 95, "y1": 47 }
+]
+```
+
+Kachel-Koordinaten, beide Grenzen eingeschlossen. Ohne `zones` ist die Karte
+eine einzige Welt (so wie bisher).
+
+**Die Regeln prüft der Server beim Laden** (`validateMap`, `loadMaps`):
+
+1. **Jede begehbare Kachel liegt in genau einer Zone.** Lücken und Überlappungen
+   sind Fehler — sonst fiele ein Spieler in eine Welt, die es nicht gibt.
+2. **Zwei Zonen müssen mindestens 16 Kacheln (512 px) auseinanderliegen.**
+   Ein Spieler sieht bis zu 511 px weit (3×3 Zellen à 256 px); steht begehbares
+   Land dichter beieinander, würde er über die Grenze sehen und Dinge würden
+   verschwinden. Das Felsband dazwischen ist nicht begehbar und darf in keiner
+   Zone liegen.
+3. **Übergänge sind Portale**, keine begehbaren Grenzen. Ein Portal darf **nicht
+   auf einem anderen Portal landen** (sonst schleudert es den Spieler sofort
+   zurück); der Start prüft das.
+
+**Im Spiel** bleibt die Karte dieselbe (`map.id` ändert sich nicht), nur die
+Welt wechselt: `testmap` → `zoned` ist ein Kartenwechsel, `zoned#west` →
+`zoned#east` ist ein Zonenwechsel. Der Client lädt die Karte nicht neu; der
+erste Snapshot der neuen Welt ist ein Vollbild.
+
+**Wo im Code**
+
+| Datei | Aufgabe |
+|---|---|
+| `shared/src/map.ts` | `MapZone`, `zonesOf`, `zoneAtTile`, `worldKeyAt`, Regeln 1–2 |
+| `server/src/game/map.ts` | Regel 3, Portale müssen in einer Zone landen |
+| `server/src/game/world.ts` | `new World(map, zone)`: spannt nur die Monster der Zone |
+| `server/src/game/realm.ts` | Welten je Zone, `join` nach Position, Übergabe |
+| `server/src/shard/worker-host.ts` | verteilt Welten (`map#zone`) auf Worker |
+
+**Demo:** `zoned` (96×48) hat zwei Bezirke (West/Ost), getrennt durch ein 16
+Kacheln breites Felsband, mit einem Tor bei (39,24) und (56,24). Erreichbar von
+`testmap` über das Portal bei (30,36). Mit `SHARDS=2` liegen die beiden Zonen
+auf verschiedenen Workern — der Wechsel ist dann eine echte Übergabe.
+
+**Test:** `packages/server/tests/zones.test.ts`.
 
 ## 7a. Last beobachten: `/status`
 

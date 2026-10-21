@@ -20,7 +20,7 @@ type MoveEntry = [number, number, number, number, number, number];
 
 type Snapshot = {
   full?: boolean;
-  players: Array<{ id: number; name: string; x: number; y: number }>;
+  players: Array<{ id: number; name: string; x: number; y: number; exp: number }>;
   monsters: Array<{ id: number; key: string }>;
   ground: Array<{ id: number }>;
   move?: { players: MoveEntry[]; monsters: MoveEntry[] };

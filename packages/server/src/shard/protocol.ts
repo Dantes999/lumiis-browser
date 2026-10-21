@@ -8,7 +8,12 @@ import type { Equipment, InventorySlot, MapData, SkillKey } from '@lumiis/shared
 import type { CharacterSave } from '../store/db.js';
 import type { PlayerSeed, RewardBroadcast } from '../game/world.js';
 
-export type WorkerInit = { maps: MapData[] };
+export type WorkerInit = {
+  /** Maps this worker needs (one shared map can appear in several workers). */
+  maps: MapData[];
+  /** World keys it owns: a map id, or map#zone for a split map. */
+  keys: string[];
+};
 
 export type ToWorker =
   | {
@@ -16,7 +21,8 @@ export type ToWorker =
       playerId: number;
       characterId: number;
       name: string;
-      map: string;
+      /** Target world key; the host picked the worker that runs it. */
+      world: string;
       seed: PlayerSeed;
     }
   | { t: 'leave'; playerId: number }
@@ -33,7 +39,7 @@ export type FromWorker =
   | {
       t: 'joined';
       playerId: number;
-      map: string;
+      world: string;
       tick: number;
       slots: InventorySlot[];
       equipment: Equipment;
@@ -42,7 +48,7 @@ export type FromWorker =
   | { t: 'snapshots'; ticks: Array<[string, number]>; entries: Array<[number, Uint8Array]> }
   | { t: 'notice'; playerId: number; text: string }
   | { t: 'inventory'; playerId: number; slots: InventorySlot[]; equipment: Equipment }
-  | { t: 'reward'; map: string; reward: RewardBroadcast }
+  | { t: 'reward'; worldId: string; reward: RewardBroadcast }
   | { t: 'save'; characterId: number; save: CharacterSave }
   | {
       t: 'transfer';
