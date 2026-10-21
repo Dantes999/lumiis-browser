@@ -1,7 +1,17 @@
 // WebSocket client. Its only jobs are: keep the socket alive, translate frames
 // into state, and never invent game facts.
 
-import { decode, encode, isItemKey, swingFor, swingMs } from '@lumiis/shared';
+import {
+  decode,
+  encode,
+  isItemKey,
+  MOVE_ATTACKING,
+  MOVE_DEAD,
+  MOVE_MOVING,
+  MOVE_WHIRLWIND,
+  swingFor,
+  swingMs,
+} from '@lumiis/shared';
 import type {
   ClientMessage,
   GroundItemSnapshot,
@@ -9,16 +19,15 @@ import type {
   PlayerSnapshot,
   ServerMessage,
   SkillKey,
+  SnapshotMessage,
 } from '@lumiis/shared';
 import { logEvent } from './log';
 import { applyServerPosition } from './sim';
 import { view } from './state';
 
 /** When the swing of another player is over, judged by the weapon they hold. */
-const swingEnd = (player: PlayerSnapshot): number => {
-  const weapon = isItemKey(player.weapon) ? player.weapon : null;
-  return performance.now() + swingMs(swingFor(weapon));
-};
+const swingEndFor = (weapon: string | null | undefined): number =>
+  performance.now() + swingMs(swingFor(isItemKey(weapon) ? weapon : null));
 
 /** One kill: where it happened and who earned what. */
 export type RewardMessage = {
@@ -331,7 +340,7 @@ export class Connection {
       case 'snapshot':
         view.tick = message.tick;
         view.mapId = message.map;
-        this.applySnapshot(message.players, message.monsters, message.ground);
+        this.applySnapshot(message);
         break;
       case 'inventory':
         view.inventory = message.slots;
@@ -391,14 +400,15 @@ export class Connection {
    * The server is always right. We keep our predicted position for rendering and
    * fade the difference out, so a correction looks like a slide, not a jump.
    */
-  private applySnapshot(
-    players: PlayerSnapshot[],
-    monsters: MonsterSnapshot[],
-    ground: GroundItemSnapshot[],
-  ): void {
-    const seen = new Set<number>();
+  private applySnapshot(message: SnapshotMessage): void {
+    // A full snapshot is the truth for the whole view: start from scratch.
+    if (message.full === true) {
+      view.others.clear();
+      view.monsters.clear();
+      view.ground.clear();
+    }
 
-    for (const player of players) {
+    for (const player of message.players) {
       if (player.id === view.selfId) {
         view.self.name = player.name;
         applyServerPosition(player.x, player.y);
@@ -411,7 +421,6 @@ export class Connection {
         continue;
       }
 
-      seen.add(player.id);
       const existing = view.others.get(player.id);
       if (existing === undefined) {
         view.others.set(player.id, {
@@ -425,7 +434,7 @@ export class Connection {
           maxHp: player.maxHp,
           weapon: player.weapon,
           armor: player.armor,
-          attackUntil: player.attacking === true ? swingEnd(player) : 0,
+          attackUntil: player.attacking === true ? swingEndFor(player.weapon) : 0,
           whirlwindUntil: player.whirlwind === true ? performance.now() + 600 : 0,
           buffs: player.buffs ?? {},
           renderX: player.x,
@@ -441,21 +450,14 @@ export class Connection {
         existing.maxHp = player.maxHp;
         existing.weapon = player.weapon;
         existing.armor = player.armor;
-        if (player.attacking === true) existing.attackUntil = swingEnd(player);
+        if (player.attacking === true) existing.attackUntil = swingEndFor(player.weapon);
         if (player.whirlwind === true) existing.whirlwindUntil = performance.now() + 600;
         existing.buffs = player.buffs ?? {};
       }
     }
 
-    for (const id of [...view.others.keys()]) {
-      if (!seen.has(id)) view.others.delete(id);
-    }
-
-    const seenMonsters = new Set<number>();
-    for (const monster of monsters) {
-      seenMonsters.add(monster.id);
+    for (const monster of message.monsters) {
       const existing = view.monsters.get(monster.id);
-
       if (existing === undefined) {
         view.monsters.set(monster.id, {
           id: monster.id,
@@ -481,13 +483,7 @@ export class Connection {
       }
     }
 
-    for (const id of [...view.monsters.keys()]) {
-      if (!seenMonsters.has(id)) view.monsters.delete(id);
-    }
-
-    const seenGround = new Set<number>();
-    for (const item of ground) {
-      seenGround.add(item.id);
+    for (const item of message.ground) {
       const existing = view.ground.get(item.id);
       if (existing === undefined) {
         view.ground.set(item.id, { id: item.id, key: item.key, x: item.x, y: item.y, count: item.count });
@@ -498,8 +494,43 @@ export class Connection {
       }
     }
 
-    for (const id of [...view.ground.keys()]) {
-      if (!seenGround.has(id)) view.ground.delete(id);
+    // Everything below is only for entities the client already knows.
+    if (message.move !== undefined) {
+      for (const [id, x, y, dir, flags, hp] of message.move.players) {
+        // The own entry is a move tuple too; the server position wins.
+        if (id === view.selfId) {
+          applyServerPosition(x, y);
+          view.self.hp = hp;
+          continue;
+        }
+
+        const existing = view.others.get(id);
+        if (existing === undefined) continue;
+        existing.x = x;
+        existing.y = y;
+        existing.dir = dir as typeof view.self.dir;
+        existing.moving = (flags & MOVE_MOVING) !== 0;
+        existing.hp = hp;
+        if ((flags & MOVE_ATTACKING) !== 0) existing.attackUntil = swingEndFor(existing.weapon);
+        if ((flags & MOVE_WHIRLWIND) !== 0) existing.whirlwindUntil = performance.now() + 600;
+      }
+
+      for (const [id, x, y, dir, flags, hp] of message.move.monsters) {
+        const existing = view.monsters.get(id);
+        if (existing === undefined) continue;
+        existing.x = x;
+        existing.y = y;
+        existing.dir = dir as typeof view.self.dir;
+        existing.hp = hp;
+        existing.moving = (flags & MOVE_MOVING) !== 0;
+        existing.dead = (flags & MOVE_DEAD) !== 0;
+      }
+    }
+
+    if (message.gone !== undefined) {
+      for (const id of message.gone.players) view.others.delete(id);
+      for (const id of message.gone.monsters) view.monsters.delete(id);
+      for (const id of message.gone.ground) view.ground.delete(id);
     }
   }
 }

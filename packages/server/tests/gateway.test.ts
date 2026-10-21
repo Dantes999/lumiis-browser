@@ -121,13 +121,22 @@ describe('gateway', () => {
 
     const welcome = (await enterAs(socket)) as { id: number };
 
+    // Snapshots are deltas: the own position is in the full list on arrival and
+    // afterwards in the compact move tuples.
     const ownPosition = async (): Promise<number | null> => {
       for (let attempt = 0; attempt < 20; attempt += 1) {
         const message = (await nextMessage(socket)) as Record<string, unknown>;
         if (message['t'] !== 'snapshot') continue;
-        const players = message['players'] as Array<{ id: number; x: number }>;
+
+        const players = (message['players'] ?? []) as Array<{ id: number; x: number }>;
         const me = players.find((player) => player.id === welcome.id);
         if (me !== undefined) return me.x;
+
+        const move = message['move'] as
+          | { players?: Array<[number, number, number]> }
+          | undefined;
+        const moved = move?.players?.find((entry) => entry[0] === welcome.id);
+        if (moved !== undefined) return moved[1];
       }
       return null;
     };

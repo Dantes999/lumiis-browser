@@ -15,6 +15,18 @@ import { INVENTORY_SLOTS } from './items.js';
 import { isDirection } from './movement.js';
 import { isSkillKey, type SkillKey } from './skills.js';
 
+/**
+ * One compact update for an entity the client already knows.
+ * `[id, x, y, dir, flags, hp]` — flags are the MOVE_* bits below.
+ */
+export type MoveEntry = [number, number, number, number, number, number];
+
+/** Bit flags inside a MoveEntry. */
+export const MOVE_MOVING = 1;
+export const MOVE_ATTACKING = 2;
+export const MOVE_WHIRLWIND = 4;
+export const MOVE_DEAD = 8;
+
 export type PlayerSnapshot = {
   id: number;
   name: string;
@@ -58,6 +70,28 @@ export type GroundItemSnapshot = {
   count: number;
 };
 
+/**
+ * The server sends the whole view on arrival (`full: true`), afterwards only
+ * what changed: new or restyled entities as full entries, movement as compact
+ * tuples, and the ids that left. Everything else stays as it was on the client.
+ */
+export type SnapshotMessage = {
+  t: 'snapshot';
+  tick: number;
+  /** Map this snapshot belongs to. */
+  map: string;
+  /** The lists are the whole view; the client drops everything first. */
+  full?: boolean;
+  /** Full entries: new entities (and the player himself, every time). */
+  players: PlayerSnapshot[];
+  monsters: MonsterSnapshot[];
+  ground: GroundItemSnapshot[];
+  /** Known entities that moved, turned, fought or lost health. */
+  move?: { players: MoveEntry[]; monsters: MoveEntry[] };
+  /** Ids that left the view. */
+  gone?: { players: number[]; monsters: number[]; ground: number[] };
+};
+
 /** Messages the client may send. */
 export type ClientMessage =
   | { t: 'login'; name: string; password: string; mode: 'login' | 'register' }
@@ -85,15 +119,7 @@ export type ServerMessage =
       /** Map the player is standing on. */
       map: string;
     }
-  | {
-      t: 'snapshot';
-      tick: number;
-      /** Map this snapshot belongs to. */
-      map: string;
-      players: PlayerSnapshot[];
-      monsters: MonsterSnapshot[];
-      ground: GroundItemSnapshot[];
-    }
+  | SnapshotMessage
   | { t: 'inventory'; slots: (InventorySlot | null)[]; equipment: Equipment }
   | { t: 'characters'; list: CharacterSummary[]; max: number; token?: string }
   | { t: 'authError'; reason: string }

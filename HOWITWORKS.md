@@ -219,6 +219,22 @@ Der Code dafür: `packages/server/src/store/db.ts` (`Store`, `loadCharacter`,
 Socket, kein Hashen großer Strings. Im Shard-Betrieb wandern diese Puffer als
 `Uint8Array` durch `postMessage` (gleiche Puffer bleiben geteilt).
 
+**Delta:** Der erste Snapshot einer Zelle ist das ganze Bild (`full: true`).
+Danach kommt nur, was sich geändert hat:
+
+| Feld | Inhalt |
+|---|---|
+| `players`, `monsters`, `ground` | **volle** Einträge — nur für neue oder veränderte Wesen |
+| `move.players`, `move.monsters` | `[id, x, y, dir, flags, hp]` — Bewegung, Blickrichtung, TP |
+| `gone.*` | IDs, die den Blick verlassen haben (oder aufgesammelt wurden) |
+
+`flags` in `move`: 1 läuft, 2 schlägt gerade, 4 Wirbelwind, 8 tot. Der eigene
+Eintrag ist kein Sonderfall — er kommt als voller Eintrag, wenn sich EXP, Yang,
+Level, max. TP oder Buffs ändern, sonst als Move-Tupel. Eine Zelle, in der sich
+nichts tut, sendet **gar nichts**. Der Client wendet die Deltas in
+`packages/client/src/net.ts` (`applySnapshot`) an; `full` löscht vorher alles.
+Tests: `packages/server/tests/snapshot-delta.test.ts`.
+
 ---
 
 ## 7b. Mehrere Prozesse (Shards)

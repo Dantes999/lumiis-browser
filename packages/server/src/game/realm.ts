@@ -92,7 +92,7 @@ export class Realm {
     const encoded = new Map<number, Uint8Array>();
 
     for (const world of this.worlds.values()) {
-      for (const [playerId, payload] of world.cellSnapshots()) encoded.set(playerId, payload);
+      for (const [playerId, payload] of world.snapshots()) encoded.set(playerId, payload);
     }
 
     return encoded;

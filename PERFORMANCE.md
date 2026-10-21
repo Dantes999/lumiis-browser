@@ -27,18 +27,36 @@ den Tick je Thread (`main` = Hauptprozess, `shards` = je Worker). Am Ende steht
 
 | | 1 Prozess | 2 Shards (je Worker) | Hauptprozess |
 |---|---|---|---|
-| Tick | 16 ms | 4,5 / 0,8 ms | 6,3 ms |
-| Spitze | 58 ms | 11 / 1,6 ms | 23 ms |
-| CPU (ganzer Prozess) | ~183 % | ~200 % | – |
+| Tick | 16 ms | 8,6 / 1,3 ms | 7,1 ms |
+| Spitze | 58 ms | 19 / 3 ms | 26 ms |
+| Verkehr | 18–55 MB/s | **3,8 MB/s** | – |
+| Snapshot im Schnitt | 5,7–11 KB | **1,2 KB** | – |
+| CPU (ganzer Prozess) | ~183 % | ~213 % | – |
 
-Mit Shards sinkt der **Spiel-Tick** deutlich (16 → 4,5 ms). Der Hauptprozess
-bleibt bei rund 6 ms; er trägt nur noch Sockets und Weiterleitung.
+Die Bytes sind durch die **Delta-Snapshots** um das 5–9-fache gefallen: nur noch
+Neuigkeiten, Bewegung und Abgänge statt aller Spieler mit Namen, Level, EXP und
+Yang. Eine Zelle, in der sich nichts tut, schickt **gar nichts**.
 
 **Grenze:** Mehr Shards als Karten bringen nichts — bei zwei Karten sind zwei
 Shards das Maximum, `SHARDS=4` ergibt dasselbe. Und eine einzelne **volle**
 Karte lässt sich so nicht teilen: alle Spieler dieser Karte liegen in einem
 Worker. In der Praxis verteilen sich Spieler über 26 Karten, deshalb hilft es
 dort.
+
+## Delta-Snapshots (der größte Byte-Hebel)
+
+Vorher: jede Zelle bekam 10×/s die vollständige Liste aller sichtbaren Spieler.
+Jetzt (je Zelle einmal gebaut, von allen dort geteilt):
+
+- **erster Snapshot** einer Zelle und jedes Mal, wenn jemand neu hineinläuft:
+  das ganze Bild (`full: true`)
+- danach **nur Änderungen**: neue oder veränderte Wesen als voller Eintrag,
+  Bewegung als kurzes Tupel `[id, x, y, dir, flags, hp]`, Abgänge als IDs
+- der eigene Eintrag ist ein normaler Eintrag: er kommt, wenn sich EXP, Yang,
+  Level, TP oder Buffs ändern
+
+Der Worker-Tick blieb dabei bei 8,6 ms, obwohl die Kodierung aufwendiger ist —
+weil sie **einmal je Zelle** läuft, nicht je Spieler.
 
 ## Hauptprozess entlastet — was gemessen wurde
 
