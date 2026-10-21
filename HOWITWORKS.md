@@ -233,14 +233,35 @@ auseinanderhalten:
 [ws] closed test code=1006 reason=-
 ```
 
-Serverseitig schreibt jedes Verbindungs-Ereignis eine Zeile ins Terminal:
+Serverseitig schreibt jedes Verbindungs-Ereignis eine Zeile ins Terminal — mit
+Dauer und Nachrichtenzahl, damit man sieht, wie weit eine Verbindung kam:
 
 ```
-[ws] open from 127.0.0.1
-[ws] closed test code=1006 reason=-
+[ws] open from 192.168.1.20
+[ws] closed test @ 192.168.1.20 after 42.3s / 211 messages, code=1006 reason=-
+[ws] socket error for test @ 192.168.1.20: read ECONNRESET
+[ws] heartbeat missed for test @ 192.168.1.20 (31s), terminating
 [ws] refused code=1008 reason=rate limit
 [ws] handler failed for "attack": ...
 ```
+
+Die **Schließ-Codes** sagen die Ursache:
+
+| Code | Bedeutung |
+|---|---|
+| 1006 | Verbindung ohne Abschied abgerissen (Netz, WLAN, Proxy) |
+| 1001 | Gegenstelle geht weg (Server-Neustart, Seite zu) |
+| 1002 | Protokollfehler (ungültige Nachricht) |
+| 1008 | Ratenlimit oder Richtlinie |
+| 4000 | Derselbe Charakter auf einer anderen Verbindung |
+| 1009 | Nachricht zu groß |
+
+**Wichtig bei zwei PCs:** Der Client verbindet sich immer mit `<host>/ws`. Läuft
+er über den **Vite-Entwicklungsserver (Port 5173)**, geht die Verbindung durch
+Vite's Proxy — der ist bei Dauer-WebSockets unzuverlässig. Für einen zweiten PC
+**den gebauten Client auf Port 3000** nehmen (`npm run build`, dann
+`http://<IP>:3000`), dann spricht er direkt mit dem Spielserver. Im Log steht
+die verwendete Adresse in der Zeile `connecting to ws://…`.
 
 Hinweis: Zeilen, die **vor** dem Verbindungsaufbau entstehen (z. B.
 `client started`) oder **während** des Schließens (`connection closed`), kommen

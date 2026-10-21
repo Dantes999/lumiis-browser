@@ -41,6 +41,10 @@ export class Connection {
   private lastMessageAt = 0;
   /** The character played before a drop, so a reconnect can walk straight in. */
   private lastCharacterId: number | null = null;
+  /** When the socket opened, to report how long a connection lasted. */
+  private connectedAt = 0;
+  /** Throttles the high-ping warning so a bad line does not flood the log. */
+  private lastHighPingLog = 0;
 
   private get url(): string {
     const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -61,6 +65,7 @@ export class Connection {
     socket.addEventListener('open', () => {
       this.reconnectDelayMs = 1000;
       this.lastMessageAt = performance.now();
+      this.connectedAt = performance.now();
       logEvent('info', 'connected, logging in');
       this.sendLogin();
       this.startPinging();
@@ -81,6 +86,9 @@ export class Connection {
       view.ground.clear();
       this.socket = null;
 
+      const lasted = this.connectedAt === 0 ? '?' : ((performance.now() - this.connectedAt) / 1000).toFixed(1);
+      this.connectedAt = 0;
+
       if (event.code === SIGNED_IN_ELSEWHERE) {
         // Another session took this character. Jumping straight back in would
         // make the two kick each other forever, so stop auto-selecting and just
@@ -88,11 +96,11 @@ export class Connection {
         this.lastCharacterId = null;
         view.notice = 'Signed in elsewhere';
         view.noticeUntil = performance.now() + 5000;
-        logEvent('warn', 'character is in use by another session; pick it again to take it back');
+        logEvent('warn', `character in use elsewhere after ${lasted}s; pick it again to take it back`);
       } else {
         logEvent(
           'warn',
-          `connection closed (code ${event.code}${event.reason ? `: ${event.reason}` : ''})`,
+          `connection closed after ${lasted}s (code ${event.code}${event.reason ? `: ${event.reason}` : ''})`,
         );
       }
 
@@ -199,7 +207,11 @@ export class Connection {
     if (view.selfId === null) return;
     if (performance.now() - this.lastMessageAt < STALL_MS) return;
 
-    logEvent('warn', `no traffic for ${Math.round(STALL_MS / 1000)}s, dropping the connection`);
+    const silent = ((performance.now() - this.lastMessageAt) / 1000).toFixed(1);
+    logEvent(
+      'warn',
+      `no traffic for ${silent}s (last ping ${view.pingMs ?? '?'}ms), dropping the connection`,
+    );
     const socket = this.socket;
     this.socket = null;
     this.stopPinging();
@@ -258,9 +270,15 @@ export class Connection {
         view.inventory = message.slots;
         view.equipment = message.equipment;
         break;
-      case 'pong':
-        view.pingMs = Math.max(0, Math.round(performance.now() - message.at));
+      case 'pong': {
+        const ping = Math.max(0, Math.round(performance.now() - message.at));
+        view.pingMs = ping;
+        if (ping > 2000 && performance.now() - this.lastHighPingLog > 10000) {
+          this.lastHighPingLog = performance.now();
+          logEvent('warn', `high ping: ${ping}ms`);
+        }
         break;
+      }
       case 'notice':
         view.notice = message.text;
         view.noticeUntil = performance.now() + 3000;

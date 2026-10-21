@@ -61,6 +61,9 @@ export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store
 
   const sessions = new Set<Session>();
 
+  /** How often a dead connection is looked for with a websocket ping. */
+  const HEARTBEAT_MS = 30000;
+
   /** One line per connection event, so a dropped client leaves a trace. */
   const note = (text: string): void => {
     console.log(`[ws] ${text}`);
@@ -229,6 +232,7 @@ export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store
 
   wss.on('connection', (socket, request) => {
     const address = request.socket.remoteAddress ?? 'unknown';
+    const openedAt = Date.now();
     note(`open from ${address}`);
 
     const session: Session = {
@@ -242,7 +246,30 @@ export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store
     };
     sessions.add(session);
 
+    /** Messages seen on this socket, so a drop can say how far it got. */
+    let messageCount = 0;
+    /** Answers the heartbeat ping; a missed pong means the peer is gone. */
+    let alive = true;
+    let lastPongAt = Date.now();
+
+    socket.on('pong', () => {
+      alive = true;
+      lastPongAt = Date.now();
+    });
+
+    const heartbeat = setInterval(() => {
+      if (!alive) {
+        const silent = ((Date.now() - lastPongAt) / 1000).toFixed(0);
+        note(`heartbeat missed for ${session.player?.name ?? 'guest'} @ ${address} (${silent}s), terminating`);
+        socket.terminate();
+        return;
+      }
+      alive = false;
+      socket.ping();
+    }, HEARTBEAT_MS);
+
     socket.on('message', (data, isBinary) => {
+      messageCount += 1;
       if (isBinary) {
         refuse(socket, 1003, 'text frames only');
         return;
@@ -371,9 +398,14 @@ export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store
     };
 
     socket.on('close', (code, reason) => {
+      clearInterval(heartbeat);
       sessions.delete(session);
+      const seconds = ((Date.now() - openedAt) / 1000).toFixed(1);
       const who = session.player?.name ?? (session.accountId === null ? 'guest' : 'account');
-      note(`closed ${who} code=${code} reason=${reason.toString() || '-'}`);
+      note(
+        `closed ${who} @ ${address} after ${seconds}s / ${messageCount} messages, ` +
+          `code=${code} reason=${reason.toString() || '-'}`,
+      );
 
       const player = session.player;
       if (player === null) return;
@@ -381,8 +413,12 @@ export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store
       realm.leave(player.id);
     });
 
-    socket.on('error', () => {
-      // A broken socket is not a server problem; close() follows anyway.
+    socket.on('error', (error) => {
+      // This used to be swallowed. A dropped client needs the reason in the log.
+      note(
+        `socket error for ${session.player?.name ?? 'guest'} @ ${address}: ` +
+          `${(error as Error).message}`,
+      );
       socket.terminate();
     });
   });
