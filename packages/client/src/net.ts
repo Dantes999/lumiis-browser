@@ -34,6 +34,11 @@ export const setRewardHandler = (fn: ((reward: RewardMessage) => void) | null): 
   rewardHandler = fn;
 };
 
+/** Where the session token is kept between reloads. */
+const TOKEN_KEY = 'lumiis.token';
+/** The last character played, so a reload walks straight back in. */
+const CHARACTER_KEY = 'lumiis.character';
+
 const PING_INTERVAL_MS = 2000;
 const MAX_RECONNECT_DELAY_MS = 10000;
 /** No message for this long while in the world means the connection is dead. */
@@ -59,6 +64,8 @@ export class Connection {
   private connectedAt = 0;
   /** Throttles the high-ping warning so a bad line does not flood the log. */
   private lastHighPingLog = 0;
+  /** Signed session token, so a reload does not ask for the password again. */
+  private token: string | null = null;
 
   private get url(): string {
     const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -70,6 +77,15 @@ export class Connection {
     view.status = 'connecting';
     view.notice = null;
 
+    try {
+      this.token = window.localStorage.getItem(TOKEN_KEY);
+      const storedCharacter = window.localStorage.getItem(CHARACTER_KEY);
+      this.lastCharacterId = storedCharacter === null ? null : Number(storedCharacter);
+    } catch {
+      this.token = null;
+      this.lastCharacterId = null;
+    }
+
     logEvent('info', `connecting to ${this.url}`);
 
     const socket = new WebSocket(this.url);
@@ -80,8 +96,13 @@ export class Connection {
       this.reconnectDelayMs = 1000;
       this.lastMessageAt = performance.now();
       this.connectedAt = performance.now();
-      logEvent('info', 'connected, logging in');
-      this.sendLogin();
+      if (this.token !== null) {
+        logEvent('info', 'connected, resuming session');
+        this.send({ t: 'resume', token: this.token });
+      } else {
+        logEvent('info', 'connected, logging in');
+        this.sendLogin();
+      }
       this.startPinging();
     });
 
@@ -137,6 +158,11 @@ export class Connection {
 
   selectCharacter(id: number): void {
     this.lastCharacterId = id;
+    try {
+      window.localStorage.setItem(CHARACTER_KEY, String(id));
+    } catch {
+      // Private mode: the choice lasts for this tab only.
+    }
     this.send({ t: 'select', id });
   }
 
@@ -302,11 +328,26 @@ export class Connection {
         break;
       case 'authError':
         logEvent('warn', `auth error: ${message.reason}`);
+        // The stored session is no good: forget it and show the login form.
+        this.token = null;
+        try {
+          window.localStorage.removeItem(TOKEN_KEY);
+        } catch {
+          // Private mode: there was nothing to remove.
+        }
         view.authError = message.reason;
         break;
       case 'characters': {
         view.characters = message.list;
         view.characterMax = message.max;
+        if (message.token !== undefined) {
+          this.token = message.token;
+          try {
+            window.localStorage.setItem(TOKEN_KEY, message.token);
+          } catch {
+            // Private mode: the session lasts for this tab only.
+          }
+        }
         // After a drop, walk straight back into the same character instead of
         // making the player pick again.
         const remembered = this.lastCharacterId;
@@ -332,6 +373,7 @@ export class Connection {
 
     for (const player of players) {
       if (player.id === view.selfId) {
+        view.self.name = player.name;
         applyServerPosition(player.x, player.y);
         view.self.hp = player.hp;
         view.self.maxHp = player.maxHp;

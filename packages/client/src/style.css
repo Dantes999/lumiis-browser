@@ -469,6 +469,10 @@ body.mobile #touch {
 }
 
 .touch-button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   pointer-events: auto;
   width: 74px;
   height: 74px;
@@ -488,6 +492,23 @@ body.mobile #touch {
   font-size: 14px;
   border-color: color-mix(in srgb, #ffb35c 65%, transparent);
   background: color-mix(in srgb, #ffb35c 18%, transparent);
+}
+
+.touch-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 38%;
+  height: 38%;
+  border-radius: 50%;
+  background: color-mix(in srgb, #ffb35c 55%, transparent);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.touch-label {
+  position: relative;
+  pointer-events: none;
 }
 
 .touch-button.pressed {

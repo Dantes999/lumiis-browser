@@ -67,6 +67,7 @@ export type ClientMessage =
   | { t: 'attack'; target?: number; dir?: number }
   | { t: 'skill'; key: SkillKey }
   | { t: 'log'; level: 'info' | 'warn' | 'error'; text: string }
+  | { t: 'resume'; token: string }
   | { t: 'pickup'; target: number }
   | { t: 'equip'; slot: number }
   | { t: 'unequip'; piece: 'weapon' | 'armor' }
@@ -94,7 +95,7 @@ export type ServerMessage =
       ground: GroundItemSnapshot[];
     }
   | { t: 'inventory'; slots: (InventorySlot | null)[]; equipment: Equipment }
-  | { t: 'characters'; list: CharacterSummary[]; max: number }
+  | { t: 'characters'; list: CharacterSummary[]; max: number; token?: string }
   | { t: 'authError'; reason: string }
   | { t: 'pong'; at: number }
   | { t: 'notice'; text: string }
@@ -186,6 +187,14 @@ export function parseClientMessage(input: unknown): ParsedMessage {
       const key = message.key;
       if (!isSkillKey(key)) return fail('skill needs a known skill');
       return { ok: true, message: { t: 'skill', key } };
+    }
+
+    case 'resume': {
+      const token = message.token;
+      if (typeof token !== 'string' || token.length === 0 || token.length > 2048) {
+        return fail('resume needs a token');
+      }
+      return { ok: true, message: { t: 'resume', token } };
     }
 
     case 'log': {

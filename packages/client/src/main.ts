@@ -10,7 +10,7 @@ import { initInput } from './input';
 import { initMobile } from './mobile';
 import { attackAt, isAttackHeld, setAttackHeld, setAttackSender, swingForward } from './combat';
 import { cast, setSkillSender } from './skill';
-import { setAimEnabled } from './aim';
+import { setAimEnabled, setStickAim } from './aim';
 import { initAudio, resumeAudio, unlockAudioOnFirstGesture } from './audio';
 import { initController } from './controller';
 import { itemNear, orderPickup, pickupNearestInRange, setPickupSender, tickPickup } from './loot';
@@ -86,6 +86,14 @@ connection.setWelcomeHandler(() => {
   connection.setPickupSettings(value.autoPickup, value.types);
 });
 
+// A stored session token means a reload walks straight back in: connect now and
+// let the server answer with the character list.
+try {
+  if (window.localStorage.getItem('lumiis.token') !== null) connection.connect();
+} catch {
+  // Private mode: there is no stored session.
+}
+
 initInput({
   onAttack: () => {
     swingForward();
@@ -131,6 +139,9 @@ initInput({
   },
   onWorldUp: () => {
     setAttackHeld(false);
+  },
+  onAttackAim: (dir) => {
+    setStickAim(dir);
   },
 });
 

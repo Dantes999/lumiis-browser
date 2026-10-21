@@ -540,6 +540,7 @@ export class WorldScene extends Phaser.Scene {
       });
       playerView.setPose(player.dir, this.poseColumn(player.dir, player));
       playerView.setHealth(player.hp, player.maxHp, false);
+      playerView.setName(player.name);
 
       const weapon = isItemKey(player.weapon) ? player.weapon : null;
       const duration = swingMs(swingFor(weapon));
@@ -577,6 +578,7 @@ export class WorldScene extends Phaser.Scene {
       selfView.setLook(tables, view.equipment);
       selfView.setPose(self.dir, this.selfColumn(column));
       selfView.setHealth(self.hp, self.maxHp, true);
+      selfView.setName(self.name);
 
       const shown = attackPose();
       if (shown !== null) {

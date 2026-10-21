@@ -16,6 +16,7 @@ beforeEach(() => {
     y: 100,
     prevX: 100,
     prevY: 100,
+    name: 'Kain',
     dir: 0,
     moveDir: 0,
     moving: false,

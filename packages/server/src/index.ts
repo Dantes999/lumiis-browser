@@ -5,7 +5,8 @@
 
 import { createServer } from 'node:http';
 import { mkdirSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { randomBytes } from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { SNAPSHOT_EVERY_TICKS, TICK_MS, TICK_RATE } from '@lumiis/shared';
 import type { World } from './game/world.js';
@@ -13,6 +14,7 @@ import { FixedStepLoop } from './game/loop.js';
 import { loadMaps } from './game/map.js';
 import { Realm } from './game/realm.js';
 import { Store } from './store/db.js';
+import { loadTokenSecret } from './store/token.js';
 import { attachGateway, type Gateway } from './net/gateway.js';
 import { handleMapSave } from './http/mapsave.js';
 import { createStaticHandler } from './http/static.js';
@@ -56,6 +58,12 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
   if (dataFile !== ':memory:') mkdirSync(dirname(dataFile), { recursive: true });
   const store = new Store(dataFile);
 
+  // Signs session tokens next to the database; created on first start.
+  const tokenSecret =
+    dataFile === ':memory:'
+      ? randomBytes(32)
+      : loadTokenSecret(join(dirname(dataFile), 'token.key'));
+
   const maps = loadMaps(mapPath);
   // The map is served from the same file the server loaded, so server and
   // browser can never disagree about where the walls are.
@@ -85,7 +93,7 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
   const world = realm.primary;
   if (world === null) throw new Error('no map loaded');
 
-  const gateway = attachGateway(httpServer, realm, store);
+  const gateway = attachGateway(httpServer, realm, store, tokenSecret);
 
   const loop = new FixedStepLoop(TICK_MS, () => {
     realm.tick();

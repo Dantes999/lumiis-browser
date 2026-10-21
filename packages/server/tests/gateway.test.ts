@@ -194,4 +194,32 @@ describe('gateway', () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(server?.world.playerCount).toBe(0);
   });
+
+  it('hands out a session token that logs in again without the password', async () => {
+    const port = await startServer();
+    const first = await openSocket(port);
+
+    first.send(JSON.stringify({ t: 'login', name: 'Kain', password: 'secret123', mode: 'register' }));
+    const characters = await nextOfType(first, 'characters');
+    const token = characters['token'];
+    expect(typeof token).toBe('string');
+    first.close();
+    await closedWith(first);
+
+    const second = await openSocket(port);
+    second.send(JSON.stringify({ t: 'resume', token }));
+    const resumed = await nextOfType(second, 'characters');
+    expect(resumed['list']).toEqual([]);
+    second.close();
+  });
+
+  it('refuses a session token that was tampered with', async () => {
+    const port = await startServer();
+    const socket = await openSocket(port);
+
+    socket.send(JSON.stringify({ t: 'resume', token: 'header.payload.signature' }));
+    const error = await nextOfType(socket, 'authError');
+    expect(String(error['reason'])).toContain('Session expired');
+    socket.close();
+  });
 });

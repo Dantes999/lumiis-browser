@@ -18,6 +18,7 @@ import {
 import type { ClientMessage, Direction, InventorySlot } from '@lumiis/shared';
 import type { Player } from '../game/world.js';
 import type { Realm } from '../game/realm.js';
+import { signToken, verifyToken } from '../store/token.js';
 import { MAX_CHARACTERS, type Store } from '../store/db.js';
 
 type Session = {
@@ -57,7 +58,12 @@ const refuse = (socket: WebSocket, code: number, reason: string): void => {
   socket.close(code, reason);
 };
 
-export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store): Gateway {
+export function attachGateway(
+  httpServer: HttpServer,
+  realm: Realm,
+  store: Store,
+  tokenSecret: Buffer,
+): Gateway {
   const wss = new WebSocketServer({
     server: httpServer,
     path: '/ws',
@@ -116,8 +122,13 @@ export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store
     if (state !== null) store.saveCharacter(player.characterId, state);
   };
 
-  const sendCharacters = (session: Session, accountId: number): void => {
-    send(session, { t: 'characters', list: store.listCharacters(accountId), max: MAX_CHARACTERS });
+  const sendCharacters = (session: Session, accountId: number, token?: string): void => {
+    send(session, {
+      t: 'characters',
+      list: store.listCharacters(accountId),
+      max: MAX_CHARACTERS,
+      ...(token !== undefined ? { token } : {}),
+    });
   };
 
   /** Loads a character and puts the player into the world. */
@@ -217,7 +228,34 @@ export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store
     }
 
     session.accountId = result.accountId;
-    sendCharacters(session, result.accountId);
+    sendCharacters(
+      session,
+      result.accountId,
+      signToken(result.accountId, result.name, tokenSecret),
+    );
+  };
+
+  /** Logs an account in from a signed token, without the password. */
+  const resume = (session: Session, token: string): void => {
+    if (session.accountId !== null || session.player !== null) {
+      send(session, { t: 'authError', reason: 'Already logged in.' });
+      return;
+    }
+
+    const payload = verifyToken(token, tokenSecret);
+    if (payload === null) {
+      send(session, { t: 'authError', reason: 'Session expired, please log in.' });
+      return;
+    }
+
+    session.accountId = payload.accountId;
+    note(`resumed session for "${payload.name}"`);
+    // Refresh the token so an active player never has to log in again.
+    sendCharacters(
+      session,
+      payload.accountId,
+      signToken(payload.accountId, payload.name, tokenSecret),
+    );
   };
 
   const handleCreate = (session: Session, name: string): void => {
@@ -389,6 +427,9 @@ export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store
           );
           break;
         }
+        case 'resume':
+          resume(session, message.token);
+          break;
         case 'log': {
           // Strip control characters so a client cannot paint the terminal.
           const clean = message.text.replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, 500);

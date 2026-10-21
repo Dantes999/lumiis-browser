@@ -18,6 +18,8 @@ export const COLUMNS = 9;
 const PLAYER_BAR_WIDTH = 30;
 const PLAYER_BAR_HEIGHT = 4;
 const PLAYER_BAR_Y = -50;
+/** The name sits just above the health bar. */
+const NAME_Y = -62;
 export const CELL = 48;
 /** Foot position inside a cell. The sprite is anchored here, not at its centre. */
 export const FOOT_X = 24;
@@ -110,6 +112,7 @@ export class PlayerView {
   private readonly hair: Phaser.GameObjects.Image;
   private readonly weaponFront: Phaser.GameObjects.Image;
   private readonly bar: Phaser.GameObjects.Graphics;
+  private readonly nameText: Phaser.GameObjects.Text;
 
   private lookSignature = '';
   private shownHp = -1;
@@ -138,6 +141,16 @@ export class PlayerView {
 
     this.bar = scene.add.graphics();
 
+    this.nameText = scene.add
+      .text(0, NAME_Y, '', {
+        fontFamily: 'ui-monospace, monospace',
+        fontSize: '11px',
+        color: '#e6eef6',
+        stroke: '#0b0f13',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5);
+
     this.container = scene.add.container(0, 0, [
       this.weaponBack,
       this.body,
@@ -145,6 +158,7 @@ export class PlayerView {
       this.hair,
       this.weaponFront,
       this.bar,
+      this.nameText,
     ]);
 
     this.applyLook(tables, { weapon: null, armor: null }, true);
@@ -153,6 +167,11 @@ export class PlayerView {
   /** A slight forward/backward tilt of the whole figure while swinging. */
   setLean(radians: number): void {
     this.container.setRotation(radians);
+  }
+
+  /** The name plaque above the head; empty hides it. */
+  setName(name: string): void {
+    if (this.nameText.text !== name) this.nameText.setText(name);
   }
 
   /** The health bar above the head. `always` shows it even at full health. */

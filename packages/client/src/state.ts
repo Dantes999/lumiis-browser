@@ -57,6 +57,7 @@ export type MonsterState = {
  * the 20 Hz steps. offsetX/offsetY is the last server correction, faded out.
  */
 export type SelfState = {
+  name: string;
   x: number;
   y: number;
   prevX: number;
@@ -108,6 +109,7 @@ export const view: ViewState = {
   pingMs: null,
   selfId: null,
   self: {
+    name: '',
     x: 0,
     y: 0,
     prevX: 0,

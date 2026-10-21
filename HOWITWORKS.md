@@ -185,7 +185,15 @@ Weitere Formeln an ihrem Ort:
 ## 7. Speichern
 
 - Datei: **`data/lumiis.db`** (SQLite, WAL-Modus). Daneben `-wal` und `-shm`.
+- **`data/token.key`**: geheimer HS256-Schlüssel für Session-Tokens. Wird beim
+  ersten Start erzeugt. **Nie löschen/wechseln** ohne Grund — sonst loggen alle
+  Clients einmalig aus.
 - Passwörter: scrypt. Kein Klartext.
+- **Session-Login:** Nach dem Login schickt der Server einen signierten Token
+  (7 Tage) im `characters`-Paket. Der Client legt ihn in `localStorage`
+  (`lumiis.token`) ab und schickt beim nächsten Start `{t:'resume', token}`.
+  Gültig → Charakterliste; ungültig → `authError`, Token wird verworfen.
+  Der zuletzt gespielte Charakter (`lumiis.character`) wird direkt betreten.
 - Gespeichert wird: nach Login, alle 30 s, beim Abmelden und beim Shutdown.
 - `data/` gehört **nie** in eine Lieferung oder ein Backup ohne Absicht.
 

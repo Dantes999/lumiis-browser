@@ -3,6 +3,7 @@
 // factor, or "hit that one". Nothing in this file knows where a player is.
 
 import { view } from './state';
+import { dirFromInput } from '@lumiis/shared';
 import { resend, setManualInput } from './controller';
 import { clampZoom, zoomByPinch, zoomByWheel } from './zoom';
 
@@ -15,6 +16,8 @@ export type InputOptions = {
   onAttackHold?: (held: boolean) => void;
   /** A number key was pressed: 0 is "1", 1 is "2" and so on. */
   onSkill?: (slot: number) => void;
+  /** Direction pushed on the touch attack stick, or null when let go. */
+  onAttackAim?: (dir: import('@lumiis/shared').Direction | null) => void;
   /** Y key: pick up the closest item in reach. */
   onPickup?: () => void;
   /** A short tap on the world (touch), in screen pixels. */
@@ -76,12 +79,25 @@ const menuOpen = (): boolean => {
     (characters !== null && !characters.classList.contains('hidden'))
   );
 };
+/** Travel needed before the attack stick counts as a direction. */
+const ATTACK_STICK_DEADZONE = 12;
+/** How far the attack knob may travel from its centre. */
+const ATTACK_STICK_RADIUS = 34;
 /** A tap may wobble this much and still count as a tap, not a drag. */
 const TAP_SLOP = 10;
 const TAP_MAX_MS = 350;
 
 export function initInput(options: InputOptions): void {
-  const { onAttack, onAttackHold, onPickup, onTap, onSkill, onWorldDown, onWorldUp } = options;
+  const {
+    onAttack,
+    onAttackHold,
+    onPickup,
+    onTap,
+    onSkill,
+    onWorldDown,
+    onWorldUp,
+    onAttackAim,
+  } = options;
 
   const pressed = new Set<string>();
 
@@ -111,20 +127,60 @@ export function initInput(options: InputOptions): void {
   // On-screen buttons for phones: attack (hold to keep swinging) and pickup.
   const attackButton = document.getElementById('attack-button');
   if (attackButton !== null) {
+    const knob = attackButton.querySelector<HTMLElement>('.touch-knob');
+    let attackPointer: number | null = null;
+    let originX = 0;
+    let originY = 0;
+
+    const recentre = (): void => {
+      if (knob !== null) knob.style.transform = 'translate(-50%, -50%)';
+    };
+
     const press = (event: PointerEvent): void => {
       event.preventDefault();
+      event.stopPropagation();
       attackButton.classList.add('pressed');
+      attackPointer = event.pointerId;
+      originX = event.clientX;
+      originY = event.clientY;
+      recentre();
+      attackButton.setPointerCapture(event.pointerId);
+      onAttackAim?.(null);
       onAttack?.();
       onAttackHold?.(true);
     };
-    const release = (): void => {
+
+    const move = (event: PointerEvent): void => {
+      if (event.pointerId !== attackPointer) return;
+      const dx = event.clientX - originX;
+      const dy = event.clientY - originY;
+      const travelled = Math.hypot(dx, dy);
+
+      if (travelled >= ATTACK_STICK_DEADZONE) {
+        onAttackAim?.(dirFromInput(dx, dy));
+      } else {
+        onAttackAim?.(null);
+      }
+
+      if (knob !== null) {
+        const scale = Math.min(1, ATTACK_STICK_RADIUS / Math.max(1, travelled));
+        knob.style.transform = `translate(calc(-50% + ${dx * scale}px), calc(-50% + ${dy * scale}px))`;
+      }
+    };
+
+    const release = (event: PointerEvent): void => {
+      if (attackPointer !== null && event.pointerId !== attackPointer) return;
+      attackPointer = null;
       attackButton.classList.remove('pressed');
+      recentre();
+      onAttackAim?.(null);
       onAttackHold?.(false);
     };
+
     attackButton.addEventListener('pointerdown', press);
+    attackButton.addEventListener('pointermove', move);
     attackButton.addEventListener('pointerup', release);
     attackButton.addEventListener('pointercancel', release);
-    attackButton.addEventListener('pointerleave', release);
   }
 
   const pickupButton = document.getElementById('pickup-button');

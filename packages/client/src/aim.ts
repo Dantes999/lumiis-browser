@@ -10,6 +10,8 @@ import { view } from './state';
 
 let enabled = false;
 let pointer: { x: number; y: number } | null = null;
+/** Direction pushed on the touch attack stick, null when not pushed. */
+let stick: Direction | null = null;
 
 export const setAimEnabled = (on: boolean): void => {
   enabled = on;
@@ -21,6 +23,14 @@ export const isAimEnabled = (): boolean => enabled;
 export const setAimPointer = (x: number, y: number): void => {
   pointer = { x, y };
 };
+
+/** Sets the direction of the on-screen attack stick (null releases it). */
+export const setStickAim = (dir: Direction | null): void => {
+  stick = dir;
+};
+
+/** The direction the attack stick is pushed to, or null. */
+export const stickAimDirection = (): Direction | null => stick;
 
 /** The eight-way direction from the player to the pointer, or null. */
 export const aimDirection = (): Direction | null => {
