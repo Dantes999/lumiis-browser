@@ -258,7 +258,13 @@ export class LocalHost implements GameHost {
   private savePlayer(playerId: number): void {
     const characterId = this.characters.get(playerId);
     if (characterId === undefined) return;
-    const save = this.realm.saveOf(playerId);
-    if (save !== null) this.store.saveCharacter(characterId, save);
+
+    try {
+      const save = this.realm.saveOf(playerId);
+      if (save !== null) this.store.saveCharacter(characterId, save);
+    } catch (error) {
+      // A locked or busy database is temporary; the next round tries again.
+      console.error(`[save] character ${characterId} not written:`, (error as Error).message);
+    }
   }
 }

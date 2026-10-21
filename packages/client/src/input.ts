@@ -298,8 +298,11 @@ export function initInput(options: InputOptions): void {
     { passive: false },
   );
 
-  const hud = document.getElementById('hud');
-  const touch = document.getElementById('touch');
+  /**
+   * Anything inside these roots is interface, not world: a press there must not
+   * start a swing (it used to hit the ground behind the bag panel).
+   */
+  const UI_ROOTS = '.panel, #hud, #touch, #hud-toggle, #item-tip, #login, #characters';
 
   const pointerPair = (): [Point, Point] | null => {
     const points = [...pointers.values()];
@@ -314,11 +317,7 @@ export function initInput(options: InputOptions): void {
     // Presses on the interface must never count as a second finger: the attack
     // button would otherwise look like a pinch and stop the walk.
     const pressedTarget = event.target;
-    if (
-      pressedTarget instanceof Node &&
-      ((hud !== null && hud.contains(pressedTarget)) ||
-        (touch !== null && touch.contains(pressedTarget)))
-    ) {
+    if (pressedTarget instanceof Element && pressedTarget.closest(UI_ROOTS) !== null) {
       return;
     }
 

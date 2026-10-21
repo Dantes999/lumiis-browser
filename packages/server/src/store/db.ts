@@ -122,6 +122,8 @@ export class Store {
     // WAL + NORMAL: a save no longer forces an fsync. A power cut can lose the
     // last seconds, but the file itself stays consistent.
     this.db.exec('PRAGMA synchronous = NORMAL');
+    // Two writers must wait for each other instead of throwing at once.
+    this.db.exec('PRAGMA busy_timeout = 5000');
     this.db.exec('PRAGMA foreign_keys = ON');
     this.migrate();
     this.db.exec(SCHEMA);

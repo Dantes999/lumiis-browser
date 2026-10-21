@@ -340,10 +340,13 @@ export class WorldScene extends Phaser.Scene {
     const shown = attackPose();
     if (shown !== null && shown.startedAt !== this.shownSwingAt) {
       this.shownSwingAt = shown.startedAt;
-      const reach = swingFor(view.equipment.weapon).range;
-      this.trails.push(
-        new SwingTrail(this, () => renderedSelfPosition(), shown.dir, shown.sweep, shown.durationMs, reach),
-      );
+      // Bare hands leave no blade streak; only a real weapon draws one.
+      if (view.equipment.weapon !== null) {
+        const reach = swingFor(view.equipment.weapon).range;
+        this.trails.push(
+          new SwingTrail(this, () => renderedSelfPosition(), shown.dir, shown.sweep, shown.durationMs, reach),
+        );
+      }
     }
 
     for (const [id, player] of view.others) {
@@ -351,7 +354,8 @@ export class WorldScene extends Phaser.Scene {
       if (player.attackUntil > this.time.now && ended <= this.time.now) {
         const count = (this.swingCounts.get(id) ?? 0) + 1;
         this.swingCounts.set(id, count);
-        const reach = swingFor(isItemKey(player.weapon) ? player.weapon : null).range;
+        if (!isItemKey(player.weapon)) continue;
+        const reach = swingFor(player.weapon).range;
         const follow = player;
         this.trails.push(
           new SwingTrail(

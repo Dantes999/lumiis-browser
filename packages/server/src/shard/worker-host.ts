@@ -288,7 +288,17 @@ export class WorkerHost implements GameHost {
 
   /** Writes every save that arrived since the last tick, in one transaction. */
   saveTick(): void {
-    if (this.pendingSaves.length > 0) this.store.saveCharacters(this.pendingSaves.splice(0));
+    if (this.pendingSaves.length === 0) return;
+
+    const batch = this.pendingSaves.splice(0);
+    try {
+      this.store.saveCharacters(batch);
+    } catch (error) {
+      // Keep the batch for the next tick; a locked database is temporary.
+      console.error('[save] batch not written:', (error as Error).message);
+      this.pendingSaves.push(...batch);
+      if (this.pendingSaves.length > 5000) this.pendingSaves.splice(0, this.pendingSaves.length - 5000);
+    }
   }
 
   flush(): Promise<void> {

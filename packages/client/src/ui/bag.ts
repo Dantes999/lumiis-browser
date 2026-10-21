@@ -22,7 +22,9 @@ const escapeHtml = (text: string): string =>
     char === '&' ? '&amp;' : char === '<' ? '&lt;' : char === '>' ? '&gt;' : '&quot;',
   );
 
-const mobile = (): boolean => document.body.classList.contains('mobile');
+/** Hover tooltips only where a real pointer can hover. */
+const hoverCapable = (): boolean =>
+  window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
 export type Bag = {
   render(slots: InventorySlot[], equipment: Equipment): void;
@@ -41,6 +43,9 @@ export function createBag(
 
   /** The cell whose tooltip is open, so a second tap can act on it. */
   let tipCell: HTMLElement | null = null;
+  /** Input that produced the last press; a finger explains first, a mouse acts. */
+  let lastPointerType = 'mouse';
+  const touchLike = (): boolean => lastPointerType !== 'mouse';
 
   const hideTip = (): void => {
     tipCell = null;
@@ -74,12 +79,12 @@ export function createBag(
 
     const canWear = info.typeName !== 'Material';
     const hint = worn
-      ? mobile()
+      ? touchLike()
         ? 'Nochmal tippen: ablegen'
         : 'Klicken: ablegen'
       : !canWear
         ? 'Material'
-        : mobile()
+        : touchLike()
           ? 'Nochmal tippen: anlegen'
           : 'Klicken: anlegen';
     lines.push(`<small class="tip-hint">${hint}</small>`);
@@ -102,7 +107,7 @@ export function createBag(
 
   /** On a phone the first tap only explains; the second one acts. */
   const activate = (cell: HTMLElement, slot: InventorySlot, worn: boolean, action: () => void): void => {
-    if (mobile() && slot !== null && tipCell !== cell) {
+    if (touchLike() && slot !== null && tipCell !== cell) {
       showTip(cell, slot, worn);
       return;
     }
@@ -148,7 +153,7 @@ export function createBag(
       const wearable = slot !== null && itemDef(slot.key).slot !== undefined;
       if (slot === null) return;
       if (!wearable) {
-        if (mobile()) showTip(cell, slot, false);
+        if (touchLike()) showTip(cell, slot, false);
         return;
       }
       activate(cell, slot, false, () => onEquip(index));
@@ -168,7 +173,7 @@ export function createBag(
     activate(armorCell, armor, true, () => onUnequip('armor'));
   });
 
-  if (!mobile()) {
+  if (hoverCapable()) {
     const hover = (cell: HTMLElement, get: () => InventorySlot, worn: boolean): void => {
       cell.addEventListener('pointerenter', () => showTip(cell, get(), worn));
       cell.addEventListener('pointerleave', () => {
@@ -189,6 +194,15 @@ export function createBag(
     hideTip();
     panel.classList.toggle('hidden');
   };
+
+  // Remember whether the press came from a mouse or a finger.
+  panel.addEventListener(
+    'pointerdown',
+    (event) => {
+      lastPointerType = event.pointerType === '' ? 'mouse' : event.pointerType;
+    },
+    true,
+  );
 
   button.addEventListener('click', toggle);
   window.addEventListener('keydown', (event) => {
