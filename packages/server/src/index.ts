@@ -16,6 +16,7 @@ import { Realm } from './game/realm.js';
 import { Store } from './store/db.js';
 import { loadTokenSecret } from './store/token.js';
 import { attachGateway, type Gateway } from './net/gateway.js';
+import { LocalHost, type GameHost } from './shard/host.js';
 import { handleMapSave } from './http/mapsave.js';
 import { createStaticHandler } from './http/static.js';
 
@@ -47,7 +48,7 @@ const defaultDataFile = (): string => resolve(here, '../../../data/lumiis.db');
 
 export async function createGameServer(options: GameServerOptions = {}): Promise<GameServer> {
   const port = options.port ?? Number(process.env['PORT'] ?? 3000);
-  const host = options.host ?? process.env['HOST'] ?? '0.0.0.0';
+  const bindHost = options.host ?? process.env['HOST'] ?? '0.0.0.0';
   const staticDir = options.staticDir ?? defaultStaticDir();
   const mapPath = options.mapPath ?? defaultMapPath();
   const dataFile = options.dataFile ?? defaultDataFile();
@@ -95,10 +96,10 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
       });
       res.end(
         JSON.stringify({
-          players: realm.playerCount(),
+          players: host.playerCount(),
           connections: gateway.connectionCount,
-          maps: realm.mapIds.length,
-          tick: realm.primary?.tick ?? 0,
+          maps: host.mapIds.length,
+          tick: currentTick,
           tickMs: Math.round(average * 10) / 10,
           tickMsMax: Math.round(worst * 10) / 10,
           snapshotBytes: metrics.lastSnapshotBytes,
@@ -110,7 +111,7 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
 
     if (req.method === 'GET' && (path === '/maps/' || path === '/maps')) {
       res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({ maps: realm.mapIds }));
+      res.end(JSON.stringify({ maps: host.mapIds }));
       return;
     }
 
@@ -121,29 +122,33 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
   const world = realm.primary;
   if (world === null) throw new Error('no map loaded');
 
-  const gateway = attachGateway(httpServer, realm, store, tokenSecret);
+  // One process by default; the worker host below can split maps over threads.
+  const host: GameHost = new LocalHost(realm, store);
+  let currentTick = 0;
 
-  const loop = new FixedStepLoop(TICK_MS, () => {
+  const gateway = attachGateway(httpServer, host, store, tokenSecret);
+
+  const loop = new FixedStepLoop(TICK_MS, (tick) => {
     const startedAt = performance.now();
+    currentTick = tick;
 
-    realm.tick();
+    host.tick();
 
-    for (const update of realm.drainInventoryUpdates()) {
+    for (const update of host.drainInventoryUpdates()) {
       gateway.sendInventory(update.playerId);
     }
 
-    for (const event of realm.drainEvents()) {
-      gateway.notify(event.playerId, event.text);
+    for (const note of host.drainNotices()) {
+      gateway.notify(note.playerId, note.text);
     }
 
-    for (const { map, reward } of realm.drainRewards()) {
+    for (const { map, reward } of host.drainRewards()) {
       gateway.broadcastReward(map, reward);
     }
 
     // A slice of the players is written every tick: no 30 second spike.
     gateway.saveTick();
 
-    const tick = realm.primary?.tick ?? 0;
     if (tick % SNAPSHOT_EVERY_TICKS === 0) {
       metrics.lastSnapshotBytes = gateway.broadcastSnapshot();
     }
@@ -154,7 +159,7 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
 
   await new Promise<void>((resolve, reject) => {
     httpServer.once('error', reject);
-    httpServer.listen(port, host, () => {
+    httpServer.listen(port, bindHost, () => {
       httpServer.off('error', reject);
       resolve();
     });
@@ -172,7 +177,7 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
     store,
     async close(): Promise<void> {
       loop.stop();
-      gateway.saveAll();
+      await gateway.flush();
       await gateway.close();
       await new Promise<void>((resolve) => httpServer.close(() => resolve()));
       store.close();

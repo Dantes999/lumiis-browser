@@ -54,6 +54,11 @@ export class Realm {
     return this.worldIdByPlayer.get(playerId) ?? null;
   }
 
+  /** The world of one map, by map id. */
+  worldOfMap(map: string): World | null {
+    return this.worlds.get(map) ?? null;
+  }
+
   join(seed: JoinSeed): Player | null {
     const world = this.worlds.get(seed.map) ?? this.worlds.values().next().value;
     if (world === undefined) return null;

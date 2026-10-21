@@ -16,14 +16,13 @@ import {
   parseClientMessage,
 } from '@lumiis/shared';
 import type { ClientMessage, Direction, InventorySlot } from '@lumiis/shared';
-import type { Player } from '../game/world.js';
-import type { Realm } from '../game/realm.js';
+import type { GameHost, JoinedPlayer } from '../shard/host.js';
 import { signToken, verifyToken } from '../store/token.js';
 import { MAX_CHARACTERS, type Store } from '../store/db.js';
 
 type Session = {
   socket: WebSocket;
-  player: Player | null;
+  player: JoinedPlayer | null;
   tokens: number;
   tokensAt: number;
   /** Failed logins on this connection, to slow down guessing. */
@@ -48,8 +47,8 @@ export type Gateway = {
   ): void;
   /** Writes a slice of the players each tick, so no tick has a save spike. */
   saveTick(): void;
-  /** Writes every logged in character to the store (shutdown). */
-  saveAll(): void;
+  /** Writes every player and resolves when the store is up to date. */
+  flush(): Promise<void>;
   /** Connected sockets, including those that have not logged in yet. */
   readonly connectionCount: number;
   close(): Promise<void>;
@@ -62,7 +61,7 @@ const refuse = (socket: WebSocket, code: number, reason: string): void => {
 
 export function attachGateway(
   httpServer: HttpServer,
-  realm: Realm,
+  host: GameHost,
   store: Store,
   tokenSecret: Buffer,
 ): Gateway {
@@ -73,8 +72,6 @@ export function attachGateway(
   });
 
   const sessions = new Set<Session>();
-  /** Where the next save round picks up, so every player gets its turn. */
-  let saveCursor = 0;
 
   /** How often a dead connection is looked for with a websocket ping. */
   const HEARTBEAT_MS = 30000;
@@ -114,17 +111,12 @@ export function attachGateway(
   };
 
   const sendInventory = (session: Session, playerId: number): void => {
-    const slots = realm.inventoryOf(playerId);
-    const equipment = realm.equipmentOf(playerId);
+    const slots = host.inventoryOf(playerId);
+    const equipment = host.equipmentOf(playerId);
     if (slots !== null && equipment !== null) send(session, { t: 'inventory', slots, equipment });
   };
 
   const MAX_LOGIN_ATTEMPTS = 6;
-
-  const savePlayer = (player: Player): void => {
-    const state = realm.saveOf(player.id);
-    if (state !== null) store.saveCharacter(player.characterId, state);
-  };
 
   const sendCharacters = (session: Session, accountId: number, token?: string): void => {
     send(session, {
@@ -152,8 +144,7 @@ export function attachGateway(
     if (stale !== undefined && stale.player !== null) {
       const old = stale.player;
       note(`replacing a lingering session for "${old.name}"`);
-      savePlayer(old);
-      realm.leave(old.id);
+      host.leave(old.id);
       stale.player = null;
       try {
         stale.socket.close(4000, 'Signed in elsewhere');
@@ -168,20 +159,24 @@ export function attachGateway(
       return;
     }
 
-    const player = realm.join({
+    const player = host.join({
       map: save.map,
-      accountId: session.accountId,
       characterId,
       name: save.name,
-      x: save.x,
-      y: save.y,
-      dir: save.dir as Direction,
-      hp: save.hp,
-      level: save.level,
-      exp: save.exp,
-      yang: save.yang,
-      inventory: save.inventory,
-      equipment: save.equipment,
+      seed: {
+        accountId: session.accountId,
+        characterId,
+        name: save.name,
+        x: save.x,
+        y: save.y,
+        dir: save.dir as Direction,
+        hp: save.hp,
+        level: save.level,
+        exp: save.exp,
+        yang: save.yang,
+        inventory: save.inventory,
+        equipment: save.equipment,
+      },
     });
 
     if (player === null) {
@@ -195,8 +190,8 @@ export function attachGateway(
       id: player.id,
       protocol: PROTOCOL_VERSION,
       tickRate: TICK_RATE,
-      tick: realm.worldOf(player.id)?.tick ?? 0,
-      map: realm.worldIdOf(player.id) ?? save.map,
+      tick: host.tickOf(player.map),
+      map: player.map,
     });
     sendInventory(session, player.id);
   };
@@ -370,20 +365,15 @@ export function attachGateway(
             send(session, { t: 'notice', text: 'Log in first.' });
             break;
           }
-          realm.setInput(session.player.id, message.dx, message.dy);
+          host.setInput(session.player.id, message.dx, message.dy);
           break;
         case 'attack': {
           if (session.player === null) {
             send(session, { t: 'notice', text: 'Log in first.' });
             break;
           }
-          // The blow lands a few ticks later; rewards follow through the tick loop.
-          const result = realm.attack(
-            session.player.id,
-            message.target ?? null,
-            message.dir ?? null,
-          );
-          if (!result.ok) send(session, { t: 'notice', text: result.reason });
+          // The blow lands a few ticks later; failures answer as a notice.
+          host.attack(session.player.id, message.target ?? null, message.dir ?? null);
           break;
         }
         case 'skill': {
@@ -391,8 +381,7 @@ export function attachGateway(
             send(session, { t: 'notice', text: 'Log in first.' });
             break;
           }
-          const result = realm.useSkill(session.player.id, message.key);
-          if (!result.ok) send(session, { t: 'notice', text: result.reason });
+          host.useSkill(session.player.id, message.key);
           break;
         }
         case 'equip': {
@@ -400,8 +389,7 @@ export function attachGateway(
             send(session, { t: 'notice', text: 'Log in first.' });
             break;
           }
-          const result = realm.equip(session.player.id, message.slot);
-          if (!result.ok) send(session, { t: 'notice', text: result.reason });
+          host.equip(session.player.id, message.slot);
           break;
         }
         case 'unequip': {
@@ -409,8 +397,7 @@ export function attachGateway(
             send(session, { t: 'notice', text: 'Log in first.' });
             break;
           }
-          const result = realm.unequip(session.player.id, message.piece);
-          if (!result.ok) send(session, { t: 'notice', text: result.reason });
+          host.unequip(session.player.id, message.piece);
           break;
         }
         case 'pickup': {
@@ -418,17 +405,12 @@ export function attachGateway(
             send(session, { t: 'notice', text: 'Log in first.' });
             break;
           }
-          const result = realm.pickup(session.player.id, message.target);
-          if (!result.ok) send(session, { t: 'notice', text: result.reason });
+          host.pickup(session.player.id, message.target);
           break;
         }
         case 'settings': {
           if (session.player === null) break;
-          realm.setPickupSettings(
-            session.player.id,
-            message.autoPickup,
-            message.autoPickupTypes,
-          );
+          host.setPickupSettings(session.player.id, message.autoPickup, message.autoPickupTypes);
           break;
         }
         case 'resume':
@@ -459,8 +441,7 @@ export function attachGateway(
 
       const player = session.player;
       if (player === null) return;
-      savePlayer(player);
-      realm.leave(player.id);
+      host.leave(player.id);
     });
 
     socket.on('error', (error) => {
@@ -475,7 +456,7 @@ export function attachGateway(
 
   return {
     broadcastSnapshot(): number {
-      const snapshots = realm.snapshotJson();
+      const snapshots = new Map(host.drainSnapshots());
       let bytes = 0;
 
       for (const session of sessions) {
@@ -514,7 +495,7 @@ export function attachGateway(
       for (const session of sessions) {
         if (session.player === null) continue;
         if (session.socket.readyState !== WebSocket.OPEN) continue;
-        if (realm.worldIdOf(session.player.id) !== worldId) continue;
+        if (host.worldIdOf(session.player.id) !== worldId) continue;
         session.socket.send(message);
       }
     },
@@ -525,25 +506,11 @@ export function attachGateway(
     },
 
     saveTick(): void {
-      const active: Session[] = [];
-      for (const session of sessions) {
-        if (session.player !== null) active.push(session);
-      }
-      if (active.length === 0) return;
-
-      // Aim for one full round every 20 seconds, however many players there are.
-      const limit = Math.max(1, Math.ceil(active.length / (TICK_RATE * 20)));
-      for (let index = 0; index < limit; index += 1) {
-        const session = active[(saveCursor + index) % active.length];
-        if (session?.player) savePlayer(session.player);
-      }
-      saveCursor = (saveCursor + limit) % active.length;
+      host.saveTick();
     },
 
-    saveAll(): void {
-      for (const session of sessions) {
-        if (session.player !== null) savePlayer(session.player);
-      }
+    flush(): Promise<void> {
+      return host.flush();
     },
 
     close(): Promise<void> {
