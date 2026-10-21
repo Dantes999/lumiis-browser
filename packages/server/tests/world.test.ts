@@ -952,3 +952,31 @@ describe('skills', () => {
     expect(world.getMonster(1)?.hp).toBe(MONSTER_TYPES.wolf.maxHp);
   });
 });
+
+describe('walking and attacking at once', () => {
+  it('a swing does not change the walking direction', () => {
+    const world = new World(grassMap());
+    const player = world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
+    world.setInput(player.id, 0, -1); // walk up
+    for (let tick = 0; tick < 6; tick += 1) world.step();
+    const afterWalk = player.y;
+
+    // swing downwards while still walking up
+    expect(world.attack(player.id, null, 0).ok).toBe(true);
+    for (let tick = 0; tick < 6; tick += 1) world.step();
+
+    expect(player.y).toBeLessThan(afterWalk); // kept walking up
+    expect(player.dir).toBe(0); // body turned to the swing
+  });
+
+  it('a repeated input does not turn the body back mid-swing', () => {
+    const world = new World(grassMap());
+    const player = world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
+    world.setInput(player.id, 0, -1);
+    world.step();
+    world.attack(player.id, null, 0);
+    world.setInput(player.id, 0, -1); // the periodic resend
+
+    expect(player.dir).toBe(0);
+  });
+});

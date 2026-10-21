@@ -33,7 +33,10 @@ export function resend(): void {
 function apply(vector: Vector): void {
   view.self.moving = vector.dx !== 0 || vector.dy !== 0;
   const dir = dirFromInput(vector.dx, vector.dy);
-  if (dir !== null) view.self.dir = dir;
+  if (dir !== null) {
+    view.self.moveDir = dir;
+    view.self.dir = dir;
+  }
 
   if (vector.dx === sent.dx && vector.dy === sent.dy) return;
   sent = { dx: vector.dx, dy: vector.dy };

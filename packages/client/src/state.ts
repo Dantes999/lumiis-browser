@@ -57,7 +57,10 @@ export type SelfState = {
   y: number;
   prevX: number;
   prevY: number;
+  /** Where the body faces (sprite and swing). */
   dir: Direction;
+  /** Where the player walks; a swing never changes this. */
+  moveDir: Direction;
   moving: boolean;
   offsetX: number;
   offsetY: number;
@@ -106,6 +109,7 @@ export const view: ViewState = {
     prevX: 0,
     prevY: 0,
     dir: 0,
+    moveDir: 0,
     moving: false,
     offsetX: 0,
     offsetY: 0,

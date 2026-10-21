@@ -30,6 +30,7 @@ const place = (x: number, y: number, dir = 6): void => {
     prevX: x,
     prevY: y,
     dir: dir as typeof view.self.dir,
+    moveDir: dir as typeof view.self.dir,
     moving: false,
     offsetX: 0,
     offsetY: 0,

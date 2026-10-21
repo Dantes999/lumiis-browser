@@ -17,6 +17,7 @@ beforeEach(() => {
     prevX: 100,
     prevY: 100,
     dir: 0,
+    moveDir: 0,
     moving: false,
     offsetX: 0,
     offsetY: 0,

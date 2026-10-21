@@ -57,7 +57,7 @@ function stepOnce(): void {
   const map = getWorldMap();
   if (map === null) return;
 
-  const next = moveWithCollision(map, self.x, self.y, self.dir, TICK_SECONDS);
+  const next = moveWithCollision(map, self.x, self.y, self.moveDir, TICK_SECONDS);
   self.x = next.x;
   self.y = next.y;
 }

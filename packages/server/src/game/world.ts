@@ -103,7 +103,10 @@ export type Player = {
   /** Position in world pixels, measured at the feet. */
   x: number;
   y: number;
+  /** Where the body faces (sprite and swing). */
   dir: Direction;
+  /** Where the player walks; a swing never changes this. */
+  moveDir: Direction;
   moving: boolean;
   hp: number;
   maxHp: number;
@@ -248,6 +251,7 @@ export class World {
       x: seed.x ?? spawn.x,
       y: seed.y ?? spawn.y,
       dir: seed.dir ?? 0,
+      moveDir: seed.dir ?? 0,
       moving: false,
       hp: seed.hp ?? PLAYER_MAX_HP,
       maxHp: PLAYER_MAX_HP,
@@ -344,7 +348,11 @@ export class World {
       player.moving = false;
       return;
     }
-    player.dir = dir;
+
+    // A new walking direction turns the body; a repeated input does not, so a
+    // swing that aims another way keeps the facing until the player turns.
+    if (!player.moving || dir !== player.moveDir) player.dir = dir;
+    player.moveDir = dir;
     player.moving = true;
   }
 
@@ -410,7 +418,13 @@ export class World {
       }
 
       if (player.moving) {
-        const next = moveWithCollision(this.map, player.x, player.y, player.dir, TICK_SECONDS);
+        const next = moveWithCollision(
+          this.map,
+          player.x,
+          player.y,
+          player.moveDir,
+          TICK_SECONDS,
+        );
         player.x = next.x;
         player.y = next.y;
       }
