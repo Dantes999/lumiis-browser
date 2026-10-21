@@ -113,6 +113,7 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
           tickMs: Math.round(average * 10) / 10,
           tickMsMax: Math.round(worst * 10) / 10,
           snapshotBytes: metrics.lastSnapshotBytes,
+          saves: store.saves,
           uptimeSeconds: Math.round((Date.now() - metrics.startedAt) / 1000),
           shards,
         }),

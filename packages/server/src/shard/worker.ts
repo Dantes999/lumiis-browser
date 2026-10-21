@@ -72,7 +72,7 @@ const loop = new FixedStepLoop(TICK_MS, (tick) => {
   if (tick % SNAPSHOT_EVERY_TICKS === 0) {
     const ticks: Array<[string, number]> = [];
     for (const map of realm.mapIds) ticks.push([map, realm.worldOfMap(map)?.tick ?? 0]);
-    post({ t: 'snapshots', ticks, entries: [...realm.snapshotJson()] });
+    post({ t: 'snapshots', ticks, entries: [...realm.snapshotBuffers()] });
   }
 
   // How long a player can walk into a busy cell is the number that matters.

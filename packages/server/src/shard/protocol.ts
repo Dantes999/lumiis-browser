@@ -39,7 +39,7 @@ export type FromWorker =
       equipment: Equipment;
     }
   | { t: 'joinFailed'; playerId: number }
-  | { t: 'snapshots'; ticks: Array<[string, number]>; entries: Array<[number, string]> }
+  | { t: 'snapshots'; ticks: Array<[string, number]>; entries: Array<[number, Uint8Array]> }
   | { t: 'notice'; playerId: number; text: string }
   | { t: 'inventory'; playerId: number; slots: InventorySlot[]; equipment: Equipment }
   | { t: 'reward'; map: string; reward: RewardBroadcast }

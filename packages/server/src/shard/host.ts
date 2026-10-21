@@ -71,8 +71,8 @@ export interface GameHost {
   /** One entry per game thread; empty when everything runs in this process. */
   shardStats(): ShardStat[];
 
-  /** The latest encoded snapshot per player. */
-  drainSnapshots(): Array<[number, string]>;
+  /** The latest encoded snapshot per player, as UTF-8 bytes. */
+  drainSnapshots(): Array<[number, Uint8Array]>;
   drainNotices(): HostNotice[];
   drainRewards(): RewardEvent[];
   drainInventoryUpdates(): InventoryUpdate[];
@@ -177,8 +177,8 @@ export class LocalHost implements GameHost {
     return [];
   }
 
-  drainSnapshots(): Array<[number, string]> {
-    return [...this.realm.snapshotJson()];
+  drainSnapshots(): Array<[number, Uint8Array]> {
+    return [...this.realm.snapshotBuffers()];
   }
 
   drainNotices(): HostNotice[] {

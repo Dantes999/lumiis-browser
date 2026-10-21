@@ -463,10 +463,14 @@ export function attachGateway(
         if (session.player === null) continue;
         if (session.socket.readyState !== WebSocket.OPEN) continue;
 
-        const message = snapshots.get(session.player.id);
-        if (message === undefined) continue;
-        session.socket.send(message);
-        bytes += message.length;
+        // Already UTF-8: one buffer per cell is shared by every player in it,
+        // so nothing is re-encoded per socket.
+        const payload = snapshots.get(session.player.id);
+        if (payload === undefined) continue;
+
+        // binary: false keeps it a text frame, so the browser gets a string.
+        session.socket.send(payload, { binary: false });
+        bytes += payload.length;
       }
 
       return bytes;

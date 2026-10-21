@@ -13,7 +13,7 @@ node tools/seed-bots.mjs 300
 
 # 3. Server starten, wahlweise mit Shards
 SHARDS=1 npm start     # ein Prozess (Standard)
-SHARDS=2 npm start     # zwei Karten-Worker
+SHARDS=2 npm start     # Karten auf zwei Worker
 
 # 4. In einem zweiten Terminal: Bots, Dauer in Sekunden
 node tools/bots.mjs 300 30
@@ -23,51 +23,68 @@ Die Bots melden alle 5 s: Spieler in der Welt, Snapshots/s, Verkehr, Ping und
 den Tick je Thread (`main` = Hauptprozess, `shards` = je Worker). Am Ende steht
 `/status` unter Last.
 
-Für die CPU-Zahl im Beispiel: PID des Servers holen, dann vor und nach dem Lauf
-`/proc/<pid>/stat` lesen (Felder 14 + 15) — die Summe ist die CPU-Zeit in
-Hundertstelsekunden.
+## Ergebnis: 300 Spieler
 
-## Ergebnis
-
-| Spieler | 1 Prozess: Tick | 2 Shards: Tick je Worker | 2 Shards: Hauptprozess |
+| | 1 Prozess | 2 Shards (je Worker) | Hauptprozess |
 |---|---|---|---|
-| 100 | 6,2 ms (Spitze 11,9) | 1,4 / 0,5 ms (Spitze 3,3 / 1,3) | 2,3 ms |
-| 300 | 20,2 ms (**Spitze 52,7**) | 4,9 / 0,8 ms (Spitze 11,5 / 1,7) | 8,5 ms |
+| Tick | 16 ms | 4,5 / 0,8 ms | 6,3 ms |
+| Spitze | 58 ms | 11 / 1,6 ms | 23 ms |
+| CPU (ganzer Prozess) | ~183 % | ~200 % | – |
 
-CPU des ganzen Serverprozesses (alle Threads, inklusive Login-Sturm mit scrypt):
+Mit Shards sinkt der **Spiel-Tick** deutlich (16 → 4,5 ms). Der Hauptprozess
+bleibt bei rund 6 ms; er trägt nur noch Sockets und Weiterleitung.
 
-| Spieler | 1 Prozess | 2 Shards |
-|---|---|---|
-| 100 | 61 % eines Kerns | 74 % |
-| 300 | 200 % | 219 % |
+**Grenze:** Mehr Shards als Karten bringen nichts — bei zwei Karten sind zwei
+Shards das Maximum, `SHARDS=4` ergibt dasselbe. Und eine einzelne **volle**
+Karte lässt sich so nicht teilen: alle Spieler dieser Karte liegen in einem
+Worker. In der Praxis verteilen sich Spieler über 26 Karten, deshalb hilft es
+dort.
 
-## Was das heißt
+## Hauptprozess entlastet — was gemessen wurde
 
-- **Ein Prozess** trägt auf dieser Maschine etwa **150 Spieler** bequem. Bei 300
-  liegt der Tick bei 20 ms im Mittel, mit Spitzen **über dem 50-ms-Budget** —
-  ab da ruckelt es sichtbar.
-- **Zwei Shards** verteilen die Arbeit: 300 Spieler kosten je Worker nur noch
-  5 ms. Der Hauptprozess bleibt bei 8,5 ms, hat also Luft.
-- Die CPU steigt mit Shards **leicht** (Botschaften zwischen den Threads, zwei
-  Welten). Der Gewinn ist nicht weniger CPU, sondern **mehr Reserve pro Tick**:
-  die Arbeit läuft auf zwei Kernen statt hintereinander auf einem.
-- Der **Hauptprozess wird der nächste Engpass**: Snapshots senden (bei 300 Bots
-  21–45 MB/s, weil sie dicht stehen) und Nachrichten weiterreichen.
+CPU-Profil des Haupt-Threads unter 300 Bots (`node --cpu-prof`), Anteil der
+Samples:
+
+| Stelle | vorher | nachher | Maßnahme |
+|---|---|---|---|
+| `saveCharacter` (SQLite) | 6,7 % | 0,5 % | Statements einmal vorbereiten, `synchronous = NORMAL`, Saves je Tick in **einer** Transaktion |
+| `broadcastSnapshot` | 7,4 % | < 0,4 % | Snapshots einmal je Zelle als UTF-8-Puffer, kein Neu-Kodieren und kein Hashen großer Strings je Socket |
+| `writev` (Sockets) | 9,4 % | 7,8 % | bleibt: die Bytes müssen raus |
+| **Leerlauf** | 61 % | 77 % | – |
+
+Lesart: Der Haupt-Thread war nie voll ausgelastet, verbrauchte aber Zeit an
+vermeidbarer Arbeit. Beides ist jetzt weg — die verbleibende Arbeit ist das
+Schreiben der Snapshots in die Sockets, und die hängt an der **Byte-Menge**,
+nicht an der Spielerzahl.
+
+## 500 Spieler (nur zur Orientierung)
+
+| | 2 Shards (2 Karten) |
+|---|---|
+| Tick je Worker | 7,3 / 0,9 ms (424 / 76 Spieler) |
+| Hauptprozess | 8–11 ms (Spitze bis 47 ms) |
+| Verkehr | 42–55 MB/s |
+
+Bei 500 Bots ist **der Bot-Prozess** selbst am Limit (eine Node-Instanz mit 500
+Sockets, Pings bis 1,7 s). Die Serverzahlen sind deshalb eine Obergrenze der
+Last, keine saubere Latenzmessung.
 
 ## Grenzen dieser Messung
 
-- Der **Bot-Prozess** ist selbst eine Node-Instanz mit 300 Sockets. Die hohen
-  Pings (826 ms) im 1-Prozess-Lauf sind dessen Rückstand, nicht der des Servers.
-  Für echte Latenz müssten die Bots auf einem zweiten Rechner laufen.
-- Die erste Messphase enthält den **Login-Sturm** (scrypt-Hashing); sie ist
-  deshalb teurer als der Dauerbetrieb.
-- Alle Bots auf einer Karte: in der Praxis verteilen sich Spieler, die Snapshots
-  werden kleiner.
+- Bots und Server teilen sich die CPU. Für echte Latenz müssten die Bots auf
+  einem zweiten Rechner laufen.
+- Die erste Messphase enthält den **Login-Sturm** (scrypt); sie ist teurer als
+  der Dauerbetrieb.
+- Alle Bots auf einer Karte, dicht gedrängt: die Snapshots sind im Test viel
+  größer als im Spiel (11 KB statt wenige hundert Byte).
 
-## Nächste Schritte, wenn es eng wird
+## Wenn es wieder eng wird
 
-1. **Shards erhöhen** (`SHARDS=4`, `SHARDS=8`) — die Karten werden reihum
-   verteilt, jede Karte bleibt ganz in einem Worker.
-2. **Hauptprozess entlasten**: Snapshots nicht mehrfach kodieren (schon erledigt:
-   eine Zelle teilt einen String), Nachrichten bündeln.
-3. **Karten-Zuteilung nach Last** statt reihum (heute fest).
+1. **Mehr Karten je Worker** gibt es nicht — die Zuteilung ist reihum und fest.
+   Mehr Shards helfen nur, wenn mehr Karten da sind.
+2. **Hauptprozess**: die verbleibende Arbeit ist der Socket-Versand. Der nächste
+   Schritt wäre, Snapshots zu verkleinern (nur Änderungen senden statt aller
+   Spieler mit Namen, Level, EXP, Yang) — das senkt die Bytes direkt.
+3. **Eine volle Karte** teilen geht nur, wenn Spieler derselben Karte auf
+   mehrere Worker verteilt werden; das braucht eine andere Architektur
+   (Zonen statt Karten).

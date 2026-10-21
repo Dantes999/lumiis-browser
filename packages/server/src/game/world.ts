@@ -77,6 +77,9 @@ const PAUSE_MIN_TICKS = 20;
 const PAUSE_MAX_TICKS = 50;
 /** Side of one interest cell in pixels; players share a snapshot per cell. */
 const CELL_SIZE = 256;
+/** Encodes snapshot JSON to UTF-8 bytes once; a TextEncoder is stateless. */
+const SNAPSHOT_ENCODER = new TextEncoder();
+
 /** How many cells around a player are visible: 1 means a 3x3 block. */
 const VIEW_CELLS = 1;
 
@@ -717,26 +720,30 @@ export class World {
   }
 
   /**
-   * One encoded snapshot per player. Players standing in the same cell share the
-   * same string, so a busy cell is encoded once, not once per player.
+   * One ready-to-send snapshot per player, as UTF-8 bytes. Players standing in
+   * the same cell share the same buffer, so a busy cell is encoded once. Keys
+   * are numeric cell ids: hashing a large string per player would itself cost
+   * more than the send.
    */
-  cellSnapshots(): Map<number, string> {
-    const perCell = new Map<number, string>();
-    const result = new Map<number, string>();
+  cellSnapshots(): Map<number, Uint8Array> {
+    const perCell = new Map<number, Uint8Array>();
+    const result = new Map<number, Uint8Array>();
 
     for (const player of this.playersById.values()) {
       const cell = this.cellId(player.x, player.y);
-      let json = perCell.get(cell);
-      if (json === undefined) {
-        json = encode({
+      let payload = perCell.get(cell);
+      if (payload === undefined) {
+        const json = encode({
           t: 'snapshot',
           tick: this.tickCount,
           map: this.map.id,
           ...this.visibleInCell(this.cellX(player.x), this.cellY(player.y)),
         });
-        perCell.set(cell, json);
+        // encode() returns a fresh ArrayBuffer, which is what ws wants.
+        payload = SNAPSHOT_ENCODER.encode(json);
+        perCell.set(cell, payload);
       }
-      result.set(player.id, json);
+      result.set(player.id, payload);
     }
 
     return result;

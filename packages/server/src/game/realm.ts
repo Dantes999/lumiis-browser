@@ -88,11 +88,11 @@ export class Realm {
    * One encoded snapshot per player, already cut to what that player can see.
    * Players in the same cell share the same string.
    */
-  snapshotJson(): Map<number, string> {
-    const encoded = new Map<number, string>();
+  snapshotBuffers(): Map<number, Uint8Array> {
+    const encoded = new Map<number, Uint8Array>();
 
     for (const world of this.worlds.values()) {
-      for (const [playerId, json] of world.cellSnapshots()) encoded.set(playerId, json);
+      for (const [playerId, payload] of world.cellSnapshots()) encoded.set(playerId, payload);
     }
 
     return encoded;

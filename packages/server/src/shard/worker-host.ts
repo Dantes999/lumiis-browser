@@ -30,13 +30,15 @@ export class WorkerHost implements GameHost {
     number,
     { characterId: number; name: string; accountId: number }
   >();
-  private readonly snapshots = new Map<number, string>();
+  private readonly snapshots = new Map<number, Uint8Array>();
   private readonly inventories = new Map<number, { slots: InventorySlot[]; equipment: Equipment }>();
   private readonly mapTicks = new Map<string, number>();
   private readonly notices: HostNotice[] = [];
   private readonly rewards: RewardEvent[] = [];
   private readonly inventoryUpdates: InventoryUpdate[] = [];
   private readonly flushWaiters: Array<() => void> = [];
+  /** Saves that arrived since the last tick; written together in one go. */
+  private readonly pendingSaves: Array<{ characterId: number; save: CharacterSave }> = [];
   /** Latest tick load per worker, as reported by the worker itself. */
   private readonly stats: ShardStat[] = [];
   private nextPlayerId = 1;
@@ -162,7 +164,7 @@ export class WorkerHost implements GameHost {
     // Nothing to do here.
   }
 
-  drainSnapshots(): Array<[number, string]> {
+  drainSnapshots(): Array<[number, Uint8Array]> {
     return [...this.snapshots];
   }
 
@@ -178,9 +180,9 @@ export class WorkerHost implements GameHost {
     return this.inventoryUpdates.splice(0);
   }
 
-  /** The workers save on their own; nothing to do per tick. */
+  /** Writes every save that arrived since the last tick, in one transaction. */
   saveTick(): void {
-    // Handled inside the workers.
+    if (this.pendingSaves.length > 0) this.store.saveCharacters(this.pendingSaves.splice(0));
   }
 
   flush(): Promise<void> {
@@ -200,6 +202,7 @@ export class WorkerHost implements GameHost {
   }
 
   async close(): Promise<void> {
+    this.saveTick();
     await Promise.all(this.workers.map((worker) => worker.terminate()));
     this.workers.length = 0;
   }
@@ -266,7 +269,8 @@ export class WorkerHost implements GameHost {
         return;
 
       case 'save':
-        this.store.saveCharacter(message.characterId, message.save);
+        // Batched: the next tick writes all of them in one transaction.
+        this.pendingSaves.push({ characterId: message.characterId, save: message.save });
         return;
 
       case 'transfer':
@@ -274,6 +278,8 @@ export class WorkerHost implements GameHost {
         return;
 
       case 'flushed':
+        // Write what the workers handed over before we let shutdown continue.
+        this.saveTick();
         this.pendingFlushes = Math.max(0, this.pendingFlushes - 1);
         if (this.pendingFlushes === 0) {
           for (const waiter of this.flushWaiters.splice(0)) waiter();

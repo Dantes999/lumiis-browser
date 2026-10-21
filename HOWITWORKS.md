@@ -204,10 +204,20 @@ Weitere Formeln an ihrem Ort:
 - Gespeichert wird: nach Login, **jeden Tick ein paar Spieler** (ein voller
   Durchlauf etwa alle 20 s, kein 30-Sekunden-Ruckler), beim Abmelden und beim
   Shutdown (dann alle).
+- **Schnell gespeichert:** die SQL-Anweisungen werden einmal vorbereitet, und
+  alle Saves eines Ticks laufen in **einer** Transaktion (`saveCharacters`).
+  `PRAGMA synchronous = NORMAL` (mit WAL): kein fsync pro Save. Folge bei
+  Stromausfall: die letzten Sekunden können fehlen, die Datei bleibt heil.
+  `saves` in `/status` zählt die geschriebenen Stände.
 - `data/` gehört **nie** in eine Lieferung oder ein Backup ohne Absicht.
 
 Der Code dafür: `packages/server/src/store/db.ts` (`Store`, `loadCharacter`,
-`saveCharacter`).
+`saveCharacter`, `saveCharacters`).
+
+**Snapshots** werden je Zelle **einmal** als JSON erzeugt und als UTF-8-Puffer
+(`TextEncoder`) an alle Spieler dieser Zelle verschickt — kein Neu-Kodieren pro
+Socket, kein Hashen großer Strings. Im Shard-Betrieb wandern diese Puffer als
+`Uint8Array` durch `postMessage` (gleiche Puffer bleiben geteilt).
 
 ---
 
