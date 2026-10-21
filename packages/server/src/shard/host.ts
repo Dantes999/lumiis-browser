@@ -76,6 +76,9 @@ export interface GameHost {
 
   /** Writes everyone and resolves when the store is fully up to date. */
   flush(): Promise<void>;
+
+  /** Stops any worker threads; the local host has nothing to stop. */
+  close(): Promise<void>;
 }
 
 /** The single-process host: one Realm, all maps, exactly as before. */
@@ -200,6 +203,10 @@ export class LocalHost implements GameHost {
 
   async flush(): Promise<void> {
     for (const playerId of this.characters.keys()) this.savePlayer(playerId);
+  }
+
+  async close(): Promise<void> {
+    // Nothing to stop: everything runs in this process.
   }
 
   private savePlayer(playerId: number): void {

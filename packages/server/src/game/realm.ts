@@ -21,6 +21,8 @@ export type JoinSeed = PlayerSeed & { map: string };
 export class Realm {
   private readonly worlds = new Map<string, World>();
   private readonly worldIdByPlayer = new Map<number, string>();
+  /** Warps to a map this realm does not own; the shard host forwards them. */
+  private readonly outgoingWarps: Warp[] = [];
   /** Player ids must be unique across maps; the gateway looks players up by id. */
   private nextPlayerId = 1;
 
@@ -59,12 +61,12 @@ export class Realm {
     return this.worlds.get(map) ?? null;
   }
 
-  join(seed: JoinSeed): Player | null {
+  join(seed: JoinSeed, id?: number): Player | null {
     const world = this.worlds.get(seed.map) ?? this.worlds.values().next().value;
     if (world === undefined) return null;
 
-    const player = world.addPlayer(seed, this.nextPlayerId);
-    this.nextPlayerId += 1;
+    const player = world.addPlayer(seed, id ?? this.nextPlayerId);
+    this.nextPlayerId = Math.max(this.nextPlayerId, player.id + 1);
     this.worldIdByPlayer.set(player.id, world.map.id);
     return player;
   }
@@ -184,10 +186,22 @@ export class Realm {
 
   // ---------------------------------------------------------------- portals
 
+  /** Portals that lead into another shard, drained by the worker. */
+  drainOutgoingWarps(): Warp[] {
+    const list = [...this.outgoingWarps];
+    this.outgoingWarps.length = 0;
+    return list;
+  }
+
   private transfer(warp: Warp): void {
     const from = this.worldOf(warp.playerId);
     const to = this.worlds.get(warp.to);
-    if (from === null || to === undefined) return;
+    if (from === null) return;
+    if (to === undefined) {
+      // The map belongs to another shard: hand the player over.
+      this.outgoingWarps.push(warp);
+      return;
+    }
 
     const player = from.detachPlayer(warp.playerId);
     if (player === undefined) return;

@@ -17,6 +17,7 @@ import { Store } from './store/db.js';
 import { loadTokenSecret } from './store/token.js';
 import { attachGateway, type Gateway } from './net/gateway.js';
 import { LocalHost, type GameHost } from './shard/host.js';
+import { WorkerHost } from './shard/worker-host.js';
 import { handleMapSave } from './http/mapsave.js';
 import { createStaticHandler } from './http/static.js';
 
@@ -122,8 +123,10 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
   const world = realm.primary;
   if (world === null) throw new Error('no map loaded');
 
-  // One process by default; the worker host below can split maps over threads.
-  const host: GameHost = new LocalHost(realm, store);
+  // One process by default; SHARDS=2..8 spreads the maps over worker threads.
+  const shardCount = Math.max(1, Math.min(8, Number(process.env['SHARDS'] ?? 1) || 1));
+  const host: GameHost =
+    shardCount > 1 ? new WorkerHost(maps, store, shardCount) : new LocalHost(realm, store);
   let currentTick = 0;
 
   const gateway = attachGateway(httpServer, host, store, tokenSecret);
@@ -179,6 +182,7 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
       loop.stop();
       await gateway.flush();
       await gateway.close();
+      await host.close();
       await new Promise<void>((resolve) => httpServer.close(() => resolve()));
       store.close();
     },

@@ -57,6 +57,11 @@ Der **Client** läuft im `dev`-Modus direkt aus dem Quellcode (Vite).
 | `game/map.ts` | Karten von der Platte laden und prüfen. |
 | `net/gateway.ts` | **WebSocket**: Login, Charakterauswahl, Nachrichten-`switch`, Ratenlimit, `saveAll`. |
 | `store/db.ts` | **SQLite**: Accounts (scrypt), Charaktere, Inventar, Speichern/Laden. |
+| `store/token.ts` | Session-Token (HS256), Schlüssel in `data/token.key`. |
+| `shard/host.ts` | **Host-Schnittstelle** + `LocalHost` (ein Prozess, alle Karten) |
+| `shard/worker.ts` | Ein **Karten-Worker**: eigene `Realm`, eigener Tick |
+| `shard/worker-host.ts` | Verteilt Karten auf Worker, reicht Nachrichten weiter |
+| `shard/protocol.ts` | Nachrichten zwischen Hauptprozess und Worker |
 | `http/static.ts` | Liefert Client und `/shared/` aus. |
 | `http/mapsave.ts` | Karten-Editor speichert Karten (nur lokal). |
 
@@ -205,6 +210,32 @@ Der Code dafür: `packages/server/src/store/db.ts` (`Store`, `loadCharacter`,
 `saveCharacter`).
 
 ---
+
+## 7b. Mehrere Prozesse (Shards)
+
+Standard: **ein Prozess**, alle Karten (`LocalHost`). Mit
+
+```bash
+SHARDS=2 npm start        # 2–8 Worker-Threads
+```
+
+verteilt der Hauptprozess die Karten reihum auf Worker-Threads (`WorkerHost`):
+
+- **Hauptprozess**: Sockets, Login, Accounts, **Datenbank**, Session-Tokens.
+- **Ein Worker je Kartengruppe**: eigene `Realm`, eigener 20-Hz-Tick.
+- Spieler-Absichten (`in`, `atk`, `sk`, …) werden an den Worker der Karte
+  geschickt; Snapshots, Hinweise, Belohnungen und Speicherstände kommen zurück.
+- **Portal in eine andere Karte**: der Worker schickt eine Übergabe samt
+  Spielstand; der Hauptprozess reicht sie an den Ziel-Worker weiter. Die
+  **Spieler-ID bleibt gleich**, der Client merkt nur den Kartenwechsel.
+- **Spieler-IDs** vergibt der Hauptprozess (global eindeutig); jede `World`
+  übernimmt die ID beim `addPlayer`.
+- **Speichern**: die Worker schicken Spielstände, der Hauptprozess schreibt sie
+  (die Datenbank gehört nur ihm). Beim Herunterfahren wird auf alle gewartet.
+
+**Wann sinnvoll?** Erst wenn eine Karte bzw. ein Kern an die Grenze kommt. Jeder
+Worker hat eigene Timer; mehr Shards heißt mehr Kontextwechsel, aber parallele
+Ticks. Die Karten-Zuteilung ist fest (reihum), nicht dynamisch.
 
 ## 7a. Last beobachten: `/status`
 

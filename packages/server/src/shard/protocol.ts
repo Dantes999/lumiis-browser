@@ -1,0 +1,55 @@
+// Messages between the main process and one map worker.
+//
+// The main process owns the sockets, the accounts and the database. A worker
+// owns a set of maps and their worlds. Everything a player does is forwarded as
+// an intent; results come back as snapshots, notices, rewards and saves.
+
+import type { Equipment, InventorySlot, MapData, SkillKey } from '@lumiis/shared';
+import type { CharacterSave } from '../store/db.js';
+import type { PlayerSeed, RewardBroadcast } from '../game/world.js';
+
+export type WorkerInit = { maps: MapData[] };
+
+export type ToWorker =
+  | {
+      t: 'join';
+      playerId: number;
+      characterId: number;
+      name: string;
+      map: string;
+      seed: PlayerSeed;
+    }
+  | { t: 'leave'; playerId: number }
+  | { t: 'input'; playerId: number; dx: number; dy: number }
+  | { t: 'attack'; playerId: number; target: number | null; dir: number | null }
+  | { t: 'skill'; playerId: number; key: SkillKey }
+  | { t: 'pickup'; playerId: number; target: number }
+  | { t: 'equip'; playerId: number; slot: number }
+  | { t: 'unequip'; playerId: number; piece: 'weapon' | 'armor' }
+  | { t: 'settings'; playerId: number; autoPickup: boolean; types: string[] }
+  | { t: 'flush' };
+
+export type FromWorker =
+  | {
+      t: 'joined';
+      playerId: number;
+      map: string;
+      tick: number;
+      slots: InventorySlot[];
+      equipment: Equipment;
+    }
+  | { t: 'joinFailed'; playerId: number }
+  | { t: 'snapshots'; ticks: Array<[string, number]>; entries: Array<[number, string]> }
+  | { t: 'notice'; playerId: number; text: string }
+  | { t: 'inventory'; playerId: number; slots: InventorySlot[]; equipment: Equipment }
+  | { t: 'reward'; map: string; reward: RewardBroadcast }
+  | { t: 'save'; characterId: number; save: CharacterSave }
+  | {
+      t: 'transfer';
+      playerId: number;
+      characterId: number;
+      name: string;
+      to: string;
+      save: CharacterSave;
+    }
+  | { t: 'flushed' };
