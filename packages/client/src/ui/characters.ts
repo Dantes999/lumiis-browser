@@ -1,7 +1,7 @@
 // The character screen: pick one of the account's characters or create a new
 // one. It appears right after the login and disappears once the world loads.
 
-import type { CharacterSummary } from '@lumiis/shared';
+import type { ChannelInfo, CharacterSummary } from '@lumiis/shared';
 
 const mustFind = (id: string): HTMLElement => {
   const element = document.getElementById(id);
@@ -13,10 +13,16 @@ export type CharacterScreen = {
   show(list: CharacterSummary[], max: number): void;
   hide(): void;
   showError(text: string): void;
+  /** Channels of one character, for the picker after a click on his row. */
+  showChannels(characterId: number, list: ChannelInfo[]): void;
+  hideChannels(): void;
 };
 
 export function createCharacterScreen(
-  onSelect: (id: number) => void,
+  /** A row was clicked: ask for his channels. */
+  onPick: (id: number) => void,
+  /** A channel was chosen: enter the world there. */
+  onSelect: (id: number, channel: number) => void,
   onCreate: (name: string) => void,
 ): CharacterScreen {
   const overlay = mustFind('characters');
@@ -24,9 +30,11 @@ export function createCharacterScreen(
   const nameInput = mustFind('character-name') as HTMLInputElement;
   const error = mustFind('character-error');
   const createButton = mustFind('character-create') as HTMLButtonElement;
+  const picker = mustFind('channel-picker');
 
   let shownList = '';
   let shownError = '';
+  let shownChannels = '';
 
   const submit = (): void => {
     const name = nameInput.value.trim();
@@ -58,7 +66,7 @@ export function createCharacterScreen(
         button.type = 'button';
         button.className = 'character-row';
         button.textContent = `${character.name} — level ${character.level}`;
-        button.addEventListener('click', () => onSelect(character.id));
+        button.addEventListener('click', () => onPick(character.id));
         list.append(button);
       }
 
@@ -75,8 +83,50 @@ export function createCharacterScreen(
     hide(): void {
       shownList = '';
       shownError = '';
+      shownChannels = '';
       error.textContent = '';
+      picker.classList.add('hidden');
+      picker.replaceChildren();
       overlay.classList.add('hidden');
+    },
+    showChannels(characterId: number, channels: ChannelInfo[]): void {
+      // One channel means no choice to make: walk straight in.
+      if (channels.length <= 1) {
+        onSelect(characterId, channels[0]?.channel ?? 1);
+        return;
+      }
+
+      const signature = `${characterId}|${channels.map((entry) => `${entry.channel}:${entry.players}`).join('|')}`;
+      if (signature === shownChannels) return;
+      shownChannels = signature;
+
+      picker.replaceChildren();
+
+      const title = document.createElement('div');
+      title.className = 'channel-picker-title';
+      title.textContent = 'Choose a channel';
+      picker.append(title);
+
+      for (const entry of channels) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'character-row';
+        button.textContent = `CH${entry.channel} — ${entry.players} ${entry.players === 1 ? 'player' : 'players'}`;
+        button.addEventListener('click', () => {
+          shownChannels = '';
+          picker.classList.add('hidden');
+          onSelect(characterId, entry.channel);
+        });
+        picker.append(button);
+      }
+
+      picker.classList.remove('hidden');
+    },
+    hideChannels(): void {
+      if (shownChannels === '') return;
+      shownChannels = '';
+      picker.classList.add('hidden');
+      picker.replaceChildren();
     },
     showError(text: string): void {
       if (text === shownError) return;

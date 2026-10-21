@@ -166,6 +166,35 @@ port.on('message', (message: ToWorker) => {
       realm.setPickupSettings(message.playerId, message.autoPickup, message.types);
       return;
 
+    case 'switch': {
+      const world = realm.worldOf(message.playerId);
+      const player = world?.getPlayer(message.playerId);
+      const characterId = characters.get(message.playerId);
+      if (world === null || player === undefined || characterId === undefined) return;
+
+      // The target channel may live here or in another worker.
+      const target = realm.world(message.world);
+      if (target !== null) {
+        const moved = realm.moveToChannel(message.playerId, target.channel);
+        if (moved.ok) post({ t: 'switched', playerId: message.playerId, world: target.key });
+        return;
+      }
+
+      const save = realm.saveOf(message.playerId);
+      if (save === null) return;
+      realm.leave(message.playerId);
+      characters.delete(message.playerId);
+      post({
+        t: 'transfer',
+        playerId: message.playerId,
+        characterId,
+        name: player.name,
+        to: message.world,
+        save,
+      });
+      return;
+    }
+
     case 'flush':
       for (const playerId of characters.keys()) saveOne(playerId);
       post({ t: 'flushed' });

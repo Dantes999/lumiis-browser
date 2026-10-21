@@ -18,6 +18,7 @@ import { view } from './state';
 import { createHud } from './ui/hud';
 import { createBag } from './ui/bag';
 import { createCharacterScreen } from './ui/characters';
+import { createChannelUi } from './ui/channel';
 import { createLogin } from './ui/login';
 import { createSettings } from './ui/settings';
 import { createLogPanel } from './ui/logpanel';
@@ -73,8 +74,13 @@ const login = createLogin((name, password, mode) => {
 });
 
 const characters = createCharacterScreen(
-  (id) => connection.selectCharacter(id),
+  (id) => connection.requestChannels(id),
+  (id, channel) => connection.selectCharacter(id, channel),
   (name) => connection.createCharacter(name),
+);
+const channelUi = createChannelUi(
+  () => connection.requestChannels(),
+  (channel) => connection.switchChannel(channel),
 );
 
 connection.setWelcomeHandler(() => {
@@ -169,11 +175,19 @@ const bag = createBag(
 window.setInterval(() => {
   hud.render(view);
   bag.render(view.inventory, view.equipment);
+  channelUi.render(view);
   tickPickup();
 
   if (view.characters !== null) {
     login.hide();
     characters.show(view.characters, view.characterMax);
+  }
+  // The server answers the login picker with the channel list.
+  const options = view.channelOptions;
+  if (options !== null && options.id !== null && view.status !== 'online') {
+    characters.showChannels(options.id, options.list);
+  } else {
+    characters.hideChannels();
   }
   if (view.authError !== null) {
     login.showError(view.authError);

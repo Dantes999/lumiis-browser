@@ -72,6 +72,49 @@ describe('channels', () => {
     expect(realm.world('field#ch2')?.snapshot().monsters).toHaveLength(1);
   });
 
+  it('joins a chosen channel', () => {
+    const realm = new Realm([field()], null, 2);
+    const player = realm.join(
+      { map: 'field', accountId: 1, characterId: 1, name: 'A' },
+      undefined,
+      2,
+    );
+    expect(realm.worldIdOf(player!.id)).toBe('field#ch2');
+  });
+
+  it('reports how many players each channel has', () => {
+    const realm = new Realm([field()], null, 2);
+    realm.join({ map: 'field', accountId: 1, characterId: 1, name: 'A' });
+    realm.join({ map: 'field', accountId: 2, characterId: 2, name: 'B' });
+
+    expect(realm.channelInfo('field')).toEqual([
+      { channel: 1, players: 1 },
+      { channel: 2, players: 1 },
+    ]);
+  });
+
+  it('switches channel and keeps id and position', () => {
+    const realm = new Realm([field()], null, 2);
+    const player = realm.join({
+      map: 'field',
+      accountId: 1,
+      characterId: 1,
+      name: 'A',
+      x: 16 * 32 + 16,
+      y: 16 * 32 + 16,
+    });
+    const before = { x: player!.x, y: player!.y };
+
+    expect(realm.moveToChannel(player!.id, 2).ok).toBe(true);
+    expect(realm.worldIdOf(player!.id)).toBe('field#ch2');
+
+    const moved = realm.world('field#ch2')?.getPlayer(player!.id);
+    expect(moved?.id).toBe(player!.id);
+    expect(moved?.x).toBe(before.x);
+    expect(moved?.y).toBe(before.y);
+    expect(realm.world('field#ch1')?.getPlayer(player!.id)).toBeUndefined();
+  });
+
   it('keeps the channel when a player walks through a portal', () => {
     const realm = new Realm([field()], null, 2);
     // First player fills ch1, so the second (on the gate) starts on ch2.

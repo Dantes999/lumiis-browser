@@ -4,7 +4,7 @@
 // host below runs each map group in its own thread. The gateway talks only to
 // this interface, so splitting the game across threads changes nothing in it.
 
-import type { Equipment, InventorySlot, SkillKey } from '@lumiis/shared';
+import type { ChannelInfo, Equipment, InventorySlot, SkillKey } from '@lumiis/shared';
 import type { Player, PlayerSeed, RewardBroadcast } from '../game/world.js';
 import type { Realm } from '../game/realm.js';
 import type { Store } from '../store/db.js';
@@ -18,6 +18,10 @@ export type JoinedPlayer = {
   map: string;
   /** World key: the map id, or map#ch2 for a channel. */
   world: string;
+  /** Channel number, 1 based. */
+  channel: number;
+  /** How many channels the map has. */
+  channelCount: number;
 };
 
 export type InventoryUpdate = {
@@ -38,6 +42,8 @@ export type JoinRequest = {
   map: string;
   characterId: number;
   name: string;
+  /** 0 or missing means "the emptiest channel". */
+  channel?: number;
 };
 
 export interface GameHost {
@@ -53,6 +59,12 @@ export interface GameHost {
   leave(playerId: number): void;
 
   worldIdOf(playerId: number): string | null;
+
+  /** Player count per channel of a map, for the picker. */
+  channelInfo(map: string): ChannelInfo[];
+
+  /** Moves a player to another channel of his map; false when it is unknown. */
+  switchChannel(playerId: number, channel: number): boolean;
 
   /** The current tick of one world, for the welcome message. */
   tickOf(world: string): number;
@@ -110,7 +122,11 @@ export class LocalHost implements GameHost {
   }
 
   join(request: JoinRequest): JoinedPlayer | null {
-    const player = this.realm.join({ ...request.seed, map: request.map });
+    const player = this.realm.join(
+      { ...request.seed, map: request.map },
+      undefined,
+      request.channel ?? 0,
+    );
     if (player === null) return null;
 
     const joined = this.realm.worldOf(player.id);
@@ -121,7 +137,17 @@ export class LocalHost implements GameHost {
       name: player.name,
       map: joined?.map.id ?? request.map,
       world: joined?.key ?? request.map,
+      channel: joined?.channel ?? 1,
+      channelCount: this.realm.channelCount,
     };
+  }
+
+  channelInfo(map: string): ChannelInfo[] {
+    return this.realm.channelInfo(map);
+  }
+
+  switchChannel(playerId: number, channel: number): boolean {
+    return this.realm.moveToChannel(playerId, channel).ok;
   }
 
   leave(playerId: number): void {

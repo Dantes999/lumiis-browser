@@ -47,6 +47,7 @@ export const setRewardHandler = (fn: ((reward: RewardMessage) => void) | null): 
 const TOKEN_KEY = 'lumiis.token';
 /** The last character played, so a reload walks straight back in. */
 const CHARACTER_KEY = 'lumiis.character';
+const CHANNEL_KEY = 'lumiis.channel';
 
 const PING_INTERVAL_MS = 2000;
 const MAX_RECONNECT_DELAY_MS = 10000;
@@ -72,6 +73,8 @@ export class Connection {
   private lastMessageAt = 0;
   /** The character played before a drop, so a reconnect can walk straight in. */
   private lastCharacterId: number | null = null;
+  /** True only for an automatic reconnect; a fresh login always picks by hand. */
+  private autoEnter = false;
   /** When the socket opened, to report how long a connection lasted. */
   private connectedAt = 0;
   /** Throttles the high-ping warning so a bad line does not flood the log. */
@@ -168,14 +171,43 @@ export class Connection {
     this.socket?.close();
   }
 
-  selectCharacter(id: number): void {
+  selectCharacter(id: number, channel?: number): void {
     this.lastCharacterId = id;
     try {
       window.localStorage.setItem(CHARACTER_KEY, String(id));
     } catch {
       // Private mode: the choice lasts for this tab only.
     }
-    this.send({ t: 'select', id });
+    this.send(channel === undefined ? { t: 'select', id } : { t: 'select', id, channel });
+  }
+
+  private rememberChannel(channel: number): void {
+    try {
+      window.localStorage.setItem(CHANNEL_KEY, String(channel));
+    } catch {
+      // Private mode: the channel lasts for this tab only.
+    }
+  }
+
+  private storedChannel(): number | undefined {
+    try {
+      const stored = window.localStorage.getItem(CHANNEL_KEY);
+      if (stored === null) return undefined;
+      const value = Number(stored);
+      return Number.isInteger(value) && value > 0 ? value : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** Asks for the channels of a character (login) or of the current map. */
+  requestChannels(id?: number): void {
+    this.send(id === undefined ? { t: 'channels' } : { t: 'channels', id });
+  }
+
+  /** Moves the character to another channel of the same map. */
+  switchChannel(channel: number): void {
+    this.send({ t: 'switchChannel', channel });
   }
 
   createCharacter(name: string): void {
@@ -245,6 +277,8 @@ export class Connection {
     logEvent('info', `reconnecting in ${Math.round(delay / 1000)}s`);
     this.reconnectTimer = window.setTimeout(() => {
       this.reconnectTimer = null;
+      // A drop should not cost the player his world: walk straight back in.
+      this.autoEnter = true;
       this.connect();
     }, delay);
   }
@@ -328,11 +362,15 @@ export class Connection {
 
     switch (message.t) {
       case 'welcome':
-        logEvent('info', `in the world on map "${message.map}"`);
+        logEvent('info', `in the world on map "${message.map}" (channel ${message.channel})`);
         view.status = 'online';
         view.selfId = message.id;
         view.tick = message.tick;
         view.mapId = message.map;
+        view.channel = message.channel;
+        view.channelCount = message.channelCount;
+        view.channelOptions = null;
+        this.rememberChannel(message.channel);
         // A reconnect must log in, not try to register the same name again.
         if (this.credentials !== null) this.credentials.mode = 'login';
         this.onWelcome?.();
@@ -345,6 +383,16 @@ export class Connection {
       case 'inventory':
         view.inventory = message.slots;
         view.equipment = message.equipment;
+        break;
+      case 'channels':
+        view.channelOptions = { id: message.id, map: message.map, list: message.list };
+        break;
+      case 'channel':
+        view.channel = message.channel;
+        view.channelCount = message.count;
+        view.channelOptions = null;
+        this.rememberChannel(message.channel);
+        logEvent('info', `now on channel ${message.channel}`);
         break;
       case 'pong': {
         const ping = Math.max(0, Math.round(performance.now() - message.at));
@@ -384,13 +432,21 @@ export class Connection {
             // Private mode: the session lasts for this tab only.
           }
         }
-        // After a drop, walk straight back into the same character instead of
-        // making the player pick again.
+        // After a network drop, walk straight back into the same character and
+        // channel. A fresh login always shows the character and channel picker.
         const remembered = this.lastCharacterId;
-        if (remembered !== null && view.selfId === null) {
+        if (this.autoEnter && remembered !== null && view.selfId === null) {
           const known = message.list.some((entry) => entry.id === remembered);
-          if (known) this.send({ t: 'select', id: remembered });
+          if (known) {
+            const channel = this.storedChannel();
+            this.send(
+              channel === undefined
+                ? { t: 'select', id: remembered }
+                : { t: 'select', id: remembered, channel },
+            );
+          }
         }
+        this.autoEnter = false;
         break;
       }
     }

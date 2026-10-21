@@ -50,7 +50,8 @@ context is created when the login button is pressed.
 ## Maps
 
 Start with `CHANNELS=2` to run every map twice (CH1/CH2, like Metin2) and
-`SHARDS=2` to spread the worlds over worker threads.
+`SHARDS=2` to spread the worlds over worker threads. With channels on, pick one
+when you choose your character (with the player counts) and switch in the HUD.
 
 Two maps ship with the project: `testmap` (64x64) and `grove` (24x24), linked by
 portals in both directions. The map a character stands on is part of his save,

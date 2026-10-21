@@ -51,12 +51,13 @@ const enterAs = async (socket: WebSocket, name = 'Kain'): Promise<Record<string,
   return nextOfType(socket, 'welcome');
 };
 
-const startServer = async (): Promise<number> => {
+const startServer = async (options: { channels?: number } = {}): Promise<number> => {
   server = await createGameServer({
     port: 0,
     host: '127.0.0.1',
     staticDir: '/nonexistent',
     dataFile: ':memory:',
+    ...options,
   });
   server.loop.start();
   return server.port;
@@ -150,6 +151,50 @@ describe('gateway', () => {
     expect(after as number).toBeGreaterThan(before as number);
 
     socket.close();
+  });
+
+  it('lets the player pick and switch a channel', async () => {
+    const port = await startServer({ channels: 2 });
+
+    // Create the character (this enters the world once), then come back.
+    const first = await openSocket(port);
+    const welcome = await enterAs(first, 'Kain');
+    expect(welcome['channelCount']).toBe(2);
+    expect([1, 2]).toContain(welcome['channel']);
+
+    const closed = new Promise<void>((resolve) => first.once('close', () => resolve()));
+    first.close();
+    await closed;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const second = await openSocket(port);
+    second.send(JSON.stringify({ t: 'login', name: 'Kain', password: 'secret123', mode: 'login' }));
+    const list = (await nextOfType(second, 'characters')) as { list: Array<{ id: number }> };
+    const id = list.list[0]?.id;
+    expect(id).toBeDefined();
+
+    // The login picker asks for the channels of that character's map.
+    second.send(JSON.stringify({ t: 'channels', id: id as number }));
+    const channels = (await nextOfType(second, 'channels')) as {
+      map: string;
+      list: Array<{ channel: number; players: number }>;
+    };
+    expect(channels.map).toBe('testmap');
+    expect(channels.list).toHaveLength(2);
+
+    // Enter on channel 2.
+    second.send(JSON.stringify({ t: 'select', id: id as number, channel: 2 }));
+    const chosen = await nextOfType(second, 'welcome');
+    expect(chosen['channel']).toBe(2);
+    expect(chosen['channelCount']).toBe(2);
+
+    // And switch back to 1 without leaving the world.
+    second.send(JSON.stringify({ t: 'switchChannel', channel: 1 }));
+    const switched = await nextOfType(second, 'channel');
+    expect(switched['channel']).toBe(1);
+    expect(switched['count']).toBe(2);
+
+    second.close();
   });
 
   it('answers a rejected login instead of closing the socket', async () => {

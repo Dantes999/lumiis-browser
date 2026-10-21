@@ -9,6 +9,7 @@ import {
   channelKeysOf,
   spawnPosition,
   worldKeyOf,
+  type ChannelInfo,
   type Direction,
   type Equipment,
   type InventorySlot,
@@ -37,6 +38,7 @@ export class WorkerHost implements GameHost {
   private readonly maps = new Map<string, MapData>();
   private readonly playerShard = new Map<number, number>();
   private readonly playerWorld = new Map<number, string>();
+  private readonly playerMap = new Map<number, string>();
   /** Players per world key, so a join picks the emptiest channel. */
   private readonly worldLoad = new Map<string, number>();
   private readonly characters = new Map<
@@ -119,15 +121,22 @@ export class WorkerHost implements GameHost {
     const map = this.maps.get(request.map) ?? this.maps.values().next().value;
     if (map === undefined) return null;
 
-    // Pick the emptiest channel of the map.
+    // A chosen channel wins; otherwise the emptiest one.
     const keys = channelKeysOf(map, this.channels);
-    let world = keys[0] ?? request.map;
-    let load = Number.POSITIVE_INFINITY;
-    for (const key of keys) {
-      const count = this.worldLoad.get(key) ?? 0;
-      if (count < load) {
-        load = count;
-        world = key;
+    let world: string;
+    if (request.channel !== undefined && request.channel > 0) {
+      const chosen = worldKeyOf(map, request.channel, this.channels);
+      if (!this.worldShard.has(chosen)) return null;
+      world = chosen;
+    } else {
+      world = keys[0] ?? request.map;
+      let load = Number.POSITIVE_INFINITY;
+      for (const key of keys) {
+        const count = this.worldLoad.get(key) ?? 0;
+        if (count < load) {
+          load = count;
+          world = key;
+        }
       }
     }
 
@@ -140,6 +149,7 @@ export class WorkerHost implements GameHost {
 
     this.playerShard.set(id, shard);
     this.playerWorld.set(id, world);
+    this.playerMap.set(id, map.id);
     this.characters.set(id, {
       characterId: request.characterId,
       name: request.name,
@@ -161,6 +171,8 @@ export class WorkerHost implements GameHost {
       name: request.name,
       map: map.id,
       world,
+      channel: keys.indexOf(world) + 1,
+      channelCount: this.channels,
     };
   }
 
@@ -173,9 +185,36 @@ export class WorkerHost implements GameHost {
 
     this.playerShard.delete(playerId);
     this.playerWorld.delete(playerId);
+    this.playerMap.delete(playerId);
     this.characters.delete(playerId);
     this.snapshots.delete(playerId);
     this.inventories.delete(playerId);
+  }
+
+  channelInfo(map: string): ChannelInfo[] {
+    const mapData = this.maps.get(map);
+    if (mapData === undefined) return [];
+
+    return channelKeysOf(mapData, this.channels).map((key, index) => ({
+      channel: index + 1,
+      players: this.worldLoad.get(key) ?? 0,
+    }));
+  }
+
+  switchChannel(playerId: number, channel: number): boolean {
+    const mapId = this.playerMap.get(playerId);
+    const shard = this.playerShard.get(playerId);
+    if (mapId === undefined || shard === undefined) return false;
+
+    const map = this.maps.get(mapId);
+    if (map === undefined) return false;
+
+    const world = worldKeyOf(map, channel, this.channels);
+    if (!this.worldShard.has(world)) return false;
+    if (this.playerWorld.get(playerId) === world) return true;
+
+    this.post(shard, { t: 'switch', playerId, world });
+    return true;
   }
 
   worldIdOf(playerId: number): string | null {
@@ -351,6 +390,15 @@ export class WorkerHost implements GameHost {
         this.handOver(message);
         return;
 
+      case 'switched': {
+        const before = this.playerWorld.get(message.playerId);
+        if (before === message.world) return;
+        if (before !== undefined) this.addLoad(before, -1);
+        this.addLoad(message.world, 1);
+        this.playerWorld.set(message.playerId, message.world);
+        return;
+      }
+
       case 'flushed':
         // Write what the workers handed over before we let shutdown continue.
         this.saveTick();
@@ -374,6 +422,7 @@ export class WorkerHost implements GameHost {
 
     this.playerShard.set(message.playerId, target);
     this.playerWorld.set(message.playerId, message.to);
+    this.playerMap.set(message.playerId, message.save.map);
 
     const save: CharacterSave = message.save;
     const seed: PlayerSeed = {

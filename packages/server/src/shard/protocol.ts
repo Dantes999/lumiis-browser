@@ -35,6 +35,8 @@ export type ToWorker =
   | { t: 'equip'; playerId: number; slot: number }
   | { t: 'unequip'; playerId: number; piece: 'weapon' | 'armor' }
   | { t: 'settings'; playerId: number; autoPickup: boolean; types: string[] }
+  /** Move the player to another channel world (same map). */
+  | { t: 'switch'; playerId: number; world: string }
   | { t: 'flush' };
 
 export type FromWorker =
@@ -61,4 +63,6 @@ export type FromWorker =
       save: CharacterSave;
     }
   | { t: 'stats'; players: number; tickMs: number; tickMsMax: number }
+  /** The player now lives in this world; the main process updates its books. */
+  | { t: 'switched'; playerId: number; world: string }
   | { t: 'flushed' };

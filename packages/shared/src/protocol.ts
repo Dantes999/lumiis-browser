@@ -21,6 +21,9 @@ import { isSkillKey, type SkillKey } from './skills.js';
  */
 export type MoveEntry = [number, number, number, number, number, number];
 
+/** One channel of a map and how many players are in it. */
+export type ChannelInfo = { channel: number; players: number };
+
 /** Bit flags inside a MoveEntry. */
 export const MOVE_MOVING = 1;
 export const MOVE_ATTACKING = 2;
@@ -95,7 +98,9 @@ export type SnapshotMessage = {
 /** Messages the client may send. */
 export type ClientMessage =
   | { t: 'login'; name: string; password: string; mode: 'login' | 'register' }
-  | { t: 'select'; id: number }
+  | { t: 'select'; id: number; channel?: number }
+  | { t: 'channels'; id?: number }
+  | { t: 'switchChannel'; channel: number }
   | { t: 'createCharacter'; name: string }
   | { t: 'input'; dx: number; dy: number }
   | { t: 'attack'; target?: number; dir?: number }
@@ -118,8 +123,14 @@ export type ServerMessage =
       tick: number;
       /** Map the player is standing on. */
       map: string;
+      /** Channel number, 1 based. */
+      channel: number;
+      /** How many channels this map has. */
+      channelCount: number;
     }
   | SnapshotMessage
+  | { t: 'channels'; id: number | null; map: string; list: ChannelInfo[] }
+  | { t: 'channel'; channel: number; count: number }
   | { t: 'inventory'; slots: (InventorySlot | null)[]; equipment: Equipment }
   | { t: 'characters'; list: CharacterSummary[]; max: number; token?: string }
   | { t: 'authError'; reason: string }
@@ -263,7 +274,32 @@ export function parseClientMessage(input: unknown): ParsedMessage {
       if (typeof id !== 'number' || !Number.isInteger(id) || id < 1) {
         return fail('select needs a character id');
       }
+
+      const channel = message.channel;
+      if (channel !== undefined) {
+        if (typeof channel !== 'number' || !Number.isInteger(channel) || channel < 1 || channel > 64) {
+          return fail('select channel must be 1..64');
+        }
+        return { ok: true, message: { t: 'select', id, channel } };
+      }
       return { ok: true, message: { t: 'select', id } };
+    }
+
+    case 'channels': {
+      const id = message.id;
+      if (id === undefined) return { ok: true, message: { t: 'channels' } };
+      if (typeof id !== 'number' || !Number.isInteger(id) || id < 1) {
+        return fail('channels needs a character id');
+      }
+      return { ok: true, message: { t: 'channels', id } };
+    }
+
+    case 'switchChannel': {
+      const channel = message.channel;
+      if (typeof channel !== 'number' || !Number.isInteger(channel) || channel < 1 || channel > 64) {
+        return fail('switchChannel needs a channel in 1..64');
+      }
+      return { ok: true, message: { t: 'switchChannel', channel } };
     }
 
     case 'createCharacter': {

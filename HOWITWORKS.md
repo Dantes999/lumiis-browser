@@ -287,10 +287,19 @@ Monstern, eigenem Tick, eigenem Boden. Welt-Schlüssel: `testmap#ch2`.
   ist der Preis und der Sinn (wie Metin2 CH1/CH2): dieselbe Karte, mehr Platz.
 - **Shards**: die Kanäle einer Karte werden reihum verteilt, liegen also auf
   **verschiedenen Workern** — genau das verteilt eine volle Karte.
+- **Auswahl beim Login**: ein Klick auf den Charakter zeigt die Kanäle seiner
+  Karte mit Spielerzahl (`CH2 — 12 players`); ein Klick tritt dort ein.
+- **Wechsel im Spiel**: der Knopf im HUD zeigt `CH2/2`; ein Klick öffnet die
+  Liste mit den Zahlen, ein Klick wechselt (gleiche Karte, gleiche Position).
+- **Nach einem Verbindungsabbruch** geht es automatisch in den zuletzt
+  gespielten Kanal zurück (`localStorage` `lumiis.channel`). Ein frischer Login
+  wählt immer von Hand.
 
-**Code**: `Realm` (`leastLoaded`, `transfer` behält den Kanal),
-`WorkerHost` (`worldLoad`, Kanal-Zuteilung), `shared/src/map.ts`
-(`worldKeyOf`, `channelKeysOf`). Tests: `packages/server/tests/channels.test.ts`.
+**Code**: `Realm` (`leastLoaded`, `channelInfo`, `moveToChannel`),
+`WorkerHost` (`worldLoad`, Kanal-Zuteilung, `switchChannel`),
+`shared/src/map.ts` (`worldKeyOf`, `channelKeysOf`), Client
+`ui/channel.ts` (HUD-Knopf + Liste) und `ui/characters.ts` (Auswahl beim Login).
+Tests: `packages/server/tests/channels.test.ts`, `gateway.test.ts`.
 
 ## 7a. Last beobachten: `/status`
 

@@ -128,7 +128,7 @@ export function attachGateway(
   };
 
   /** Loads a character and puts the player into the world. */
-  const enterWorld = (session: Session, characterId: number): void => {
+  const enterWorld = (session: Session, characterId: number, channel = 0): void => {
     if (session.accountId === null || session.player !== null) return;
     if (store.characterOwner(characterId) !== session.accountId) {
       send(session, { t: 'authError', reason: 'That character is not yours.' });
@@ -163,6 +163,7 @@ export function attachGateway(
       map: save.map,
       characterId,
       name: save.name,
+      channel,
       seed: {
         accountId: session.accountId,
         characterId,
@@ -190,8 +191,10 @@ export function attachGateway(
       id: player.id,
       protocol: PROTOCOL_VERSION,
       tickRate: TICK_RATE,
-      tick: host.tickOf(player.map),
+      tick: host.tickOf(player.world),
       map: player.map,
+      channel: player.channel,
+      channelCount: player.channelCount,
     });
     sendInventory(session, player.id);
   };
@@ -355,8 +358,53 @@ export function attachGateway(
           void handleLogin(session, message);
           break;
         case 'select':
-          enterWorld(session, message.id);
+          enterWorld(session, message.id, message.channel ?? 0);
           break;
+        case 'channels': {
+          // At the login screen the client names a character; in the world it
+          // just asks for the channels of the map it is standing on.
+          if (message.id !== undefined) {
+            if (session.accountId === null) break;
+            if (store.characterOwner(message.id) !== session.accountId) break;
+            const save = store.loadCharacter(message.id);
+            if (save === null) break;
+            send(session, {
+              t: 'channels',
+              id: message.id,
+              map: save.map,
+              list: host.channelInfo(save.map),
+            });
+            break;
+          }
+
+          if (session.player === null) break;
+          send(session, {
+            t: 'channels',
+            id: null,
+            map: session.player.map,
+            list: host.channelInfo(session.player.map),
+          });
+          break;
+        }
+        case 'switchChannel': {
+          if (session.player === null) {
+            send(session, { t: 'notice', text: 'Log in first.' });
+            break;
+          }
+          if (message.channel === session.player.channel) break;
+          if (!host.switchChannel(session.player.id, message.channel)) {
+            send(session, { t: 'notice', text: 'That channel does not exist.' });
+            break;
+          }
+
+          session.player.channel = message.channel;
+          send(session, {
+            t: 'channel',
+            channel: message.channel,
+            count: session.player.channelCount,
+          });
+          break;
+        }
         case 'createCharacter':
           handleCreate(session, message.name);
           break;

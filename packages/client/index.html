@@ -37,6 +37,7 @@
       <div class="login-box">
         <h1>Characters</h1>
         <div id="character-list" class="character-list"></div>
+        <div id="channel-picker" class="channel-picker hidden"></div>
         <label for="character-name">New character</label>
         <input id="character-name" maxlength="16" autocomplete="off" spellcheck="false" />
         <div id="character-error" class="login-error"></div>
@@ -62,6 +63,13 @@
       <div class="hud-row">
         <span class="hud-label">Players</span>
         <span id="players" class="hud-value">0</span>
+      </div>
+      <div class="hud-row">
+        <span class="hud-label">Channel</span>
+        <button id="channel-button" class="channel-button hidden" type="button">CH1</button>
+      </div>
+      <div id="channel-pop" class="channel-pop hidden">
+        <div id="channel-list" class="channel-list"></div>
       </div>
       <div class="hud-row">
         <span class="hud-label">Level</span>

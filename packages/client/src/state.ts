@@ -1,7 +1,13 @@
 // Client-side state. One mutable object: the network writes into it, the
 // simulation and the scene read from it.
 
-import type { CharacterSummary, Direction, Equipment, InventorySlot } from '@lumiis/shared';
+import type {
+  ChannelInfo,
+  CharacterSummary,
+  Direction,
+  Equipment,
+  InventorySlot,
+} from '@lumiis/shared';
 
 export type ConnectionStatus = 'connecting' | 'online' | 'offline';
 
@@ -96,6 +102,11 @@ export type ViewState = {
   characters: CharacterSummary[] | null;
   /** Map the player is standing on, sent with the welcome. */
   mapId: string | null;
+  /** Channel of this character (1 based) and how many the map has. */
+  channel: number;
+  channelCount: number;
+  /** Channel list for the login picker or the in-game popup; null when none. */
+  channelOptions: { id: number | null; map: string; list: ChannelInfo[] } | null;
   characterMax: number;
   /** When the current notice stops being shown, in performance.now() ms. */
   noticeUntil: number;
@@ -135,6 +146,9 @@ export const view: ViewState = {
   authError: null,
   characters: null,
   mapId: null,
+  channel: 1,
+  channelCount: 1,
+  channelOptions: null,
   characterMax: 4,
   noticeUntil: 0,
   zoom: 1,

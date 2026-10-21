@@ -28,6 +28,8 @@ export type GameServerOptions = {
   mapPath?: string;
   /** SQLite file for accounts and characters; ':memory:' in tests. */
   dataFile?: string;
+  /** Copies of each map (channels); default from CHANNELS or 1. */
+  channels?: number;
 };
 
 export type GameServer = {
@@ -131,7 +133,10 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
   });
 
   // CHANNELS=2..8 gives every map that many copies (Metin2 style CH1/CH2).
-  const channels = Math.max(1, Math.min(8, Number(process.env['CHANNELS'] ?? 1) || 1));
+  const channels = Math.max(
+    1,
+    Math.min(8, options.channels ?? (Number(process.env['CHANNELS'] ?? 1) || 1)),
+  );
   // One process by default; SHARDS=2..8 spreads the worlds over worker threads.
   const shardCount = Math.max(1, Math.min(8, Number(process.env['SHARDS'] ?? 1) || 1));
 

@@ -2,7 +2,7 @@
 // moving between them. A player id and a character stay the same for a whole
 // session; only the world that holds the player changes at a portal.
 
-import { channelKeysOf, worldKeyOf, type MapData } from '@lumiis/shared';
+import { channelKeysOf, worldKeyOf, type ChannelInfo, type MapData } from '@lumiis/shared';
 import type {
   AttackResult,
   Player,
@@ -76,6 +76,43 @@ export class Realm {
     return [...this.worlds.keys()];
   }
 
+  /** How many channels each map runs. */
+  get channelCount(): number {
+    return this.channels;
+  }
+
+  /** Player count per channel of one map, for the picker. */
+  channelInfo(mapId: string): ChannelInfo[] {
+    const map = this.maps.get(mapId);
+    if (map === undefined) return [];
+
+    return channelKeysOf(map, this.channels).map((key, index) => ({
+      channel: index + 1,
+      players: this.worlds.get(key)?.playerCount ?? 0,
+    }));
+  }
+
+  /** Moves a player to another channel of the same map, keeping id and state. */
+  moveToChannel(
+    playerId: number,
+    channel: number,
+  ): { ok: true } | { ok: false; reason: string } {
+    const world = this.worldOf(playerId);
+    if (world === null) return { ok: false, reason: 'You are not in the world.' };
+
+    const target = this.worlds.get(worldKeyOf(world.map, channel, this.channels));
+    if (target === undefined) return { ok: false, reason: 'That channel does not exist.' };
+    if (target === world) return { ok: true };
+
+    const player = world.detachPlayer(playerId);
+    if (player === undefined) return { ok: false, reason: 'You are not in the world.' };
+
+    player.moving = false;
+    target.attachPlayer(player);
+    this.worldIdByPlayer.set(player.id, target.key);
+    return { ok: true };
+  }
+
   /** The first map; used for logging and by tests. */
   get primary(): World | null {
     return this.worlds.values().next().value ?? null;
@@ -104,13 +141,16 @@ export class Realm {
     return null;
   }
 
-  join(seed: JoinSeed, id?: number): Player | null {
+  join(seed: JoinSeed, id?: number, channel = 0): Player | null {
     // A deleted map must not lock the character out: use the first map.
     const map = this.maps.get(seed.map) ?? this.maps.values().next().value;
     if (map === undefined) return null;
 
-    const world = this.leastLoaded(map) ?? this.worldOfMap(map.id);
-    if (world === null) return null;
+    // A chosen channel wins; 0 means "the emptiest one".
+    const chosen =
+      channel > 0 ? this.worlds.get(worldKeyOf(map, channel, this.channels)) : undefined;
+    const world = chosen ?? this.leastLoaded(map) ?? this.worldOfMap(map.id);
+    if (world === null || world === undefined) return null;
 
     return this.joinIn(world.key, seed, id);
   }
