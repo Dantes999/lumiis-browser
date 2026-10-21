@@ -434,6 +434,35 @@ Dann den ausgegebenen Eintrag in `styles.json` legen und
 Lauf-/Schlag-Animation — es zeigt nur, ob Stil und Größe passen. Im Repo liegt
 es als Beispiel (`gemini_warrior`).
 
+### 3D-Modell → Sprite-Sheet (der eigentliche Weg)
+
+Drei Werkzeuge, ein Ablauf:
+
+1. `tools/blender/build-demo-hero.py` — baut das Demo-Modell (nur zum Testen).
+2. `tools/blender/render-pack.py` — öffnet ein `.blend`, rendert 3 Ansichten × 9 Spalten.
+3. `tools/assemble-3d-pack.py` — verkleinert auf 48 px, legt Sheet, `rows.json`
+   und den `styles.json`-Eintrag an.
+
+```bash
+blender -b -noaudio --python tools/blender/render-pack.py -- \
+  --blend tools/blender/demo_hero.blend --out build/demo3d --size 192
+python3 tools/assemble-3d-pack.py --frames build/demo3d --id demo3d
+```
+
+**Was ein echtes Modell mitbringen muss:** eine Armatur mit **9 Actions**
+`col0`..`col8` (stehen, Schritt 1/2, atmen, Angriff 1–3, Treffer, tot) — oder
+ein Mapping-JSON (`--map`), das je Spalte Action und Frame nennt. Die drei
+Ansichten macht die Kamera (vorn/rechts/hinten); die linken Richtungen spiegelt
+der Client.
+
+**Render-Einstellungen** (im Skript): orthografisch, `ortho_scale` 2,2, Ziel bei
+z = 1,0, 192 px gerendert und auf 48 px heruntergerechnet, transparenter Film,
+Cycles (CPU, 12 Samples), Ansicht `Standard` statt AgX (sonst blasse Farben).
+
+**Grenze dieses ersten Pakets:** Rüstung und Waffe sind ins Modell gebacken —
+es gibt **einen Look**. Für Ausrüstungs-Wechsel rendert man je Rüstung/Waffe
+ein eigenes Sheet; die Paket-Vorlagen (`armor`, `weapon`) sind schon da.
+
 **Test:** `packages/server/tests/art.test.ts` prüft alle Sheets der Pakete
 (Existenz, Raster, Zeilenzahl).
 

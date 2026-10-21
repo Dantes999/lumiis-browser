@@ -27,6 +27,21 @@
       "weapon": "/assets/styles/gemini_warrior/weapon.png",
       "armorRows": "any",
       "rows": "/assets/styles/gemini_warrior/rows.json"
+    },
+    "demo3d": {
+      "name": "Demo-Held (3D-Render)",
+      "cell": 48,
+      "columns": 9,
+      "footX": 24,
+      "footY": 44,
+      "body": "/assets/styles/demo3d/body.png",
+      "head": "/assets/styles/demo3d/head.png",
+      "hair": "/assets/styles/demo3d/hair.png",
+      "armor": "/assets/styles/demo3d/armor.png",
+      "weapon": "/assets/styles/demo3d/weapon.png",
+      "armorRows": "any",
+      "rows": "/assets/styles/demo3d/rows.json",
+      "bodyArt": "faust"
     }
   }
 }

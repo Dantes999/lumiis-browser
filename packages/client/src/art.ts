@@ -43,6 +43,11 @@ export type StylePack = {
    * sheet's rows. Without it the old asset tables are used.
    */
   rows?: string;
+  /**
+   * Fixed pose art for the body (e.g. "faust"). A single-mesh 3D character
+   * does not change its arm pose with the weapon, so all weapons share rows.
+   */
+  bodyArt?: string;
 };
 
 const STYLES = stylesFile as { default: string; packs: Record<string, StylePack> };
@@ -198,9 +203,11 @@ export class PlayerView {
   private hairRows: number[] = [0, 0, 0];
 
   private readonly columns: number;
+  private readonly bodyArt: string | undefined;
 
   constructor(scene: Phaser.Scene, tables: ArtTables, pack: StylePack = defaultPack()) {
     this.columns = pack.columns;
+    this.bodyArt = pack.bodyArt;
     const origin = {
       x: (pack.footX ?? FOOT_X) / pack.cell,
       y: (pack.footY ?? FOOT_Y) / pack.cell,
@@ -328,8 +335,9 @@ export class PlayerView {
 
     this.body.setTexture(armorDef?.armorFile ? `armor_${armorDef.armorFile}` : 'body');
 
-    // The pose of the arms depends on what is held.
-    const art = weaponDef?.weaponArt ?? 'faust';
+    // The pose of the arms depends on what is held (unless the pack says it
+    // does not, as a single-mesh 3D character).
+    const art = this.bodyArt ?? weaponDef?.weaponArt ?? 'faust';
     this.bodyRows = rowsFor(
       tables.armor,
       VIEW_NAMES.map((view) => `koerper/${art}/${view}`),

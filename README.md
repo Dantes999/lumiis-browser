@@ -97,6 +97,10 @@ anchor. Open the game with `?style=<id>` to try another pack (or set
 - To make your own characters: render a 3D model (Blender + Mixamo) from the
   three views (down/right/up) into a 48 px sheet with nine columns, drop it in
   `public/assets/styles/<id>/` and add the pack to `styles.json`.
+- The 3D route ships as three tools: `tools/blender/build-demo-hero.py` (a
+  rigged demo), `tools/blender/render-pack.py` (3 views × 9 columns) and
+  `tools/assemble-3d-pack.py` (downscale, lay out the sheet, print the pack
+  entry). `?style=demo3d` shows the result.
 
 ## Map editor
 
