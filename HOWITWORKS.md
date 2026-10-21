@@ -196,13 +196,31 @@ Weitere Formeln an ihrem Ort:
   (`lumiis.token`) ab und schickt beim nächsten Start `{t:'resume', token}`.
   Gültig → Charakterliste; ungültig → `authError`, Token wird verworfen.
   Der zuletzt gespielte Charakter (`lumiis.character`) wird direkt betreten.
-- Gespeichert wird: nach Login, alle 30 s, beim Abmelden und beim Shutdown.
+- Gespeichert wird: nach Login, **jeden Tick ein paar Spieler** (ein voller
+  Durchlauf etwa alle 20 s, kein 30-Sekunden-Ruckler), beim Abmelden und beim
+  Shutdown (dann alle).
 - `data/` gehört **nie** in eine Lieferung oder ein Backup ohne Absicht.
 
 Der Code dafür: `packages/server/src/store/db.ts` (`Store`, `loadCharacter`,
 `saveCharacter`).
 
 ---
+
+## 7a. Last beobachten: `/status`
+
+`GET /status` liefert JSON für Messungen:
+
+```json
+{"players":1,"connections":1,"maps":2,"tick":380,
+ "tickMs":2.9,"tickMsMax":4.2,"snapshotBytes":1167,"uptimeSeconds":19}
+```
+
+- `tickMs` / `tickMsMax`: Durchschnitt und Maximum der letzten 5 Sekunden.
+  Budget pro Tick: **50 ms**.
+- `snapshotBytes`: Bytes, die der letzte Snapshot-Versand insgesamt verschickt hat.
+- `players` = im Spiel, `connections` = offene Sockets inkl. Login-Screen.
+
+Damit siehst du, wann der Server an seine Grenze kommt, statt zu raten.
 
 ## 8. Einen Bug suchen — der Ablauf
 

@@ -28,6 +28,13 @@ export class Realm {
     for (const map of maps) this.worlds.set(map.id, new WorldClass(map));
   }
 
+  /** Players in the world, across every map. */
+  playerCount(): number {
+    let total = 0;
+    for (const world of this.worlds.values()) total += world.playerCount;
+    return total;
+  }
+
   get mapIds(): string[] {
     return [...this.worlds.keys()];
   }

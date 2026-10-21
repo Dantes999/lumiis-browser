@@ -35,8 +35,8 @@ type Session = {
 };
 
 export type Gateway = {
-  /** Sends the current world state to everyone who is logged in. */
-  broadcastSnapshot(): void;
+  /** Sends the current world state to everyone who is logged in; bytes sent. */
+  broadcastSnapshot(): number;
   /** Sends one player's inventory; used after a pickup. */
   sendInventory(playerId: number): void;
   /** Tells one player something; used for rewards and other tick results. */
@@ -46,7 +46,9 @@ export type Gateway = {
     worldId: string,
     reward: { x: number; y: number; shares: Array<{ playerId: number; exp: number; yang: number }> },
   ): void;
-  /** Writes every logged in character to the store. */
+  /** Writes a slice of the players each tick, so no tick has a save spike. */
+  saveTick(): void;
+  /** Writes every logged in character to the store (shutdown). */
   saveAll(): void;
   /** Connected sockets, including those that have not logged in yet. */
   readonly connectionCount: number;
@@ -71,6 +73,8 @@ export function attachGateway(
   });
 
   const sessions = new Set<Session>();
+  /** Where the next save round picks up, so every player gets its turn. */
+  let saveCursor = 0;
 
   /** How often a dead connection is looked for with a websocket ping. */
   const HEARTBEAT_MS = 30000;
@@ -470,16 +474,21 @@ export function attachGateway(
   });
 
   return {
-    broadcastSnapshot(): void {
+    broadcastSnapshot(): number {
       const snapshots = realm.snapshotJson();
+      let bytes = 0;
 
       for (const session of sessions) {
         if (session.player === null) continue;
         if (session.socket.readyState !== WebSocket.OPEN) continue;
 
         const message = snapshots.get(session.player.id);
-        if (message !== undefined) session.socket.send(message);
+        if (message === undefined) continue;
+        session.socket.send(message);
+        bytes += message.length;
       }
+
+      return bytes;
     },
 
     get connectionCount(): number {
@@ -513,6 +522,22 @@ export function attachGateway(
     sendInventory(playerId: number): void {
       const session = [...sessions].find((entry) => entry.player?.id === playerId);
       if (session !== undefined) sendInventory(session, playerId);
+    },
+
+    saveTick(): void {
+      const active: Session[] = [];
+      for (const session of sessions) {
+        if (session.player !== null) active.push(session);
+      }
+      if (active.length === 0) return;
+
+      // Aim for one full round every 20 seconds, however many players there are.
+      const limit = Math.max(1, Math.ceil(active.length / (TICK_RATE * 20)));
+      for (let index = 0; index < limit; index += 1) {
+        const session = active[(saveCursor + index) % active.length];
+        if (session?.player) savePlayer(session.player);
+      }
+      saveCursor = (saveCursor + limit) % active.length;
     },
 
     saveAll(): void {

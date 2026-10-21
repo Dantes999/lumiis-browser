@@ -45,9 +45,6 @@ const defaultStaticDir = (): string => resolve(here, '../../client/dist');
 const defaultMapPath = (): string => resolve(here, '../../shared/maps/testmap.json');
 const defaultDataFile = (): string => resolve(here, '../../../data/lumiis.db');
 
-/** How often every logged in character is written to disk. */
-const SAVE_EVERY_SECONDS = 30;
-
 export async function createGameServer(options: GameServerOptions = {}): Promise<GameServer> {
   const port = options.port ?? Number(process.env['PORT'] ?? 3000);
   const host = options.host ?? process.env['HOST'] ?? '0.0.0.0';
@@ -72,11 +69,42 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
   const serveClient = createStaticHandler(staticDir);
   const serveShared = createStaticHandler(sharedRoot);
 
+  /** Rolling numbers for /status, so load can be watched instead of guessed. */
+  const metrics = {
+    startedAt: Date.now(),
+    tickMs: [] as number[],
+    lastSnapshotBytes: 0,
+  };
+
   const httpServer = createServer((req, res) => {
     const path = req.url ?? '/';
 
     if (req.method === 'PUT' && path.startsWith('/maps/')) {
       void handleMapSave(req, res, sharedRoot);
+      return;
+    }
+
+    if (req.method === 'GET' && (path === '/status' || path.startsWith('/status?'))) {
+      const times = metrics.tickMs;
+      const average = times.length === 0 ? 0 : times.reduce((sum, value) => sum + value, 0) / times.length;
+      const worst = times.length === 0 ? 0 : Math.max(...times);
+
+      res.writeHead(200, {
+        'content-type': 'application/json; charset=utf-8',
+        'cache-control': 'no-store',
+      });
+      res.end(
+        JSON.stringify({
+          players: realm.playerCount(),
+          connections: gateway.connectionCount,
+          maps: realm.mapIds.length,
+          tick: realm.primary?.tick ?? 0,
+          tickMs: Math.round(average * 10) / 10,
+          tickMsMax: Math.round(worst * 10) / 10,
+          snapshotBytes: metrics.lastSnapshotBytes,
+          uptimeSeconds: Math.round((Date.now() - metrics.startedAt) / 1000),
+        }),
+      );
       return;
     }
 
@@ -96,6 +124,8 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
   const gateway = attachGateway(httpServer, realm, store, tokenSecret);
 
   const loop = new FixedStepLoop(TICK_MS, () => {
+    const startedAt = performance.now();
+
     realm.tick();
 
     for (const update of realm.drainInventoryUpdates()) {
@@ -110,9 +140,16 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
       gateway.broadcastReward(map, reward);
     }
 
+    // A slice of the players is written every tick: no 30 second spike.
+    gateway.saveTick();
+
     const tick = realm.primary?.tick ?? 0;
-    if (tick % SNAPSHOT_EVERY_TICKS === 0) gateway.broadcastSnapshot();
-    if (tick % (TICK_RATE * SAVE_EVERY_SECONDS) === 0) gateway.saveAll();
+    if (tick % SNAPSHOT_EVERY_TICKS === 0) {
+      metrics.lastSnapshotBytes = gateway.broadcastSnapshot();
+    }
+
+    metrics.tickMs.push(performance.now() - startedAt);
+    if (metrics.tickMs.length > TICK_RATE * 5) metrics.tickMs.shift();
   });
 
   await new Promise<void>((resolve, reject) => {
