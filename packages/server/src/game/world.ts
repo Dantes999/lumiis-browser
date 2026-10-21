@@ -26,12 +26,10 @@ import {
   TICK_RATE,
   TILE_SIZE,
   TILE,
-  DIR_VECTORS,
   SKILLS,
   dirFromInput,
   expForNextLevel,
   facingTowards,
-  findPath,
   inSwingArc,
   swingFor,
   canStand,
@@ -45,6 +43,16 @@ import {
 } from '@lumiis/shared';
 import type { CharacterSave } from '../store/db.js';
 import type { Point, SkillKey, SwingProfile } from '@lumiis/shared';
+import { chaseDirection, findTarget, randomWalkableDirection } from './monster-ai.js';
+import {
+  attackDamage,
+  damageTaken,
+  damagePortion,
+  regeneratedHp,
+  revivedHp,
+  rollBetween,
+  whirlwindDamage,
+} from './formulas.js';
 import type {
   Direction,
   Equipment,
@@ -70,11 +78,6 @@ const PAUSE_MAX_TICKS = 50;
 const BLOCKED_PAUSE_TICKS = 5;
 /** A chasing monster that cannot get closer for this long loses interest. */
 const STUCK_LIMIT_TICKS = 40;
-/** How often a chasing monster looks for a new route (half a second). */
-const PATH_REFRESH_TICKS = 10;
-/** Close enough to a waypoint to take the next one. */
-const WAYPOINT_REACHED = 8;
-
 export type PlayerSeed = {
   accountId: number;
   characterId: number;
@@ -286,7 +289,7 @@ export class World {
 
     // A character that was stored dead comes back on his feet at the spawn.
     if (player.hp <= 0) {
-      player.hp = Math.max(1, Math.round(player.maxHp * PLAYER_RESPAWN_HP_SHARE));
+      player.hp = revivedHp(player.maxHp, PLAYER_RESPAWN_HP_SHARE);
       player.x = spawn.x;
       player.y = spawn.y;
     }
@@ -397,7 +400,7 @@ export class World {
       }
 
       if (this.tickCount % PLAYER_REGEN_TICKS === 0 && player.hp < player.maxHp) {
-        player.hp = Math.min(player.maxHp, player.hp + PLAYER_REGEN_HP);
+        player.hp = regeneratedHp(player.hp, player.maxHp, PLAYER_REGEN_HP);
       }
 
       if (player.buffs.size > 0) {
@@ -560,7 +563,7 @@ export class World {
     if (skill.kind === 'buff') {
       player.buffs.set(key, this.tickCount + (skill.durationTicks ?? 0));
     } else {
-      const damage = Math.round(this.attackOf(player) * (skill.damageScale ?? 1));
+      const damage = whirlwindDamage(this.attackOf(player), skill.damageScale ?? 1);
       const radius = skill.radius ?? 0;
       for (const monster of this.monstersById.values()) {
         if (monster.respawnAt > 0) continue;
@@ -576,10 +579,10 @@ export class World {
     return { ok: true };
   }
 
+  /** Normalschaden eines Schlags: Grundwert + Waffe + Aura. */
   private attackOf(player: Player): number {
     const weapon = player.equipment.weapon === null ? null : itemDef(player.equipment.weapon);
-    const aura = player.buffs.has('aura') ? SKILLS.aura.attackBonus ?? 0 : 0;
-    return PLAYER_DAMAGE + (weapon?.attack ?? 0) + aura;
+    return attackDamage(weapon?.attack ?? 0, player.buffs);
   }
 
   private defenseOf(player: Player): number {
@@ -722,7 +725,7 @@ export class World {
   private hurtPlayer(player: Player, damage: number): void {
     if (player.deadUntil > 0) return;
 
-    const taken = Math.max(1, damage - this.defenseOf(player));
+    const taken = damageTaken(damage, this.defenseOf(player));
     player.hp = Math.max(0, player.hp - taken);
     if (player.hp > 0) return;
 
@@ -735,7 +738,7 @@ export class World {
     const spawn = spawnPosition(this.map);
     player.x = spawn.x;
     player.y = spawn.y;
-    player.hp = Math.max(1, Math.round(player.maxHp * PLAYER_RESPAWN_HP_SHARE));
+    player.hp = revivedHp(player.maxHp, PLAYER_RESPAWN_HP_SHARE);
     player.deadUntil = 0;
     player.moving = false;
     player.lastAttackTick = this.tickCount - ATTACK_COOLDOWN_TICKS;
@@ -749,8 +752,7 @@ export class World {
    */
   private rewardKill(monster: Monster, killer: Player): KillReward[] {
     const type = MONSTER_TYPES[monster.key];
-    const yangTotal =
-      type.yangMin + Math.floor(this.random() * (type.yangMax - type.yangMin + 1));
+    const yangTotal = rollBetween(type.yangMin, type.yangMax, () => this.random());
 
     // Contributors who are still in the world; someone who logged out is gone.
     const shares: Array<{ player: Player; damage: number }> = [];
@@ -767,7 +769,7 @@ export class World {
     let yangPaid = 0;
 
     for (const share of shares) {
-      const portion = share.damage / totalDamage;
+      const portion = damagePortion(share.damage, totalDamage);
       const exp = Math.floor(type.exp * portion);
       const yang = Math.floor(yangTotal * portion);
 
@@ -800,7 +802,7 @@ export class World {
       if (this.random() >= drop.chance) continue;
       if (!isItemKey(drop.key)) continue;
 
-      const count = drop.min + Math.floor(this.random() * (drop.max - drop.min + 1));
+      const count = rollBetween(drop.min, drop.max, () => this.random());
       const angle = this.random() * Math.PI * 2;
       const radius = 8 + this.random() * 14;
 
@@ -1000,7 +1002,7 @@ export class World {
         return true;
       }
 
-      const dir = this.chaseDirection(monster, target);
+      const dir = chaseDirection(this.map, monster, target, this.tickCount);
       if (dir !== null) {
         monster.dir = dir;
         const beforeX = monster.x;
@@ -1031,61 +1033,11 @@ export class World {
     monster.path = [];
     monster.pathStep = 0;
     monster.pathTile = -1;
-    const found = this.findTarget(monster);
+    const found = findTarget(this.playersById.values(), monster);
     if (found === null) return false;
 
     monster.targetId = found.id;
     return true;
-  }
-
-  /**
-   * The next direction towards the target, following a route around obstacles.
-   * The route is rebuilt when the target changes tile or after a short while.
-   */
-  private chaseDirection(monster: Monster, target: Player): Direction | null {
-    const targetTile =
-      Math.floor(target.y / TILE_SIZE) * this.map.width + Math.floor(target.x / TILE_SIZE);
-
-    const stale =
-      monster.path.length === 0 ||
-      monster.pathTile !== targetTile ||
-      this.tickCount >= monster.nextPathTick;
-
-    if (stale) {
-      monster.path =
-        findPath(this.map, { x: monster.x, y: monster.y }, { x: target.x, y: target.y }) ?? [];
-      monster.pathStep = 0;
-      monster.pathTile = targetTile;
-      monster.nextPathTick = this.tickCount + PATH_REFRESH_TICKS;
-    }
-
-    while (monster.pathStep < monster.path.length) {
-      const point = monster.path[monster.pathStep];
-      if (point === undefined) break;
-      if (Math.hypot(point.x - monster.x, point.y - monster.y) > WAYPOINT_REACHED) break;
-      monster.pathStep += 1;
-    }
-
-    const waypoint = monster.path[monster.pathStep];
-    if (waypoint === undefined) {
-      return dirFromInput(target.x - monster.x, target.y - monster.y);
-    }
-    return dirFromInput(waypoint.x - monster.x, waypoint.y - monster.y);
-  }
-
-  private findTarget(monster: Monster): Player | null {
-    let best: Player | null = null;
-    let bestDistance = monster.aggro;
-
-    for (const player of this.playersById.values()) {
-      if (player.deadUntil > 0) continue;
-      const distance = Math.hypot(player.x - monster.x, player.y - monster.y);
-      if (distance <= bestDistance) {
-        best = player;
-        bestDistance = distance;
-      }
-    }
-    return best;
   }
 
   private stepMonsterWander(monster: Monster): void {
@@ -1124,7 +1076,7 @@ export class World {
       return;
     }
 
-    const dir = this.randomWalkableDirection(monster);
+    const dir = randomWalkableDirection(this.map, monster, () => this.random());
     if (dir === null) {
       // Boxed in on every side: stay put for a moment.
       monster.wanderDir = null;
@@ -1135,25 +1087,6 @@ export class World {
     monster.wanderDir = dir;
     monster.dir = dir;
     monster.wanderUntil = this.tickCount + this.randomTicks(WANDER_MIN_TICKS, WANDER_MAX_TICKS);
-  }
-
-  /** A random direction whose next tile can be stood on, so monsters do not
-   * wander straight into rocks and hang there. */
-  private randomWalkableDirection(monster: Monster): Direction | null {
-    const tx = Math.floor(monster.x / TILE_SIZE);
-    const ty = Math.floor(monster.y / TILE_SIZE);
-    const options: Direction[] = [];
-
-    for (let dir = 0; dir < 8; dir += 1) {
-      const vector = DIR_VECTORS[dir];
-      if (vector === undefined) continue;
-      const cx = (tx + vector[0] + 0.5) * TILE_SIZE;
-      const cy = (ty + vector[1] + 0.5) * TILE_SIZE;
-      if (canStand(this.map, cx, cy)) options.push(dir as Direction);
-    }
-
-    if (options.length === 0) return null;
-    return options[Math.floor(this.random() * options.length)] ?? null;
   }
 
   private reviveMonster(monster: Monster): void {

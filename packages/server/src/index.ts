@@ -149,6 +149,19 @@ async function main(): Promise<void> {
 
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));
+
+  // A bug must not kill the process without a trace and without saving. This
+  // logs what broke, writes every character to disk, and only then exits.
+  process.on('uncaughtException', (error) => {
+    console.error('Uncaught exception, saving and stopping:', error);
+    void server
+      .close()
+      .catch((closeError: unknown) => console.error('Saving during crash failed:', closeError))
+      .finally(() => process.exit(1));
+  });
+  process.on('unhandledRejection', (reason) => {
+    console.error('Unhandled promise rejection:', reason);
+  });
 }
 
 const invokedDirectly =

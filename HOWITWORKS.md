@@ -1,0 +1,291 @@
+# HOWITWORKS — Lumiis technisch
+
+Diese Datei ist der Einstieg, wenn etwas nicht stimmt: **wo steht was, wo wird
+gerechnet, und wie findet man einen Bug oder einen Absturz.**
+
+Wenn Code und diese Datei sich widersprechen, gilt der **Code**. Dann bitte die
+Stelle hier korrigieren.
+
+---
+
+## 1. Was das ist
+
+Ein server-autoritatives 2D-MMORPG im Browser (Handy + PC). Der Server rechnet
+alles, der Browser schickt nur Absichten und zeichnet. Ein Prozess, eine
+Datenbank, kein Build-Zwang im Spiel (nur TypeScript → JavaScript).
+
+```
+packages/shared   Regeln und Daten, die Server UND Browser importieren
+packages/server   Spielserver, Tick-Schleife, WebSocket, SQLite
+packages/client   Phaser-Szene, Netzwerk, HTML-Oberfläche
+tools/            Karten-Generator, Testcharaktere, Bots
+```
+
+---
+
+## 2. Starten, bauen, testen
+
+| Was | Befehl |
+|---|---|
+| Entwicklung (Server + Hot-Reload-Client) | `npm run dev` → Client auf http://localhost:5173 |
+| Bauen + starten (ein Port) | `npm run build && npm start` → http://localhost:3000 |
+| Nur bauen | `npm run build` |
+| TypeScript prüfen | `npm run typecheck` |
+| Alle Tests | `npx vitest run` |
+| Eine Testdatei | `npx vitest run packages/server/tests/world.test.js` |
+| Karten-Editor | http://localhost:3000/editor.html (oder :5173/editor.html) |
+
+Der **Server** läuft aus `packages/server/dist/` (kompiliert). Änderst du
+Server-Code, musst du neu bauen (im `dev`-Modus passiert das automatisch).
+Der **Client** läuft im `dev`-Modus direkt aus dem Quellcode (Vite).
+
+---
+
+## 3. Projektkarte — wo liegt was
+
+### Server (`packages/server/src/`)
+
+| Datei | Inhalt |
+|---|---|
+| `index.ts` | Einstieg: `createGameServer`, Tick-Schleife, Autosave, Shutdown, **Absturz-Handler** |
+| `game/world.ts` | **Die Welt einer Karte**: Spieler, Monster, Boden-Items, Inventar, Ausrüstung, Snapshot. Der größte Brocken. |
+| `game/realm.ts` | **Alle Karten** + Portale. Ein `World` je Karte, Spieler wandern zwischen ihnen. |
+| `game/formulas.ts` | **Alle Berechnungen** (Schaden, Abklingen, Beute-Würfe, Split). Reine Funktionen. |
+| `game/monster-ai.ts` | **Monster-Entscheidungen**: Ziel suchen, Weg finden, Wandern. |
+| `game/loop.ts` | `FixedStepLoop`: fester 20-Hz-Takt, holt Rückstand begrenzt nach. |
+| `game/map.ts` | Karten von der Platte laden und prüfen. |
+| `net/gateway.ts` | **WebSocket**: Login, Charakterauswahl, Nachrichten-`switch`, Ratenlimit, `saveAll`. |
+| `store/db.ts` | **SQLite**: Accounts (scrypt), Charaktere, Inventar, Speichern/Laden. |
+| `http/static.ts` | Liefert Client und `/shared/` aus. |
+| `http/mapsave.ts` | Karten-Editor speichert Karten (nur lokal). |
+
+### Geteilte Regeln (`packages/shared/src/`)
+
+| Datei | Inhalt |
+|---|---|
+| `constants.ts` | `TICK_RATE` 20, `TICK_MS` 50, `SNAPSHOT_EVERY_TICKS` 2, `TILE_SIZE` 32, Limits |
+| `protocol.ts` | **Alle Netz-Nachrichten** (Typen + Prüfung `parseClientMessage`) |
+| `map.ts` | Karten-Typ, Kacheln, **Kollision** (`canStand`, `moveWithCollision`), SOLID |
+| `movement.ts` | 8 Richtungen, `dirFromInput`, Schritt pro Tick |
+| `combat.ts` | **Schwung**: Profile (Tempo, Reichweite, Trefferzeitpunkt), **Bogen** (`inSwingArc`) |
+| `skills.ts` | **Skill-Tabelle**: Aura (Buff) und Schwertwirbel (AoE) |
+| `items.ts` | **Gegenstände** (Waffen, Rüstung, Material), `itemDef`, Inventar-Größe |
+| `monsters.ts` | **Monster-Tabelle**: TP, Schaden, Tempo, Beute, EXP. Plus `PLAYER_DAMAGE`. |
+| `progression.ts` | **Levelkurve**: `expForNextLevel(level)` |
+| `pathfinding.ts` | A* über die Kacheln (Monster nutzen das) |
+| `index.ts` | Re-Export aller obigen Dateien |
+
+### Client (`packages/client/src/`)
+
+| Datei | Inhalt |
+|---|---|
+| `main.ts` | **Klebstoff**: Login, HUD-Takt, alles verdrahten. Keine Spielregeln. |
+| `net.ts` | WebSocket: senden, Snapshot lesen, Betriebszustand |
+| `state.ts` | `view`: ein veränderbares Objekt, in das das Netz schreibt und die Szene liest |
+| `sim.ts` | Vorhersage der eigenen Figur + Interpolation |
+| `input.ts` | Tastatur, Touch-Joystick, Zoom, Tastenbelegung |
+| `combat.ts` | Schwung auslösen, Zielen, Angriffs-Pose |
+| `skill.ts` | Skill auslösen, lokale Abklingzeit, Buff-Anzeige |
+| `loot.ts` | Aufheben (Y / Klick / Auto) |
+| `scene/world-scene.ts` | **Die Welt zeichnen**: Karte, Spieler, Monster, Boden, Effekte, Kamera |
+| `scene/swing-trail.ts` | Lichtstreif des Schwungs |
+| `scene/skill-effects.ts` | Wirbel-Effekt |
+| `art.ts` | Spieler aus Ebenen zusammensetzen (Rüstung, Kopf, Haare, Waffe) |
+| `mobart.ts` | Monster-Sprites + Lebensbalken |
+| `audio.ts` | Töne im Code erzeugt (Web Audio), kein Ton-Asset |
+| `ui/hud.ts` | HUD: Status, TP, EXP, Yang, Angriff, Skills |
+| `ui/bag.ts`, `ui/characters.ts`, `ui/login.ts`, `ui/settings.ts` | Fenster |
+| `editor/main.ts` | Karten-Editor |
+
+---
+
+## 4. Wie ein Tick läuft
+
+Ein Tick ist **50 ms** (20 pro Sekunde). Die Schleife liegt in
+`packages/server/src/game/loop.ts`, der Ablauf in `World.step()`
+(`packages/server/src/game/world.ts`).
+
+Reihenfolge in `step()`:
+
+1. `tickCount += 1`
+2. **Schwünge auflösen** (`resolveSwings` → `landSwing`): Treffer landen,
+   Schaden, Tötungen, Beute.
+3. **Spieler**: tot? wiederbeleben. Sonst: TP-Regeneration, Buffs ablaufen,
+   Bewegung (`moveWithCollision`), Portal prüfen.
+4. **Monster**: tot? wiederbeleben. Sonst: Kampf (`stepMonsterCombat`) oder
+   Wandern (`stepMonsterWander`).
+5. **Boden-Items einsammeln** (Auto-Pickup).
+
+Danach im Hauptthread (`index.ts`):
+
+- Inventar-Änderungen an die Clients schicken.
+- **Jeden 2. Tick** (`SNAPSHOT_EVERY_TICKS`): Snapshot je Karte an alle Spieler
+  (also 10-mal pro Sekunde).
+- **Alle 30 s**: alle Charaktere speichern.
+
+---
+
+## 5. Wie eine Nachricht läuft
+
+```
+Browser  ──WebSocket /ws──►  gateway.ts  ──►  realm.ts  ──►  world.ts
+   ▲                            │                                │
+   └──────── snapshot / notice ◄─┴────────────────────────────────┘
+```
+
+1. **Browser** (`client/net.ts`) schickt JSON, z. B. `{ t: 'attack', target: 7 }`.
+2. **`gateway.ts`** prüft Ratenlimit, dekodiert, ruft `parseClientMessage`
+   (`shared/protocol.ts`) → prüft Typ, Schlüssel und Wertebereiche.
+3. Der `switch (msg.t)` ruft die passende Methode auf (`realm.attack(...)`).
+4. `Realm` sucht die richtige Karte (`worldOf(playerId)`) und reicht weiter.
+5. `World` entscheidet, was wirklich passiert (Server ist autoritativ).
+6. Antwort: direkt (`notice`), über den Snapshot oder als Ereignis.
+
+**Wichtig:** Der Client kann nichts „behaupten". Er schickt nur Absichten; der
+Server prüft alles neu. Neue Nachrichten brauchen immer einen Fall in
+`parseClientMessage` **und** im `switch` in `gateway.ts`.
+
+---
+
+## 6. Wo wird gerechnet
+
+Alles Wichtige ist in **`packages/server/src/game/formulas.ts`** gebündelt:
+
+| Funktion | Bedeutung |
+|---|---|
+| `attackDamage(waffe, buffs)` | Schaden eines Schlags = `PLAYER_DAMAGE` + Waffe + Aura |
+| `damageTaken(roh, rüstung)` | Was nach Rüstung wirklich abgeht (mindestens 1) |
+| `rollBetween(min, max, random)` | Ganzzahl-Wurf (Yang, Beutemenge) |
+| `damagePortion(anteil, gesamt)` | Anteil am Kill (Schaden-Split) |
+| `whirlwindDamage(angriff, faktor)` | Schaden des Schwertwirbels |
+| `regeneratedHp(...)`, `revivedHp(...)` | TP-Regeneration und Wiederbelebung |
+
+Weitere Formeln an ihrem Ort:
+
+| Was | Wo |
+|---|---|
+| Levelkurve | `shared/progression.ts` → `expForNextLevel` (50 × Level^1,6) |
+| Trefferbogen / Reichweite | `shared/combat.ts` → `inSwingArc`, `SWINGS` |
+| Waffentempo/Trefferzeitpunkt | `shared/combat.ts` → `SWINGS` (Ticks) |
+| Monster-Werte | `shared/monsters.ts` → `MONSTER_TYPES` |
+| Gegenstands-Werte | `shared/items.ts` → `ITEMS` |
+| Skill-Werte | `shared/skills.ts` → `SKILLS` |
+| Kollision (Fußbox) | `shared/map.ts` → `canStand`, `PLAYER_HALF_WIDTH` |
+| EXP/Yang-Split | `world.ts` → `rewardKill` (nutzt `damagePortion`) |
+| Beute-Wurf | `world.ts` → `dropLoot` (nutzt `rollBetween`) |
+
+**Merke:** Wenn eine Zahl im Spiel falsch aussieht, ist die erste Adresse
+`formulas.ts` und die Tabelle in `shared/`.
+
+---
+
+## 7. Speichern
+
+- Datei: **`data/lumiis.db`** (SQLite, WAL-Modus). Daneben `-wal` und `-shm`.
+- Passwörter: scrypt. Kein Klartext.
+- Gespeichert wird: nach Login, alle 30 s, beim Abmelden und beim Shutdown.
+- `data/` gehört **nie** in eine Lieferung oder ein Backup ohne Absicht.
+
+Der Code dafür: `packages/server/src/store/db.ts` (`Store`, `loadCharacter`,
+`saveCharacter`).
+
+---
+
+## 8. Einen Bug suchen — der Ablauf
+
+1. **Nachstellen**: Server starten, im Browser nachspielen (oder per Test).
+   Wartezeiten lassen sich mit `?` im Code kürzen, oder per Testcharakter.
+2. **Eingrenzen, welche Schicht** es ist:
+   - Falsche **Zahl** (Schaden, EXP, TP)? → `formulas.ts`, `shared/`-Tabellen.
+   - Falsche **Bewegung/Kollision**? → `shared/map.ts` (`canStand`).
+   - Monster läuft falsch? → `game/monster-ai.ts`.
+   - Server tut nicht, was der Client will? → `gateway.ts` → `realm.ts` → `world.ts`.
+   - Client zeigt es falsch an? → `client/scene/` oder `client/ui/`.
+3. **Snapshot prüfen**: Im Browser `window.lumiis.view` in die Konsole eingeben.
+   Das ist der komplette Client-Zustand (Spieler, Monster, Boden, Inventar).
+   `window.lumiis.connection` und `window.lumiis.game` hängen daneben.
+4. **Test schreiben**: In `packages/server/tests/world.test.ts` (oder passender
+   Datei) den Fall nachbauen. Erst rot, dann fixen.
+
+### Nützliche Debug-Blicke (Browser-Konsole)
+
+```js
+window.lumiis.view.self            // eigene Figur: Position, TP, Buffs
+window.lumiis.view.monsters        // Map aller Monster
+window.lumiis.audio.state()        // { state, played, volume } für Tonprobleme
+window.lumiis.game.scene.getScene('world')   // Szene: views, trails, whirlwinds
+```
+
+---
+
+## 9. Wenn der Server abstürzt
+
+Seit dem Absturz-Handler (`index.ts`) gilt:
+
+1. Der Prozess **loggt den Fehler samt Stacktrace** in die Konsole:
+   `Uncaught exception, saving and stopping: ...`
+2. Er **speichert alle Charaktere** und beendet sich dann mit Code 1.
+
+Das heißt: höchstens die letzten Sekunden seit dem letzten Autosave (max. 30 s)
+gehen verloren.
+
+**Was du tun sollst:**
+
+1. Die **letzte Logzeile vor dem Absturz** lesen — dort steht Datei und Zeile
+   (z. B. `at World.landSwing (…/world.js:123:9)`).
+2. Diese Stelle im TypeScript suchen (`world.ts`), die Bedingung prüfen.
+3. Bug nachstellen (Abschnitt 8) und einen Test schreiben.
+4. Läuft der Server nicht mehr: `data/lumiis.db` ist gespeichert; einfach neu
+   starten.
+
+**Typische Absturz-Ursachen:**
+
+| Ursache | Wo suchen |
+|---|---|
+| `undefined`-Zugriff nach einem Kill/Tod | `world.ts` (`killMonster`, `revivePlayer`, `landSwing`) |
+| Monster/Spieler aus der Map genommen, aber weiter benutzt | `removePlayer`, `detachPlayer`, `killMonster` |
+| Karte kaputt (ungültige Kachel/Portal) | `game/map.ts` (Start bricht bewusst ab) |
+| Datenbank gesperrt / Datei weg | `store/db.ts`, Meldung beim Start |
+
+**Wichtig:** Es gibt *keinen* Fall, in dem der Server absichtlich ohne Speichern
+stirbt — außer `kill -9` (SIGKILL). Dann hilft nur der letzte Autosave.
+
+---
+
+## 10. Häufige Änderungen — wo anfassen
+
+| Ich will … | Datei |
+|---|---|
+| Monster stärker/schwächer | `shared/monsters.ts` (`MONSTER_TYPES`) |
+| Waffe/Rüstung ändern oder neu | `shared/items.ts` (`ITEMS`) — neue Gegenstände **vor** den Kostüm-Block |
+| Skill-Zahlen (Schaden, Abklingzeit) | `shared/skills.ts` (`SKILLS`) |
+| Schwung-Tempo/Reichweite | `shared/combat.ts` (`SWINGS`) |
+| Trefferbogen breiter/schmaler | `shared/combat.ts` (`SWING_ARC`) |
+| Levelkurve | `shared/progression.ts` |
+| Schadensformel | `game/formulas.ts` |
+| Monster-KI | `game/monster-ai.ts` |
+| Neue Nachricht (Client↔Server) | `shared/protocol.ts` **und** `net/gateway.ts` |
+| Neues Fenster (UI) | `ui/` + `index.html` + `main.ts` (Verdrahtung) |
+| Karten | `shared/maps/*.json` oder der Editor |
+
+---
+
+## 11. Grenzen (bewusst noch offen)
+
+- **Kein Mana/SP** — Skills laufen nur über Abklingzeit.
+- **Nur zwei Skills** (Aura, Schwertwirbel).
+- **Kein Chat**, keine Gruppen, keine Gilden.
+- **Ein Prozess**: fällt er, ist die Welt kurz weg (Spielstände sind gesichert).
+- **Karten und Zahlen sind vorläufig**; Balancing kommt später mit Bots.
+
+---
+
+## 12. Wenn du gar nicht weiterkommst
+
+Sammle diese drei Dinge und schick sie:
+
+1. **Was du getan hast** (Schritte bis zum Bug).
+2. **Die letzte Konsolenzeile** des Servers (Stacktrace).
+3. **Den Client-Zustand**: `JSON.stringify(window.lumiis.view)` in der Konsole.
+
+Damit lässt sich fast jeder Fehler in wenigen Minuten eingrenzen.
