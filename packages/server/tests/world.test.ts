@@ -713,6 +713,17 @@ describe('equipment', () => {
     expect(player.inventory.some((slot) => slot?.key === 'wooden_sword')).toBe(true);
   });
 
+  it('refuses gear above the player level', () => {
+    const { world, player } = hero(inventoryWith([0, 'eisenplattenpanzer']));
+
+    const refused = world.equip(player.id, 0);
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) expect(refused.reason).toContain('level 9');
+
+    player.level = 9;
+    expect(world.equip(player.id, 0).ok).toBe(true);
+  });
+
   it('refuses to wear things that are not equipment', () => {
     const { world, player } = hero(inventoryWith([0, 'wolf_fur']));
     expect(world.equip(player.id, 0).ok).toBe(false);

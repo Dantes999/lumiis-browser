@@ -42,6 +42,7 @@ import {
   isItemKey,
   itemDef,
   moveWithCollision,
+  requiredLevel,
   nearestWalkable,
   spawnPosition,
   tileAt,
@@ -713,6 +714,9 @@ export class World {
 
     const def = itemDef(item.key);
     if (def.slot === undefined) return { ok: false, reason: 'You cannot wear that.' };
+
+    const need = requiredLevel(item.key);
+    if (player.level < need) return { ok: false, reason: `You need level ${need}.` };
 
     const previous = player.equipment[def.slot];
     if (previous !== null) {

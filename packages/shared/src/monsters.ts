@@ -26,8 +26,8 @@ export const MONSTER_TYPES = {
     /** What it leaves behind. */
     drops: [
       { key: 'wolf_fur', chance: 0.65, min: 1, max: 2 },
-      { key: 'iron_sword', chance: 0.05, min: 1, max: 1 },
-      { key: 'great_sword', chance: 0.05, min: 1, max: 1 },
+      { key: 'iron_sword', chance: 0.04, min: 1, max: 1 },
+      { key: 'eisenplattenpanzer', chance: 0.02, min: 1, max: 1 },
     ],
   },
   boar: {
@@ -43,9 +43,11 @@ export const MONSTER_TYPES = {
     yangMin: 10,
     yangMax: 22,
     drops: [
-      { key: 'boar_tusk', chance: 0.7, min: 1, max: 1 },
+      { key: 'boar_tusk', chance: 0.6, min: 1, max: 1 },
       { key: 'padded_armor', chance: 0.08, min: 1, max: 1 },
-      { key: 'plate_armor', chance: 0.02, min: 1, max: 1 },
+      { key: 'langschwert', chance: 0.02, min: 1, max: 1 },
+      { key: 'great_sword', chance: 0.02, min: 1, max: 1 },
+      { key: 'plate_armor', chance: 0.01, min: 1, max: 1 },
     ],
   },
   /** A standing target for testing swings and reach; never fights back. */

@@ -325,6 +325,41 @@ die Startkarte für neue Charaktere und die erste in der Liste.
 - **Im Editor:** `/editor.html` öffnet die Karten aus dem Ordner und schreibt
   sie zurück.
 
+## 7f. Gegenstände und Inventar
+
+Die Tabelle `ITEMS` in `shared/src/items.ts` beschreibt jeden Gegenstand an
+einer Stelle — Server und Client lesen dieselbe:
+
+| Feld | Bedeutung |
+|---|---|
+| `name` | Anzeigename (deutsch, aus dem alten Projekt: „Eisenschwert“, „Mönchsplattenpanzer“) |
+| `type` | `weapon`, `armor` oder `material` (das Wort steht im Tooltip) |
+| `slot` | `weapon`/`armor`, wenn man es anlegen kann |
+| `attack`, `defense`, `maxHp` | Werte für Kampf und TP |
+| `level` | nötiges Level (0 = jeder) |
+| `icon` | Bild unter `/assets/icons/…` (aus dem alten Projekt) |
+| `desc` | Flavour-Text für den Tooltip |
+| `stackMax` | wie viele in ein Feld passen |
+| `weaponArt`/`stage` bzw. `armorFile` | Aussehen an der Figur |
+
+**Tooltip:** `describeItem(key)` macht daraus die Zeilen (Name, Typ + „ab Level
+N“, Werte, Beschreibung). Der Client zeigt sie in `#item-tip`: am PC beim
+Darüberfahren, am Handy beim **ersten** Tippen — der zweite Tipp legt an/ab.
+Über dem Level steht die Anforderung rot.
+
+**Anlegen:** Klick auf ein Inventarfeld legt an (oder tauscht), Klick auf das
+getragene Stück legt ab. Der **Server** prüft das Level (`requiredLevel`) und
+lehnt zu Hohes mit „You need level N.“ ab; der Client prüft nur zur Anzeige.
+
+**Woher die Sachen kommen:** Wölfe lassen Fell, selten ein Eisenschwert oder
+einen Eisenplattenpanzer fallen; Keiler Hauer, Polster- und Tiger-Plattenpanzer
+sowie selten Langschwert/Großschwert. Tabelle: `shared/src/monsters.ts`
+(`drops`). Höhere Stufen (Bambus-, Breit-, Silberschwert, Löwenpanzer) sind
+schon definiert und warten auf stärkere Monster oder einen Händler.
+
+**Tests:** `packages/server/tests/items.test.ts` (jeder Gegenstand hat Name,
+Typ, Icon; Tooltip-Inhalte) und der Level-Test in `world.test.ts`.
+
 ## 7a. Last beobachten: `/status`
 
 `GET /status` liefert JSON für Messungen:

@@ -70,6 +70,18 @@ has a gate to `grove`. Regenerate the maps with `node tools/make-world.mjs`
 The map a character stands on is part of his save, so logging in puts him back
 where he left.
 
+## Items and inventory
+
+Press **I** (or click *Bag*) for the inventory: 20 slots, a weapon and an armour
+piece on top. Items use the icons and German names from the old project
+(*Eisenschwert*, *Mönchsplattenpanzer*, …). Hover an item (on a phone: tap once)
+for the tooltip with type, required level, attack/defence/health and a short
+description. Click a bag slot to wear it; gear above your level is refused.
+
+Wolves and boars drop materials and low-level gear; see `drops` in
+`packages/shared/src/monsters.ts`. The item table lives in
+`packages/shared/src/items.ts`.
+
 ## Map editor
 
 Open <http://localhost:3000/editor.html> while the server runs. Paint tiles,
