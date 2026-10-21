@@ -31,6 +31,8 @@ export type PlayerSnapshot = {
   armor: string | null;
   /** Present only while a swing is running. */
   attacking?: boolean;
+  /** Present briefly after a whirlwind, so other clients can show it. */
+  whirlwind?: boolean;
   /** Active buffs with their remaining time in seconds; empty when none. */
   buffs?: Record<string, number>;
 };

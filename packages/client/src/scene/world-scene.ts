@@ -77,6 +77,8 @@ export class WorldScene extends Phaser.Scene {
   private shownSwingAt = 0;
   /** Running whirlwind effects. */
   private readonly whirlwinds: WhirlwindEffect[] = [];
+  /** Players whose whirlwind is already being shown. */
+  private readonly whirlwindShown = new Set<number>();
   /** The pulsing ring at the feet while the aura buff is up. */
   private auraRing: Phaser.GameObjects.Graphics | null = null;
   /** The ground arrow that shows where a mouse-aimed swing will go. */
@@ -188,6 +190,7 @@ export class WorldScene extends Phaser.Scene {
     this.renderPlayers(delta);
     this.renderTrails(delta);
     this.updateWhirlwinds(delta);
+    this.drawAuraRings();
     this.drawAimArrow();
     this.updateShake();
     this.watchInventory();
@@ -228,17 +231,26 @@ export class WorldScene extends Phaser.Scene {
     arrow.fillTriangle(tipX, tipY, leftX, leftY, rightX, rightY);
   }
 
-  /** A pulsing ring at the feet while the aura buff is up. */
-  private drawAuraRing(x: number, y: number, seconds: number | undefined): void {
+  /** A pulsing ring at the feet of everyone with the aura buff. */
+  private drawAuraRings(): void {
     const ring = this.auraRing;
     if (ring === null) return;
     ring.clear();
-    if (seconds === undefined || seconds <= 0) return;
+    ring.setDepth(1);
 
     const pulse = 0.5 + 0.5 * Math.sin(this.time.now / 170);
-    ring.setDepth(Math.round(y) - 1);
-    ring.lineStyle(2, 0x7fd4ff, 0.35 + pulse * 0.35);
-    ring.strokeEllipse(x, y - 2, 34 + pulse * 6, 13 + pulse * 3);
+    const stroke = (x: number, y: number): void => {
+      ring.lineStyle(2, 0x7fd4ff, 0.35 + pulse * 0.35);
+      ring.strokeEllipse(x, y - 2, 34 + pulse * 6, 13 + pulse * 3);
+    };
+
+    if ((view.self.buffs['aura'] ?? 0) > 0 && view.selfId !== null) {
+      const position = renderedSelfPosition();
+      stroke(position.x, position.y);
+    }
+    for (const player of view.others.values()) {
+      if ((player.buffs['aura'] ?? 0) > 0) stroke(player.renderX, player.renderY);
+    }
   }
 
   /** The whirlwind spins around the caster for a moment. */
@@ -510,6 +522,19 @@ export class WorldScene extends Phaser.Scene {
       } else {
         playerView.setLean(0);
       }
+
+      // Their whirlwind, shown once per cast.
+      if (player.whirlwindUntil > this.time.now) {
+        if (!this.whirlwindShown.has(player.id)) {
+          this.whirlwindShown.add(player.id);
+          const reach = swingFor(weapon).range + 10;
+          this.whirlwinds.push(
+            new WhirlwindEffect(this, () => ({ x: player.renderX, y: player.renderY }), reach),
+          );
+        }
+      } else {
+        this.whirlwindShown.delete(player.id);
+      }
     }
 
     const selfId = view.selfId;
@@ -522,7 +547,6 @@ export class WorldScene extends Phaser.Scene {
       selfView.setLook(tables, view.equipment);
       selfView.setPose(self.dir, this.selfColumn(column));
       selfView.setHealth(self.hp, self.maxHp, true);
-      this.drawAuraRing(drawn.x, drawn.y, view.self.buffs['aura']);
 
       const shown = attackPose();
       if (shown !== null) {

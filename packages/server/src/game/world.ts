@@ -129,6 +129,8 @@ export type Player = {
   skillCooldowns: Map<SkillKey, number>;
   /** Tick when each active buff expires. */
   buffs: Map<SkillKey, number>;
+  /** Tick until which the whirlwind is shown to other clients. */
+  whirlwindUntil: number;
 };
 
 /** One swing: it starts, the blow lands half way, the arm returns. */
@@ -269,6 +271,7 @@ export class World {
       swing: null,
       skillCooldowns: new Map(),
       buffs: new Map(),
+      whirlwindUntil: 0,
     };
     this.recalcStats(player);
 
@@ -577,6 +580,8 @@ export class World {
     if (skill.kind === 'buff') {
       player.buffs.set(key, this.tickCount + (skill.durationTicks ?? 0));
     } else {
+      // A short window so other clients can play the same spin.
+      player.whirlwindUntil = this.tickCount + 12;
       const damage = whirlwindDamage(this.attackOf(player), skill.damageScale ?? 1);
       const radius = skill.radius ?? 0;
       for (const monster of this.monstersById.values()) {
@@ -676,6 +681,7 @@ export class World {
         weapon: player.equipment.weapon,
         armor: player.equipment.armor,
         ...(player.swing !== null ? { attacking: true } : {}),
+        ...(player.whirlwindUntil > this.tickCount ? { whirlwind: true } : {}),
         ...this.playerBuffs(player),
       });
     }

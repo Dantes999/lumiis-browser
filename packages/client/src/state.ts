@@ -19,6 +19,10 @@ export type RemotePlayer = {
   armor: string | null;
   /** performance.now() when the shown swing ends; 0 when standing still. */
   attackUntil: number;
+  /** performance.now() when their whirlwind visual ends; 0 when none. */
+  whirlwindUntil: number;
+  /** Active buffs with their remaining time in seconds. */
+  buffs: Record<string, number>;
   renderX: number;
   renderY: number;
 };

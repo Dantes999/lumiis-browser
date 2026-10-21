@@ -340,6 +340,8 @@ export class Connection {
           weapon: player.weapon,
           armor: player.armor,
           attackUntil: player.attacking === true ? swingEnd(player) : 0,
+          whirlwindUntil: player.whirlwind === true ? performance.now() + 600 : 0,
+          buffs: player.buffs ?? {},
           renderX: player.x,
           renderY: player.y,
         });
@@ -354,6 +356,8 @@ export class Connection {
         existing.weapon = player.weapon;
         existing.armor = player.armor;
         if (player.attacking === true) existing.attackUntil = swingEnd(player);
+        if (player.whirlwind === true) existing.whirlwindUntil = performance.now() + 600;
+        existing.buffs = player.buffs ?? {};
       }
     }
 
