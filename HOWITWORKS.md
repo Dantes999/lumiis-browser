@@ -52,6 +52,7 @@ Der **Client** läuft im `dev`-Modus direkt aus dem Quellcode (Vite).
 | `game/realm.ts` | **Alle Karten** + Portale. Ein `World` je Karte, Spieler wandern zwischen ihnen. |
 | `game/formulas.ts` | **Alle Berechnungen** (Schaden, Abklingen, Beute-Würfe, Split). Reine Funktionen. |
 | `game/monster-ai.ts` | **Monster-Entscheidungen**: Ziel suchen, Weg finden, Wandern. |
+| (in `world.ts`) `drainRewards` | Kill-Belohnungen zum Rundruf (EXP-Kugeln) |
 | `game/loop.ts` | `FixedStepLoop`: fester 20-Hz-Takt, holt Rückstand begrenzt nach. |
 | `game/map.ts` | Karten von der Platte laden und prüfen. |
 | `net/gateway.ts` | **WebSocket**: Login, Charakterauswahl, Nachrichten-`switch`, Ratenlimit, `saveAll`. |
@@ -90,9 +91,11 @@ Der **Client** läuft im `dev`-Modus direkt aus dem Quellcode (Vite).
 | `scene/world-scene.ts` | **Die Welt zeichnen**: Karte, Spieler, Monster, Boden, Effekte, Kamera |
 | `scene/swing-trail.ts` | Lichtstreif des Schwungs |
 | `scene/skill-effects.ts` | Wirbel-Effekt |
+| `scene/reward-orbs.ts` | Gelbe EXP-Kugeln vom Monster zum Spieler |
 | `art.ts` | Spieler aus Ebenen zusammensetzen (Rüstung, Kopf, Haare, Waffe) |
 | `mobart.ts` | Monster-Sprites + Lebensbalken |
 | `audio.ts` | Töne im Code erzeugt (Web Audio), kein Ton-Asset |
+| `mobile.ts` | Handy-Erkennung, Querformat-Hinweis, Landscape-Sperre |
 | `ui/hud.ts` | HUD: Status, TP, EXP, Yang, Angriff, Skills |
 | `ui/bag.ts`, `ui/characters.ts`, `ui/login.ts`, `ui/settings.ts` | Fenster |
 | `editor/main.ts` | Karten-Editor |

@@ -20,6 +20,20 @@ const swingEnd = (player: PlayerSnapshot): number => {
   return performance.now() + swingMs(swingFor(weapon));
 };
 
+/** One kill: where it happened and who earned what. */
+export type RewardMessage = {
+  x: number;
+  y: number;
+  shares: Array<{ id: number; exp: number; yang: number }>;
+};
+
+let rewardHandler: ((reward: RewardMessage) => void) | null = null;
+
+/** The scene listens here to throw experience orbs. */
+export const setRewardHandler = (fn: ((reward: RewardMessage) => void) | null): void => {
+  rewardHandler = fn;
+};
+
 const PING_INTERVAL_MS = 2000;
 const MAX_RECONNECT_DELAY_MS = 10000;
 /** No message for this long while in the world means the connection is dead. */
@@ -282,6 +296,9 @@ export class Connection {
       case 'notice':
         view.notice = message.text;
         view.noticeUntil = performance.now() + 3000;
+        break;
+      case 'reward':
+        rewardHandler?.(message);
         break;
       case 'authError':
         logEvent('warn', `auth error: ${message.reason}`);

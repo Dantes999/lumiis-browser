@@ -98,6 +98,10 @@ export async function createGameServer(options: GameServerOptions = {}): Promise
       gateway.notify(event.playerId, event.text);
     }
 
+    for (const { map, reward } of realm.drainRewards()) {
+      gateway.broadcastReward(map, reward);
+    }
+
     const tick = realm.primary?.tick ?? 0;
     if (tick % SNAPSHOT_EVERY_TICKS === 0) gateway.broadcastSnapshot();
     if (tick % (TICK_RATE * SAVE_EVERY_SECONDS) === 0) gateway.saveAll();

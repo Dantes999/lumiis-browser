@@ -426,6 +426,73 @@ body {
   border-color: var(--line);
 }
 
+/* Touch controls: only on phones (body.mobile), bottom right. */
+#touch {
+  display: none;
+}
+
+body.mobile #touch {
+  position: fixed;
+  right: calc(16px + env(safe-area-inset-right, 0px));
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.touch-button {
+  pointer-events: auto;
+  width: 74px;
+  height: 74px;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  border: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: 50%;
+  touch-action: none;
+}
+
+.touch-button.attack {
+  width: 96px;
+  height: 96px;
+  font-size: 14px;
+  border-color: color-mix(in srgb, #ffb35c 65%, transparent);
+  background: color-mix(in srgb, #ffb35c 18%, transparent);
+}
+
+.touch-button.pressed {
+  background: color-mix(in srgb, var(--accent) 32%, transparent);
+}
+
+.touch-button.attack.pressed {
+  background: color-mix(in srgb, #ffb35c 40%, transparent);
+}
+
+/* Portrait prompt: the game is meant to be played sideways. */
+#rotate {
+  display: none;
+}
+
+@media (orientation: portrait) {
+  body.mobile #rotate {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    text-align: center;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 16px;
+    z-index: 50;
+  }
+}
+
 /* Touch joystick: appears where the finger lands, never captures the HUD. */
 #stick {
   position: fixed;

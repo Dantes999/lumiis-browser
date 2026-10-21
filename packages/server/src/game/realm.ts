@@ -8,6 +8,7 @@ import type {
   AttackResult,
   Player,
   PlayerSeed,
+  RewardBroadcast,
   Warp,
   World,
   WorldEvent,
@@ -149,6 +150,15 @@ export class Realm {
 
   saveOf(playerId: number): ReturnType<World['saveOf']> {
     return this.worldOf(playerId)?.saveOf(playerId) ?? null;
+  }
+
+  /** Kill rewards from this tick, tagged with the map they happened on. */
+  drainRewards(): Array<{ map: string; reward: RewardBroadcast }> {
+    const list: Array<{ map: string; reward: RewardBroadcast }> = [];
+    for (const world of this.worlds.values()) {
+      for (const reward of world.drainRewards()) list.push({ map: world.map.id, reward });
+    }
+    return list;
   }
 
   /** Messages from this tick, for every world. */

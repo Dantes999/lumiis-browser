@@ -108,6 +108,33 @@ export function initInput(options: InputOptions): void {
   base.append(knob);
   document.body.append(base);
 
+  // On-screen buttons for phones: attack (hold to keep swinging) and pickup.
+  const attackButton = document.getElementById('attack-button');
+  if (attackButton !== null) {
+    const press = (event: PointerEvent): void => {
+      event.preventDefault();
+      attackButton.classList.add('pressed');
+      onAttack?.();
+      onAttackHold?.(true);
+    };
+    const release = (): void => {
+      attackButton.classList.remove('pressed');
+      onAttackHold?.(false);
+    };
+    attackButton.addEventListener('pointerdown', press);
+    attackButton.addEventListener('pointerup', release);
+    attackButton.addEventListener('pointercancel', release);
+    attackButton.addEventListener('pointerleave', release);
+  }
+
+  const pickupButton = document.getElementById('pickup-button');
+  if (pickupButton !== null) {
+    pickupButton.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      onPickup?.();
+    });
+  }
+
   const storedZoom = Number(window.localStorage.getItem(ZOOM_STORAGE_KEY));
   if (Number.isFinite(storedZoom) && storedZoom > 0) view.zoom = clampZoom(storedZoom);
 
@@ -216,6 +243,7 @@ export function initInput(options: InputOptions): void {
   );
 
   const hud = document.getElementById('hud');
+  const touch = document.getElementById('touch');
 
   const pointerPair = (): [Point, Point] | null => {
     const points = [...pointers.values()];
@@ -248,7 +276,12 @@ export function initInput(options: InputOptions): void {
     // Events can also arrive from the window itself, so only test for the HUD
     // when the target really is a node.
     const target = event.target;
-    if (hud !== null && target instanceof Node && hud.contains(target)) return;
+    if (
+      target instanceof Node &&
+      ((hud !== null && hud.contains(target)) || (touch !== null && touch.contains(target)))
+    ) {
+      return;
+    }
 
     const isMouse = event.pointerType === 'mouse';
     if (isMouse && event.button !== 0) return;

@@ -40,6 +40,11 @@ export type Gateway = {
   sendInventory(playerId: number): void;
   /** Tells one player something; used for rewards and other tick results. */
   notify(playerId: number, text: string): void;
+  /** Tells everyone in one map about a kill and who earned what. */
+  broadcastReward(
+    worldId: string,
+    reward: { x: number; y: number; shares: Array<{ playerId: number; exp: number; yang: number }> },
+  ): void;
   /** Writes every logged in character to the store. */
   saveAll(): void;
   /** Connected sockets, including those that have not logged in yet. */
@@ -443,6 +448,26 @@ export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store
 
     notify(playerId: number, text: string): void {
       sendToPlayer(playerId, { t: 'notice', text });
+    },
+
+    broadcastReward(worldId, reward): void {
+      const message = encode({
+        t: 'reward',
+        x: Math.round(reward.x * 10) / 10,
+        y: Math.round(reward.y * 10) / 10,
+        shares: reward.shares.map((share) => ({
+          id: share.playerId,
+          exp: share.exp,
+          yang: share.yang,
+        })),
+      });
+
+      for (const session of sessions) {
+        if (session.player === null) continue;
+        if (session.socket.readyState !== WebSocket.OPEN) continue;
+        if (realm.worldIdOf(session.player.id) !== worldId) continue;
+        session.socket.send(message);
+      }
     },
 
     sendInventory(playerId: number): void {

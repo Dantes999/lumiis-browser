@@ -145,6 +145,13 @@ export type SwingState = {
 /** Something the player should be told, collected during the tick. */
 export type WorldEvent = { playerId: number; text: string };
 
+/** A kill everyone in the world may watch: which players earned what. */
+export type RewardBroadcast = {
+  x: number;
+  y: number;
+  shares: Array<{ playerId: number; exp: number; yang: number }>;
+};
+
 /** An item lying on the ground, waiting to be picked up. */
 export type GroundItem = {
   id: number;
@@ -215,6 +222,8 @@ export class World {
   private readonly warps: Warp[] = [];
   /** Messages that came up during the tick, for the players they belong to. */
   private readonly events: WorldEvent[] = [];
+  /** Kill rewards to broadcast to everyone in this world. */
+  private readonly rewardBroadcasts: RewardBroadcast[] = [];
   private nextPlayerId = 1;
   private nextMonsterId = 1;
   private nextGroundId = 1;
@@ -540,6 +549,20 @@ export class World {
         text: `${prefix}+${reward.exp} EXP, +${reward.yang} Yang`,
       });
     }
+
+    const shares = rewards
+      .filter((reward) => reward.exp > 0 || reward.yang > 0)
+      .map((reward) => ({ playerId: reward.playerId, exp: reward.exp, yang: reward.yang }));
+    if (shares.length > 0) {
+      this.rewardBroadcasts.push({ x: monster.x, y: monster.y, shares });
+    }
+  }
+
+  /** Kill rewards produced during the tick; the gateway broadcasts them. */
+  drainRewards(): RewardBroadcast[] {
+    const list = [...this.rewardBroadcasts];
+    this.rewardBroadcasts.length = 0;
+    return list;
   }
 
   /** Messages produced during the tick; the gateway delivers them. */

@@ -97,7 +97,15 @@ export type ServerMessage =
   | { t: 'characters'; list: CharacterSummary[]; max: number }
   | { t: 'authError'; reason: string }
   | { t: 'pong'; at: number }
-  | { t: 'notice'; text: string };
+  | { t: 'notice'; text: string }
+  | {
+      t: 'reward';
+      /** Where the monster fell. */
+      x: number;
+      y: number;
+      /** One entry per player who earned something, with their share. */
+      shares: Array<{ id: number; exp: number; yang: number }>;
+    };
 
 export type CharacterSummary = { id: number; name: string; level: number };
 

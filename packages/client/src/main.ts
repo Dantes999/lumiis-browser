@@ -7,6 +7,7 @@ import { WorldScene } from './scene/world-scene';
 import { Connection } from './net';
 import { audioState, sfx } from './audio';
 import { initInput } from './input';
+import { initMobile } from './mobile';
 import { attackAt, isAttackHeld, setAttackHeld, setAttackSender, swingForward } from './combat';
 import { cast, setSkillSender } from './skill';
 import { setAimEnabled } from './aim';
@@ -63,6 +64,7 @@ setAimEnabled(settings.current().aimAtMouse);
 // The browser only allows sound after a gesture; the login click is one, and
 // this listener is the safety net for every other first interaction.
 unlockAudioOnFirstGesture();
+initMobile();
 
 const login = createLogin((name, password, mode) => {
   initAudio();

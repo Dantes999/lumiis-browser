@@ -29,6 +29,8 @@ import { setWorldMap } from '../world-map';
 import { SwingTrail } from './swing-trail';
 import { WhirlwindEffect } from './skill-effects';
 import { setSkillVisual } from '../skill';
+import { setRewardHandler } from '../net';
+import { RewardOrb } from './reward-orbs';
 import { aimDirection, aimPoint, setAimPointer } from '../aim';
 
 /** Milliseconds per walking frame. */
@@ -79,6 +81,8 @@ export class WorldScene extends Phaser.Scene {
   private readonly whirlwinds: WhirlwindEffect[] = [];
   /** Players whose whirlwind is already being shown. */
   private readonly whirlwindShown = new Set<number>();
+  /** Experience orbs flying from dead monsters to the players who earned them. */
+  private readonly orbs: RewardOrb[] = [];
   /** The pulsing ring at the feet while the aura buff is up. */
   private auraRing: Phaser.GameObjects.Graphics | null = null;
   /** The ground arrow that shows where a mouse-aimed swing will go. */
@@ -142,6 +146,20 @@ export class WorldScene extends Phaser.Scene {
       if (key === 'whirlwind') this.spawnWhirlwind();
     });
 
+    // A kill: one orb per player, sized by their share of the damage.
+    setRewardHandler((reward) => {
+      for (const share of reward.shares) {
+        const target =
+          share.id === view.selfId
+            ? () => renderedSelfPosition()
+            : () => {
+                const other = view.others.get(share.id);
+                return other === undefined ? null : { x: other.renderX, y: other.renderY };
+              };
+        this.orbs.push(new RewardOrb(this, { x: reward.x, y: reward.y }, target, share.exp));
+      }
+    });
+
     // One soft dot, reused for the sparks a hit throws out.
     const spark = this.add.graphics();
     spark.fillStyle(0xffffff, 1);
@@ -190,6 +208,7 @@ export class WorldScene extends Phaser.Scene {
     this.renderPlayers(delta);
     this.renderTrails(delta);
     this.updateWhirlwinds(delta);
+    this.updateOrbs(delta);
     this.drawAuraRings();
     this.drawAimArrow();
     this.updateShake();
@@ -229,6 +248,17 @@ export class WorldScene extends Phaser.Scene {
     arrow.lineBetween(feet.x, feet.y - 2, baseX, baseY);
     arrow.fillStyle(0xffd479, 0.8);
     arrow.fillTriangle(tipX, tipY, leftX, leftY, rightX, rightY);
+  }
+
+  private updateOrbs(delta: number): void {
+    for (let index = this.orbs.length - 1; index >= 0; index -= 1) {
+      const orb = this.orbs[index];
+      if (orb === undefined) continue;
+      orb.update(delta);
+      if (!orb.done) continue;
+      orb.destroy();
+      this.orbs.splice(index, 1);
+    }
   }
 
   /** A pulsing ring at the feet of everyone with the aura buff. */
