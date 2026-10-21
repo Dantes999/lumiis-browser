@@ -17,6 +17,8 @@ beforeEach(() => {
     prevX: 100,
     prevY: 100,
     name: 'Kain',
+    body: '',
+    hair: '',
     dir: 0,
     moveDir: 0,
     moving: false,

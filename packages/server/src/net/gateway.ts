@@ -168,6 +168,8 @@ export function attachGateway(
         accountId: session.accountId,
         characterId,
         name: save.name,
+        body: save.body,
+        hair: save.hair,
         x: save.x,
         y: save.y,
         dir: save.dir as Direction,
@@ -193,6 +195,8 @@ export function attachGateway(
       tickRate: TICK_RATE,
       tick: host.tickOf(player.world),
       map: player.map,
+      body: save.body,
+      hair: save.hair,
       channel: player.channel,
       channelCount: player.channelCount,
     });
@@ -260,13 +264,13 @@ export function attachGateway(
     );
   };
 
-  const handleCreate = (session: Session, name: string): void => {
+  const handleCreate = (session: Session, name: string, body = '', hair = ''): void => {
     if (session.accountId === null) {
       send(session, { t: 'authError', reason: 'Log in first.' });
       return;
     }
 
-    const result = store.createCharacter(session.accountId, name);
+    const result = store.createCharacter(session.accountId, name, body, hair);
     if (!result.ok) {
       send(session, { t: 'authError', reason: result.reason });
       sendCharacters(session, session.accountId);
@@ -406,7 +410,7 @@ export function attachGateway(
           break;
         }
         case 'createCharacter':
-          handleCreate(session, message.name);
+          handleCreate(session, message.name, message.body ?? '', message.hair ?? '');
           break;
         case 'input':
           if (session.player === null) {

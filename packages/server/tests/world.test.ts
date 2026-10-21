@@ -190,6 +190,8 @@ describe('world', () => {
       {
         id: 1,
         name: 'Kain',
+        body: '',
+        hair: '',
         x: spawn.x,
         y: Math.round(spawn.y * 10) / 10,
         dir: 0,

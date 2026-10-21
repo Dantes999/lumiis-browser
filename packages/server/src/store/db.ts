@@ -33,6 +33,9 @@ export type CharacterSummary = { id: number; name: string; level: number };
 
 export type CharacterSave = {
   name: string;
+  /** Body and headwear ids of the look (see the style pack manifest). */
+  body: string;
+  hair: string;
   equipment: Equipment;
   level: number;
   exp: number;
@@ -55,6 +58,8 @@ type AccountRow = { id: number; name: string; salt: string; hash: string };
 type CharacterRow = {
   id: number;
   name: string;
+  body: string | null;
+  hair: string | null;
   weapon: string | null;
   armor: string | null;
   level: number;
@@ -92,6 +97,8 @@ CREATE TABLE IF NOT EXISTS characters (
   dir INTEGER NOT NULL,
   weapon TEXT,
   armor TEXT,
+  body TEXT NOT NULL DEFAULT '',
+  hair TEXT NOT NULL DEFAULT '',
   updated_at INTEGER NOT NULL
 );
 
@@ -127,13 +134,13 @@ export class Store {
     this.db.exec('PRAGMA foreign_keys = ON');
     this.migrate();
     this.db.exec(SCHEMA);
-    this.ensureEquipmentColumns();
+    this.ensureCharacterColumns();
 
     // Prepared once. Preparing on every save was a measurable cost under load.
     this.stmtSaveCharacter = this.db.prepare(`
       UPDATE characters SET
         level = ?, exp = ?, yang = ?, hp = ?, map = ?, x = ?, y = ?, dir = ?,
-        weapon = ?, armor = ?, updated_at = ?
+        weapon = ?, armor = ?, body = ?, hair = ?, updated_at = ?
       WHERE id = ?
     `);
     this.stmtClearItems = this.db.prepare('DELETE FROM character_items WHERE character_id = ?');
@@ -142,8 +149,8 @@ export class Store {
     );
   }
 
-  /** Saves from before equipment existed get the two new columns. */
-  private ensureEquipmentColumns(): void {
+  /** Older saves get the new columns, so nothing is lost on an update. */
+  private ensureCharacterColumns(): void {
     const columns = this.db.prepare("PRAGMA table_info('characters')").all() as unknown as Array<{
       name: string;
     }>;
@@ -152,6 +159,12 @@ export class Store {
     }
     if (!columns.some((column) => column.name === 'armor')) {
       this.db.exec('ALTER TABLE characters ADD COLUMN armor TEXT');
+    }
+    if (!columns.some((column) => column.name === 'body')) {
+      this.db.exec("ALTER TABLE characters ADD COLUMN body TEXT NOT NULL DEFAULT ''");
+    }
+    if (!columns.some((column) => column.name === 'hair')) {
+      this.db.exec("ALTER TABLE characters ADD COLUMN hair TEXT NOT NULL DEFAULT ''");
     }
   }
 
@@ -264,7 +277,12 @@ export class Store {
     return rows.map((row) => ({ id: Number(row.id), name: row.name, level: Number(row.level) }));
   }
 
-  createCharacter(accountId: number, name: string): CreateResult {
+  createCharacter(
+    accountId: number,
+    name: string,
+    body = '',
+    hair = '',
+  ): CreateResult {
     const count = this.listCharacters(accountId).length;
     if (count >= MAX_CHARACTERS) {
       return { ok: false, reason: `You already have ${MAX_CHARACTERS} characters.` };
@@ -277,10 +295,10 @@ export class Store {
       const info = this.db
         .prepare(
           `INSERT INTO characters
-             (account_id, name, level, exp, yang, hp, map, x, y, dir, weapon, armor, updated_at)
-           VALUES (?, ?, 1, 0, 0, 100, ?, 0, 0, 0, 'wooden_sword', NULL, ?)`,
+             (account_id, name, level, exp, yang, hp, map, x, y, dir, weapon, armor, body, hair, updated_at)
+           VALUES (?, ?, 1, 0, 0, 100, ?, 0, 0, 0, 'wooden_sword', NULL, ?, ?, ?)`,
         )
-        .run(accountId, name, START_MAP, Date.now());
+        .run(accountId, name, START_MAP, body, hair, Date.now());
 
       return { ok: true, id: Number(info.lastInsertRowid) };
     } catch {
@@ -300,7 +318,7 @@ export class Store {
   loadCharacter(characterId: number): CharacterSave | null {
     const row = this.db
       .prepare(
-        'SELECT id, name, level, exp, yang, hp, map, x, y, dir, weapon, armor FROM characters WHERE id = ?',
+        'SELECT id, name, level, exp, yang, hp, map, x, y, dir, weapon, armor, body, hair FROM characters WHERE id = ?',
       )
       .get(characterId) as unknown as CharacterRow | undefined;
 
@@ -325,6 +343,8 @@ export class Store {
 
     return {
       name: row.name,
+      body: String(row.body ?? ''),
+      hair: String(row.hair ?? ''),
       equipment,
       level: Number(row.level),
       exp: Number(row.exp),
@@ -365,6 +385,8 @@ export class Store {
           save.dir,
           save.equipment.weapon,
           save.equipment.armor,
+          save.body,
+          save.hair,
           now,
           characterId,
         );

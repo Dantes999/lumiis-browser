@@ -33,6 +33,9 @@ export const MOVE_DEAD = 8;
 export type PlayerSnapshot = {
   id: number;
   name: string;
+  /** Look ids of the style pack manifest (body and headwear). */
+  body?: string;
+  hair?: string;
   x: number;
   y: number;
   dir: number;
@@ -101,7 +104,7 @@ export type ClientMessage =
   | { t: 'select'; id: number; channel?: number }
   | { t: 'channels'; id?: number }
   | { t: 'switchChannel'; channel: number }
-  | { t: 'createCharacter'; name: string }
+  | { t: 'createCharacter'; name: string; body?: string; hair?: string }
   | { t: 'input'; dx: number; dy: number }
   | { t: 'attack'; target?: number; dir?: number }
   | { t: 'skill'; key: SkillKey }
@@ -123,6 +126,9 @@ export type ServerMessage =
       tick: number;
       /** Map the player is standing on. */
       map: string;
+      /** Look ids of the style pack manifest (body and headwear). */
+      body: string;
+      hair: string;
       /** Channel number, 1 based. */
       channel: number;
       /** How many channels this map has. */
@@ -305,7 +311,19 @@ export function parseClientMessage(input: unknown): ParsedMessage {
     case 'createCharacter': {
       const name = message.name;
       if (typeof name !== 'string' || !NAME_PATTERN.test(name)) return fail('invalid character name');
-      return { ok: true, message: { t: 'createCharacter', name } };
+
+      // Look ids are chosen from the style pack; the server only checks the shape.
+      const look = (value: unknown): string | undefined => {
+        if (value === undefined) return undefined;
+        if (typeof value !== 'string' || !/^[a-z0-9_]{0,24}$/.test(value)) return undefined;
+        return value;
+      };
+      const body = look(message.body);
+      const hair = look(message.hair);
+      if (message.body !== undefined && body === undefined) return fail('invalid body id');
+      if (message.hair !== undefined && hair === undefined) return fail('invalid hair id');
+
+      return { ok: true, message: { t: 'createCharacter', name, body, hair } };
     }
 
     case 'settings': {

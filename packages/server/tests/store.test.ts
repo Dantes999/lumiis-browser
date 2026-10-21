@@ -29,6 +29,8 @@ const sampleSave = (name: string): CharacterSave => {
 
   return {
     name,
+    body: 'default',
+    hair: 'helmet',
     equipment: { weapon: 'iron_sword', armor: 'padded_armor' },
     level: 5,
     exp: 20,

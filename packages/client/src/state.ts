@@ -15,6 +15,9 @@ export type ConnectionStatus = 'connecting' | 'online' | 'offline';
 export type RemotePlayer = {
   id: number;
   name: string;
+  /** Look ids of the style pack manifest. */
+  body: string;
+  hair: string;
   x: number;
   y: number;
   dir: Direction;
@@ -64,6 +67,9 @@ export type MonsterState = {
  */
 export type SelfState = {
   name: string;
+  /** Look ids of the style pack manifest. */
+  body: string;
+  hair: string;
   x: number;
   y: number;
   prevX: number;
@@ -121,6 +127,8 @@ export const view: ViewState = {
   selfId: null,
   self: {
     name: '',
+    body: '',
+    hair: '',
     x: 0,
     y: 0,
     prevX: 0,

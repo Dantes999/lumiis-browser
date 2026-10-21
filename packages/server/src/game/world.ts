@@ -98,6 +98,9 @@ export type PlayerSeed = {
   accountId: number;
   characterId: number;
   name: string;
+  /** Look ids of the style pack manifest; empty means "the default". */
+  body?: string;
+  hair?: string;
   x?: number;
   y?: number;
   dir?: Direction;
@@ -116,6 +119,9 @@ export type Player = {
   /** Row in the characters table; the save is written under it. */
   characterId: number;
   name: string;
+  /** Look ids of the style pack manifest; empty means "the default". */
+  body: string;
+  hair: string;
   /** Position in world pixels, measured at the feet. */
   x: number;
   y: number;
@@ -320,6 +326,8 @@ export class World {
       accountId: seed.accountId,
       characterId: seed.characterId,
       name: seed.name,
+      body: seed.body ?? '',
+      hair: seed.hair ?? '',
       x: seed.x ?? spawn.x,
       y: seed.y ?? spawn.y,
       dir: seed.dir ?? 0,
@@ -382,6 +390,8 @@ export class World {
 
     return {
       name: player.name,
+      body: player.body,
+      hair: player.hair,
       equipment: { ...player.equipment },
       level: player.level,
       exp: player.exp,
@@ -1050,7 +1060,7 @@ export class World {
       .join(',');
     return (
       `${entry.name}|${entry.level}|${entry.exp}|${entry.yang}|${entry.maxHp}|` +
-      `${entry.weapon ?? ''}|${entry.armor ?? ''}|${buffSig}`
+      `${entry.weapon ?? ''}|${entry.armor ?? ''}|${entry.body ?? ''}|${entry.hair ?? ''}|${buffSig}`
     );
   }
 
@@ -1101,6 +1111,8 @@ export class World {
       players.push({
         id: player.id,
         name: player.name,
+        body: player.body,
+        hair: player.hair,
         x: Math.round(player.x * 10) / 10,
         y: Math.round(player.y * 10) / 10,
         dir: player.dir,

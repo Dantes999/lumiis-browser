@@ -210,8 +210,8 @@ export class Connection {
     this.send({ t: 'switchChannel', channel });
   }
 
-  createCharacter(name: string): void {
-    this.send({ t: 'createCharacter', name });
+  createCharacter(name: string, hair?: string): void {
+    this.send(hair === undefined ? { t: 'createCharacter', name } : { t: 'createCharacter', name, hair });
   }
 
   /** Sends a login attempt, connecting first if needed. */
@@ -367,6 +367,8 @@ export class Connection {
         view.selfId = message.id;
         view.tick = message.tick;
         view.mapId = message.map;
+        view.self.body = message.body;
+        view.self.hair = message.hair;
         view.channel = message.channel;
         view.channelCount = message.channelCount;
         view.channelOptions = null;
@@ -482,6 +484,8 @@ export class Connection {
         view.others.set(player.id, {
           id: player.id,
           name: player.name,
+          body: player.body ?? '',
+          hair: player.hair ?? '',
           x: player.x,
           y: player.y,
           dir: player.dir as typeof view.self.dir,
@@ -498,6 +502,8 @@ export class Connection {
         });
       } else {
         existing.name = player.name;
+        existing.body = player.body ?? '';
+        existing.hair = player.hair ?? '';
         existing.x = player.x;
         existing.y = player.y;
         existing.dir = player.dir as typeof view.self.dir;
