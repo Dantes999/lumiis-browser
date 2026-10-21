@@ -25,6 +25,7 @@ beforeEach(() => {
     level: 1,
     exp: 0,
     yang: 0,
+    buffs: {},
   };
 });
 

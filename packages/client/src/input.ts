@@ -13,6 +13,8 @@ export type InputOptions = {
   onAttack?: () => void;
   /** The attack key was pressed down or let go; drives the held combo. */
   onAttackHold?: (held: boolean) => void;
+  /** A number key was pressed: 0 is "1", 1 is "2" and so on. */
+  onSkill?: (slot: number) => void;
   /** Y key: pick up the closest item in reach. */
   onPickup?: () => void;
   /** A short tap or click on the world, in screen pixels. */
@@ -75,7 +77,7 @@ const TAP_SLOP = 10;
 const TAP_MAX_MS = 350;
 
 export function initInput(options: InputOptions): void {
-  const { onAttack, onAttackHold, onPickup, onTap } = options;
+  const { onAttack, onAttackHold, onPickup, onTap, onSkill } = options;
 
   const pressed = new Set<string>();
 
@@ -155,6 +157,16 @@ export function initInput(options: InputOptions): void {
     if (event.code === 'KeyY') {
       event.preventDefault();
       if (!event.repeat) onPickup?.();
+      return;
+    }
+    if (event.code === 'Digit1') {
+      event.preventDefault();
+      if (!event.repeat) onSkill?.(0);
+      return;
+    }
+    if (event.code === 'Digit2') {
+      event.preventDefault();
+      if (!event.repeat) onSkill?.(1);
       return;
     }
     if (event.code in KEY_VECTORS) {

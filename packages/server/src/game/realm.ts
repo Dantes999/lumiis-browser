@@ -12,6 +12,7 @@ import type {
   World,
   WorldEvent,
 } from './world.js';
+import type { SkillKey } from '@lumiis/shared';
 import { World as WorldClass } from './world.js';
 
 export type JoinSeed = PlayerSeed & { map: string };
@@ -90,6 +91,12 @@ export class Realm {
 
   setInput(playerId: number, dx: number, dy: number): void {
     this.worldOf(playerId)?.setInput(playerId, dx, dy);
+  }
+
+  useSkill(playerId: number, key: SkillKey): { ok: true } | { ok: false; reason: string } {
+    const world = this.worldOf(playerId);
+    if (world === null) return { ok: false, reason: 'You are not in the world.' };
+    return world.useSkill(playerId, key);
   }
 
   attack(

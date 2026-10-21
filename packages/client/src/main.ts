@@ -2,11 +2,13 @@
 // No game rules live here — this file only wires parts together.
 
 import Phaser from 'phaser';
+import { SKILL_KEYS } from '@lumiis/shared';
 import { WorldScene } from './scene/world-scene';
 import { Connection } from './net';
 import { audioState, sfx } from './audio';
 import { initInput } from './input';
 import { attackAt, setAttackHeld, setAttackSender, swingForward } from './combat';
+import { cast, setSkillSender } from './skill';
 import { initAudio, resumeAudio, unlockAudioOnFirstGesture } from './audio';
 import { initController } from './controller';
 import { itemNear, orderPickup, pickupNearestInRange, setPickupSender, tickPickup } from './loot';
@@ -37,6 +39,13 @@ const game = new Phaser.Game({
 
 const connection = new Connection();
 setAttackSender((message) => connection.attack(message));
+setSkillSender((key) => connection.useSkill(key));
+
+/** Triggers the skill in a hotbar slot (0 = "1", 1 = "2"). */
+const castSlot = (slot: number): void => {
+  const key = SKILL_KEYS[slot];
+  if (key !== undefined) cast(key);
+};
 setPickupSender((itemId) => connection.pickup(itemId));
 initController((dx, dy) => connection.setInput(dx, dy));
 
@@ -75,6 +84,9 @@ initInput({
   onAttackHold: (held) => {
     setAttackHeld(held);
   },
+  onSkill: (slot) => {
+    castSlot(slot);
+  },
   onPickup: () => {
     pickupNearestInRange();
   },
@@ -95,7 +107,7 @@ initInput({
   },
 });
 
-const hud = createHud();
+const hud = createHud((slot) => castSlot(slot));
 const bag = createBag(
   (slot) => connection.equip(slot),
   (piece) => connection.unequip(piece),

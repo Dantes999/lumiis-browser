@@ -23,9 +23,11 @@ import {
   PLAYER_RESPAWN_HP_SHARE,
   PLAYER_RESPAWN_TICKS,
   TICK_MS,
+  TICK_RATE,
   TILE_SIZE,
   TILE,
   DIR_VECTORS,
+  SKILLS,
   dirFromInput,
   expForNextLevel,
   facingTowards,
@@ -42,7 +44,7 @@ import {
   tileAt,
 } from '@lumiis/shared';
 import type { CharacterSave } from '../store/db.js';
-import type { Point, SwingProfile } from '@lumiis/shared';
+import type { Point, SkillKey, SwingProfile } from '@lumiis/shared';
 import type {
   Direction,
   Equipment,
@@ -117,6 +119,10 @@ export type Player = {
   equipment: Equipment;
   /** The swing in progress, if any. */
   swing: SwingState | null;
+  /** Tick when each skill is ready to fire again. */
+  skillCooldowns: Map<SkillKey, number>;
+  /** Tick when each active buff expires. */
+  buffs: Map<SkillKey, number>;
 };
 
 /** One swing: it starts, the blow lands half way, the arm returns. */
@@ -254,6 +260,8 @@ export class World {
       autoPickupTypes: new Set<ItemKey>(),
       equipment: seed.equipment ?? { ...EMPTY_EQUIPMENT },
       swing: null,
+      skillCooldowns: new Map(),
+      buffs: new Map(),
     };
     this.recalcStats(player);
 
@@ -392,6 +400,12 @@ export class World {
         player.hp = Math.min(player.maxHp, player.hp + PLAYER_REGEN_HP);
       }
 
+      if (player.buffs.size > 0) {
+        for (const [key, until] of [...player.buffs]) {
+          if (this.tickCount >= until) player.buffs.delete(key);
+        }
+      }
+
       if (player.moving) {
         const next = moveWithCollision(this.map, player.x, player.y, player.dir, TICK_SECONDS);
         player.x = next.x;
@@ -522,9 +536,50 @@ export class World {
     player.hp = Math.min(player.hp, player.maxHp);
   }
 
+  /** Active buffs as seconds remaining, for the client to draw. */
+  private playerBuffs(player: Player): { buffs?: Record<string, number> } {
+    if (player.buffs.size === 0) return {};
+    const buffs: Record<string, number> = {};
+    for (const [key, until] of player.buffs) {
+      buffs[key] = Math.max(0, Math.round((until - this.tickCount) / TICK_RATE));
+    }
+    return { buffs };
+  }
+
+  /** Fires a skill: a self-buff or a whirlwind that hits everything around. */
+  useSkill(playerId: number, key: SkillKey): { ok: true } | { ok: false; reason: string } {
+    const player = this.playersById.get(playerId);
+    if (player === undefined) return { ok: false, reason: 'You are not in the world.' };
+    if (player.deadUntil > 0) return { ok: false, reason: 'You are down.' };
+
+    const skill = SKILLS[key];
+    if ((player.skillCooldowns.get(key) ?? 0) > this.tickCount) {
+      return { ok: false, reason: 'Not ready yet.' };
+    }
+
+    if (skill.kind === 'buff') {
+      player.buffs.set(key, this.tickCount + (skill.durationTicks ?? 0));
+    } else {
+      const damage = Math.round(this.attackOf(player) * (skill.damageScale ?? 1));
+      const radius = skill.radius ?? 0;
+      for (const monster of this.monstersById.values()) {
+        if (monster.respawnAt > 0) continue;
+        if (Math.hypot(monster.x - player.x, monster.y - player.y) > radius) continue;
+        monster.hp -= damage;
+        monster.damageBy.set(player.id, (monster.damageBy.get(player.id) ?? 0) + damage);
+        if (monster.targetId === null) monster.targetId = player.id;
+        if (monster.hp <= 0) this.killMonster(monster, player);
+      }
+    }
+
+    player.skillCooldowns.set(key, this.tickCount + skill.cooldownTicks);
+    return { ok: true };
+  }
+
   private attackOf(player: Player): number {
     const weapon = player.equipment.weapon === null ? null : itemDef(player.equipment.weapon);
-    return PLAYER_DAMAGE + (weapon?.attack ?? 0);
+    const aura = player.buffs.has('aura') ? SKILLS.aura.attackBonus ?? 0 : 0;
+    return PLAYER_DAMAGE + (weapon?.attack ?? 0) + aura;
   }
 
   private defenseOf(player: Player): number {
@@ -604,6 +659,7 @@ export class World {
         weapon: player.equipment.weapon,
         armor: player.equipment.armor,
         ...(player.swing !== null ? { attacking: true } : {}),
+        ...this.playerBuffs(player),
       });
     }
 

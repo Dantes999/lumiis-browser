@@ -8,6 +8,7 @@ import type {
   MonsterSnapshot,
   PlayerSnapshot,
   ServerMessage,
+  SkillKey,
 } from '@lumiis/shared';
 import { applyServerPosition } from './sim';
 import { view } from './state';
@@ -108,6 +109,11 @@ export class Connection {
   /** A swing; with a monster id it turns towards it, without it goes ahead. */
   attack(message: { target?: number; dir?: number }): void {
     this.send({ t: 'attack', ...message });
+  }
+
+  /** Fires a skill (a buff or a whirlwind). */
+  useSkill(key: SkillKey): void {
+    this.send({ t: 'skill', key });
   }
 
   pickup(target: number): void {
@@ -217,6 +223,7 @@ export class Connection {
         view.self.level = player.level;
         view.self.exp = player.exp;
         view.self.yang = player.yang;
+        view.self.buffs = player.buffs ?? {};
         continue;
       }
 

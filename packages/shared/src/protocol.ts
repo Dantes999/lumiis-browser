@@ -13,6 +13,7 @@ import {
 import { isItemKey, type Equipment, type InventorySlot } from './items.js';
 import { INVENTORY_SLOTS } from './items.js';
 import { isDirection } from './movement.js';
+import { isSkillKey, type SkillKey } from './skills.js';
 
 export type PlayerSnapshot = {
   id: number;
@@ -30,6 +31,8 @@ export type PlayerSnapshot = {
   armor: string | null;
   /** Present only while a swing is running. */
   attacking?: boolean;
+  /** Active buffs with their remaining time in seconds; empty when none. */
+  buffs?: Record<string, number>;
 };
 
 export type MonsterSnapshot = {
@@ -60,6 +63,7 @@ export type ClientMessage =
   | { t: 'createCharacter'; name: string }
   | { t: 'input'; dx: number; dy: number }
   | { t: 'attack'; target?: number; dir?: number }
+  | { t: 'skill'; key: SkillKey }
   | { t: 'pickup'; target: number }
   | { t: 'equip'; slot: number }
   | { t: 'unequip'; piece: 'weapon' | 'armor' }
@@ -165,6 +169,12 @@ export function parseClientMessage(input: unknown): ParsedMessage {
         return { ok: true, message: { t: 'attack', target, dir } };
       }
       return { ok: true, message: { t: 'attack', dir } };
+    }
+
+    case 'skill': {
+      const key = message.key;
+      if (!isSkillKey(key)) return fail('skill needs a known skill');
+      return { ok: true, message: { t: 'skill', key } };
     }
 
     case 'equip': {

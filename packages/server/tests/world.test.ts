@@ -8,6 +8,7 @@ import {
   MONSTER_TYPES,
   PLAYER_DAMAGE,
   PLAYER_MAX_HP,
+  SKILLS,
   PLAYER_RESPAWN_HP_SHARE,
   PLAYER_RESPAWN_TICKS,
   INVENTORY_SLOTS,
@@ -883,5 +884,71 @@ describe('swings', () => {
 
     for (let tick = 0; tick < 20; tick += 1) world.step();
     expect(player.exp).toBe(0);
+  });
+});
+
+describe('skills', () => {
+  const ringOfWolves = (): World => {
+    const map = grassMap();
+    map.spawn = { x: 8, y: 8 };
+    map.spawns = [
+      { kind: 'mob', key: 'wolf', tx: 9, ty: 8 },
+      { kind: 'mob', key: 'wolf', tx: 7, ty: 8 },
+      { kind: 'mob', key: 'wolf', tx: 8, ty: 9 },
+    ];
+    return new World(map);
+  };
+
+  it('the aura buff raises the attack', () => {
+    const world = new World(boxedWolf());
+    const player = world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
+
+    expect(world.useSkill(player.id, 'aura').ok).toBe(true);
+    strike(world, player.id);
+
+    expect(world.getMonster(1)?.hp).toBe(
+      MONSTER_TYPES.wolf.maxHp - (PLAYER_DAMAGE + (SKILLS.aura.attackBonus ?? 0)),
+    );
+  });
+
+  it('refuses a skill while it is still cooling down', () => {
+    const world = new World(boxedWolf());
+    const player = world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
+
+    expect(world.useSkill(player.id, 'aura').ok).toBe(true);
+    expect(world.useSkill(player.id, 'aura').ok).toBe(false);
+  });
+
+  it('the aura buff wears off after its duration', () => {
+    const world = new World(boxedWolf());
+    const player = world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
+
+    world.useSkill(player.id, 'aura');
+    for (let tick = 0; tick <= (SKILLS.aura.durationTicks ?? 0); tick += 1) world.step();
+
+    strike(world, player.id);
+    expect(world.getMonster(1)?.hp).toBe(MONSTER_TYPES.wolf.maxHp - PLAYER_DAMAGE);
+  });
+
+  it('the whirlwind hits every monster around the player', () => {
+    const world = ringOfWolves();
+    const player = world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
+
+    expect(world.useSkill(player.id, 'whirlwind').ok).toBe(true);
+
+    const hurt = world.snapshot().monsters.filter((monster) => monster.hp < monster.maxHp);
+    expect(hurt).toHaveLength(3);
+  });
+
+  it('the whirlwind misses monsters beyond its radius', () => {
+    const map = grassMap();
+    map.spawn = { x: 8, y: 8 };
+    map.spawns = [{ kind: 'mob', key: 'wolf', tx: 12, ty: 8 }];
+    const world = new World(map);
+    const player = world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
+
+    expect(world.useSkill(player.id, 'whirlwind').ok).toBe(true);
+
+    expect(world.getMonster(1)?.hp).toBe(MONSTER_TYPES.wolf.maxHp);
   });
 });

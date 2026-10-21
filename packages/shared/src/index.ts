@@ -11,3 +11,4 @@ export * from './movement.js';
 export * from './pathfinding.js';
 export * from './progression.js';
 export * from './protocol.js';
+export * from './skills.js';

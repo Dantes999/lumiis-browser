@@ -107,6 +107,76 @@ body {
   background: #2d3a46;
 }
 
+.skills {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.skill-button {
+  position: relative;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 86px;
+  padding: 5px 8px;
+  font: inherit;
+  text-align: left;
+  color: var(--text);
+  background: #232d37;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.skill-button:active {
+  background: #2d3a46;
+}
+
+.skill-name {
+  font-size: 11px;
+}
+
+.skill-key {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+/* A dark veil that shrinks as the cooldown runs out. */
+.skill-cd {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  transform-origin: bottom;
+  transform: scaleY(0);
+  pointer-events: none;
+}
+
+.skill-button.cooling {
+  border-color: #4a5a6a;
+  color: var(--muted);
+}
+
+.buffs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+  min-height: 0;
+}
+
+.buff {
+  padding: 2px 6px;
+  font-size: 10px;
+  color: #d8f0ff;
+  background: rgba(70, 140, 200, 0.25);
+  border: 1px solid rgba(120, 190, 255, 0.5);
+  border-radius: 3px;
+}
+
 .panel {
   position: fixed;
   right: 12px;

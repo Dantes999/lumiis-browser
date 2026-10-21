@@ -66,6 +66,8 @@ export type SelfState = {
   level: number;
   exp: number;
   yang: number;
+  /** Active buffs with their remaining time in seconds. */
+  buffs: Record<string, number>;
 };
 
 export type ViewState = {
@@ -112,6 +114,7 @@ export const view: ViewState = {
     level: 1,
     exp: 0,
     yang: 0,
+    buffs: {},
   },
   others: new Map(),
   monsters: new Map(),

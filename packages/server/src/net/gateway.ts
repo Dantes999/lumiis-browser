@@ -272,6 +272,15 @@ export function attachGateway(httpServer: HttpServer, realm: Realm, store: Store
           if (!result.ok) send(session, { t: 'notice', text: result.reason });
           break;
         }
+        case 'skill': {
+          if (session.player === null) {
+            send(session, { t: 'notice', text: 'Log in first.' });
+            break;
+          }
+          const result = realm.useSkill(session.player.id, parsed.message.key);
+          if (!result.ok) send(session, { t: 'notice', text: result.reason });
+          break;
+        }
         case 'equip': {
           if (session.player === null) {
             send(session, { t: 'notice', text: 'Log in first.' });

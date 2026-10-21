@@ -38,6 +38,7 @@ const place = (x: number, y: number, dir = 6): void => {
     level: 1,
     exp: 0,
     yang: 0,
+    buffs: {},
   };
   resetSimulation();
 };

@@ -1,7 +1,8 @@
 // Plain DOM for the interface. Phaser draws the world; HTML draws the rest,
 // because that is what scales from desktop to phone without extra work.
 
-import { PLAYER_DAMAGE, expForNextLevel, itemDef } from '@lumiis/shared';
+import { PLAYER_DAMAGE, SKILLS, SKILL_KEYS, expForNextLevel, itemDef } from '@lumiis/shared';
+import { cooldownFraction } from '../skill';
 import { playerCount, type ViewState } from '../state';
 
 const mustFind = (id: string): HTMLElement => {
@@ -17,7 +18,7 @@ export type Hud = {
   render(state: ViewState): void;
 };
 
-export function createHud(): Hud {
+export function createHud(onSkill?: (slot: number) => void): Hud {
   const status = mustFind('status');
   const tick = mustFind('tick');
   const ping = mustFind('ping');
@@ -30,6 +31,19 @@ export function createHud(): Hud {
   const yang = mustFind('yang');
   const attack = mustFind('attack');
   const defence = mustFind('defence');
+  const buffs = mustFind('buffs');
+
+  const skillButtons = SKILL_KEYS.map((key, slot) => {
+    const button = mustFind(`skill-${slot}`);
+    const name = button.querySelector<HTMLElement>('.skill-name');
+    if (name !== null) name.textContent = SKILLS[key].name;
+    button.addEventListener('click', () => onSkill?.(slot));
+    return {
+      key,
+      button,
+      cooldown: button.querySelector<HTMLElement>('.skill-cd'),
+    };
+  });
 
   return {
     render(state: ViewState): void {
@@ -51,8 +65,30 @@ export function createHud(): Hud {
 
       const weapon = state.equipment.weapon === null ? null : itemDef(state.equipment.weapon);
       const armor = state.equipment.armor === null ? null : itemDef(state.equipment.armor);
-      attack.textContent = String(PLAYER_DAMAGE + (weapon?.attack ?? 0));
+      const aura = state.self.buffs['aura'] !== undefined ? SKILLS.aura.attackBonus ?? 0 : 0;
+      attack.textContent = String(PLAYER_DAMAGE + (weapon?.attack ?? 0) + aura);
       defence.textContent = String(armor?.defense ?? 0);
+
+      // Cooldown veil on the skill buttons.
+      for (const entry of skillButtons) {
+        const left = cooldownFraction(entry.key);
+        if (entry.cooldown !== null) {
+          entry.cooldown.style.transform = `scaleY(${left})`;
+        }
+        entry.button.classList.toggle('cooling', left > 0);
+      }
+
+      // Active buffs as small chips with their remaining time.
+      const active = Object.entries(state.self.buffs).filter(([, seconds]) => seconds > 0);
+      buffs.replaceChildren(
+        ...active.map(([key, seconds]) => {
+          const chip = document.createElement('span');
+          chip.className = 'buff';
+          const name = key in SKILLS ? SKILLS[key as keyof typeof SKILLS].name : key;
+          chip.textContent = `${name} ${Math.ceil(seconds)}s`;
+          return chip;
+        }),
+      );
 
       const hpShare = shareOf(state.self.hp, state.self.maxHp);
       hp.textContent = `${Math.max(0, Math.round(state.self.hp))} / ${state.self.maxHp}`;

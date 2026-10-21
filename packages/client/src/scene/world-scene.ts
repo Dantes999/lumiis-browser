@@ -26,6 +26,8 @@ import { view, type RemotePlayer } from '../state';
 import { buildTilesetTexture } from '../tiles';
 import { setWorldMap } from '../world-map';
 import { SwingTrail } from './swing-trail';
+import { WhirlwindEffect } from './skill-effects';
+import { setSkillVisual } from '../skill';
 
 /** Milliseconds per walking frame. */
 const STEP_FRAME_MS = 180;
@@ -71,6 +73,10 @@ export class WorldScene extends Phaser.Scene {
   private lastSelfHp = -1;
   /** The streak of the last swing this client drew, to notice a new one. */
   private shownSwingAt = 0;
+  /** Running whirlwind effects. */
+  private readonly whirlwinds: WhirlwindEffect[] = [];
+  /** The pulsing ring at the feet while the aura buff is up. */
+  private auraRing: Phaser.GameObjects.Graphics | null = null;
   private readonly trails: SwingTrail[] = [];
   /** For other players: when their last seen swing ended, and how many they did. */
   private readonly seenSwings = new Map<number, number>();
@@ -115,6 +121,13 @@ export class WorldScene extends Phaser.Scene {
     this.tables = readTables(this);
     this.cameras.main.setBackgroundColor('#0b0f13');
     buildTilesetTexture(this);
+
+    this.auraRing = this.add.graphics();
+    this.auraRing.setDepth(1);
+
+    setSkillVisual((key) => {
+      if (key === 'whirlwind') this.spawnWhirlwind();
+    });
 
     // One soft dot, reused for the sparks a hit throws out.
     const spark = this.add.graphics();
@@ -163,8 +176,40 @@ export class WorldScene extends Phaser.Scene {
     this.renderMonsters(delta);
     this.renderPlayers(delta);
     this.renderTrails(delta);
+    this.updateWhirlwinds(delta);
     this.updateShake();
     this.watchInventory();
+  }
+
+  /** A pulsing ring at the feet while the aura buff is up. */
+  private drawAuraRing(x: number, y: number, seconds: number | undefined): void {
+    const ring = this.auraRing;
+    if (ring === null) return;
+    ring.clear();
+    if (seconds === undefined || seconds <= 0) return;
+
+    const pulse = 0.5 + 0.5 * Math.sin(this.time.now / 170);
+    ring.setDepth(Math.round(y) - 1);
+    ring.lineStyle(2, 0x7fd4ff, 0.35 + pulse * 0.35);
+    ring.strokeEllipse(x, y - 2, 34 + pulse * 6, 13 + pulse * 3);
+  }
+
+  /** The whirlwind spins around the caster for a moment. */
+  private spawnWhirlwind(): void {
+    this.whirlwinds.push(
+      new WhirlwindEffect(this, () => renderedSelfPosition(), swingFor(view.equipment.weapon).range + 10),
+    );
+  }
+
+  private updateWhirlwinds(delta: number): void {
+    for (let index = this.whirlwinds.length - 1; index >= 0; index -= 1) {
+      const effect = this.whirlwinds[index];
+      if (effect === undefined) continue;
+      effect.update(delta);
+      if (!effect.done) continue;
+      effect.destroy();
+      this.whirlwinds.splice(index, 1);
+    }
   }
 
   /** A short, decaying jolt for the camera after a blow. */
@@ -430,6 +475,7 @@ export class WorldScene extends Phaser.Scene {
       selfView.setLook(tables, view.equipment);
       selfView.setPose(self.dir, this.selfColumn(column));
       selfView.setHealth(self.hp, self.maxHp, true);
+      this.drawAuraRing(drawn.x, drawn.y, view.self.buffs['aura']);
 
       const shown = attackPose();
       if (shown !== null) {
