@@ -18,7 +18,7 @@ Datenbank, kein Build-Zwang im Spiel (nur TypeScript → JavaScript).
 packages/shared   Regeln und Daten, die Server UND Browser importieren
 packages/server   Spielserver, Tick-Schleife, WebSocket, SQLite
 packages/client   Phaser-Szene, Netzwerk, HTML-Oberfläche
-tools/            Karten-Generator, Testcharaktere, Bots
+tools/            Kartengeneratoren (make-world, make-map), Testcharaktere, Bots
 ```
 
 ---
@@ -300,6 +300,30 @@ Monstern, eigenem Tick, eigenem Boden. Welt-Schlüssel: `testmap#ch2`.
 `shared/src/map.ts` (`worldKeyOf`, `channelKeysOf`), Client
 `ui/channel.ts` (HUD-Knopf + Liste) und `ui/characters.ts` (Auswahl beim Login).
 Tests: `packages/server/tests/channels.test.ts`, `gateway.test.ts`.
+
+## 7e. Karten
+
+Alle Karten liegen als JSON in `packages/shared/maps/` und werden beim Start
+**alle** geladen; die Karte aus `START_MAP` (in `shared/src/constants.ts`) ist
+die Startkarte für neue Charaktere und die erste in der Liste.
+
+| Karte | Was |
+|---|---|
+| `greenfield` (80×80) | erste echte Welt: Dorf mit Platz und 5 Häusern, Teich mit Brücke, Wald an den Rändern, Wolf-/Keilerfeld im Osten |
+| `testmap` (64×64) | Testkarte: Straßen, See, kleines Dorf; Tor zu `grove` und nach `greenfield` |
+| `grove` (24×24) | Mini-Testkarte mit Steinkreis |
+
+- **Neu erzeugen:** `node tools/make-world.mjs` (greenfield),
+  `node tools/make-map.mjs` (testmap + grove). Beide sind deterministisch; das
+  JSON ist die Wahrheit und wird mitgeliefert.
+- **Prüfen:** `packages/server/tests/maps.test.ts` lädt jede ausgelieferte
+  Karte und prüft Startkarte und Spawn. Beim Start prüft `loadMaps` zusätzlich,
+  dass jedes Tor auf eine bekannte Karte zeigt, im Feld landet und **nicht auf
+  einem anderen Tor** (sonst würde man sofort zurückgeschleudert).
+- **Kacheln:** `TILE` in `shared/src/map.ts` (Gras, Blumen, Weg, Wasser, Sand,
+  Baum, Fels, Stein, Mauer, Brücke, Portal, Kaktus, Tor).
+- **Im Editor:** `/editor.html` öffnet die Karten aus dem Ordner und schreibt
+  sie zurück.
 
 ## 7a. Last beobachten: `/status`
 

@@ -179,7 +179,7 @@ describe('gateway', () => {
       map: string;
       list: Array<{ channel: number; players: number }>;
     };
-    expect(channels.map).toBe('testmap');
+    expect(channels.map).toBe('greenfield');
     expect(channels.list).toHaveLength(2);
 
     // Enter on channel 2.

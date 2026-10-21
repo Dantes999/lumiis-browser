@@ -53,9 +53,22 @@ Start with `CHANNELS=2` to run every map twice (CH1/CH2, like Metin2) and
 `SHARDS=2` to spread the worlds over worker threads. With channels on, pick one
 when you choose your character (with the player counts) and switch in the HUD.
 
-Two maps ship with the project: `testmap` (64x64) and `grove` (24x24), linked by
-portals in both directions. The map a character stands on is part of his save,
-so logging in puts him back where he left.
+Three maps ship with the project:
+
+- **`greenfield` (80x80)** – the first real world and the start map: a village
+  with a paved square and five houses, a pond with a wooden bridge, woods round
+  the edges, and an open field with wolves and boars in the east.
+- **`testmap` (64x64)** – the small test map (road, lake, village, grove gate).
+- **`grove` (24x24)** – the even smaller test map with a stone circle.
+
+A new character starts on `greenfield` (`START_MAP` in
+`packages/shared/src/constants.ts`). The gate south of the east road (tile
+36,63) leads to `testmap`, whose own gate at (40,36) leads back; `testmap` also
+has a gate to `grove`. Regenerate the maps with `node tools/make-world.mjs`
+(greenfield) and `node tools/make-map.mjs` (the two test maps).
+
+The map a character stands on is part of his save, so logging in puts him back
+where he left.
 
 ## Map editor
 

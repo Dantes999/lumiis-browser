@@ -10,6 +10,7 @@ import { promisify } from 'node:util';
 import type { DatabaseSync as Database } from 'node:sqlite';
 import {
   EMPTY_EQUIPMENT,
+  START_MAP,
   INVENTORY_SLOTS,
   isItemKey,
   type Equipment,
@@ -275,9 +276,9 @@ export class Store {
         .prepare(
           `INSERT INTO characters
              (account_id, name, level, exp, yang, hp, map, x, y, dir, weapon, armor, updated_at)
-           VALUES (?, ?, 1, 0, 0, 100, 'testmap', 0, 0, 0, 'wooden_sword', NULL, ?)`,
+           VALUES (?, ?, 1, 0, 0, 100, ?, 0, 0, 0, 'wooden_sword', NULL, ?)`,
         )
-        .run(accountId, name, Date.now());
+        .run(accountId, name, START_MAP, Date.now());
 
       return { ok: true, id: Number(info.lastInsertRowid) };
     } catch {

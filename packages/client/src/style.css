@@ -145,6 +145,10 @@ body.mobile #hud-toggle {
   cursor: pointer;
 }
 
+#channel-row.hidden {
+  display: none;
+}
+
 .channel-button.hidden {
   display: none;
 }

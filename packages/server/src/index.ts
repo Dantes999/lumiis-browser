@@ -8,7 +8,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { SNAPSHOT_EVERY_TICKS, TICK_MS, TICK_RATE } from '@lumiis/shared';
+import { SNAPSHOT_EVERY_TICKS, START_MAP, TICK_MS, TICK_RATE } from '@lumiis/shared';
 import type { World } from './game/world.js';
 import { FixedStepLoop } from './game/loop.js';
 import { loadMaps } from './game/map.js';
@@ -46,7 +46,7 @@ export type GameServer = {
 const here = dirname(fileURLToPath(import.meta.url));
 
 const defaultStaticDir = (): string => resolve(here, '../../client/dist');
-const defaultMapPath = (): string => resolve(here, '../../shared/maps/testmap.json');
+const defaultMapPath = (): string => resolve(here, `../../shared/maps/${START_MAP}.json`);
 const defaultDataFile = (): string => resolve(here, '../../../data/lumiis.db');
 
 export async function createGameServer(options: GameServerOptions = {}): Promise<GameServer> {

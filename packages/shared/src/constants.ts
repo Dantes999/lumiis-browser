@@ -35,3 +35,6 @@ export const PROTOCOL_VERSION = 2;
 
 /** World size of the first test map in tiles. Real maps replace this later. */
 export const TILE_SIZE = 32;
+
+/** The map a new character starts on (the first real world). */
+export const START_MAP = 'greenfield';

@@ -184,12 +184,19 @@ const testmap = {
   width: WIDTH,
   height: HEIGHT,
   spawn: SPAWN,
-  portals: [{ tx: 36, ty: 32, to: 'grove', spawnX: 12, spawnY: 15 }],
+  portals: [
+    { tx: 36, ty: 32, to: 'grove', spawnX: 12, spawnY: 15 },
+    { tx: 40, ty: 36, to: 'greenfield', spawnX: 36, spawnY: 64 },
+  ],
   tiles,
   spawns,
 };
 
+for (let y = 34; y <= 37; y += 1) {
+  for (let x = 38; x <= 42; x += 1) set(x, y, T.PATH);
+}
 set(36, 32, T.PORTAL);
+set(40, 36, T.PORTAL);
 testmap.tiles = tiles;
 
 // Keep the spawn square and the way to the portal clear.

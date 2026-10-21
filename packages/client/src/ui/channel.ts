@@ -20,6 +20,7 @@ export function createChannelUi(
   onOpen: () => void,
   onSwitch: (channel: number) => void,
 ): ChannelUi {
+  const row = mustFind('channel-row');
   const chip = mustFind('channel-button') as HTMLButtonElement;
   const pop = mustFind('channel-pop');
   const list = mustFind('channel-list');
@@ -68,12 +69,12 @@ export function createChannelUi(
     render(view: ViewState): void {
       const count = view.channelCount;
       if (count <= 1) {
-        chip.classList.add('hidden');
+        row.classList.add('hidden');
         if (open) close();
         return;
       }
 
-      chip.classList.remove('hidden');
+      row.classList.remove('hidden');
       const label = `CH${view.channel}/${count}`;
       if (chip.textContent !== label) chip.textContent = label;
 
