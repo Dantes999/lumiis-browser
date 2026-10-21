@@ -293,6 +293,11 @@ gegenseitig rauswerfen) — er landet auf der Charakterauswahl, mit Hinweis
 3. `code 1008` / `rate limit` → der Client hat zu viele Nachrichten geschickt.
 4. `handler failed` im Server → dort steht die Nachricht, die den Fehler auslöste.
 
+**Hintergrund-Tab:** Browser drosseln Timer im Hintergrund stark (~1×/Minute).
+Damit die Verbindung dann nicht einschläft, läuft der Ping in einem **Web
+Worker** (nicht gedrosselt), der den Haupt-Thread aufweckt. Ohne Worker-Unterstützung
+fällt der Client auf einen normalen Timer zurück.
+
 ### Nützliche Debug-Blicke (Browser-Konsole)
 
 ```js

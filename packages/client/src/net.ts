@@ -52,6 +52,9 @@ export class Connection {
   private socket: WebSocket | null = null;
   private credentials: Credentials | null = null;
   private pingTimer: number | null = null;
+  /** Worker that keeps the connection alive while the tab is in the background. */
+  private keepalive: Worker | null = null;
+  private keepaliveUrl: string | null = null;
   private reconnectTimer: number | null = null;
   private reconnectDelayMs = 1000;
   private closedByUser = false;
@@ -270,13 +273,37 @@ export class Connection {
 
   private startPinging(): void {
     this.stopPinging();
-    this.pingTimer = window.setInterval(() => {
+
+    const tick = (): void => {
       this.checkStall();
       this.send({ t: 'ping', at: performance.now() });
-    }, PING_INTERVAL_MS);
+    };
+
+    // A background tab throttles its timers to about once a minute, which lets
+    // the connection die of silence. A worker's timer is not throttled, so it
+    // ticks and wakes the main thread to send the ping.
+    try {
+      const source = `setInterval(function () { postMessage(0); }, ${PING_INTERVAL_MS});`;
+      const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
+      const worker = new Worker(url);
+      worker.onmessage = tick;
+      this.keepalive = worker;
+      this.keepaliveUrl = url;
+    } catch {
+      // No workers (old browser or blocked): fall back to a plain timer.
+      this.pingTimer = window.setInterval(tick, PING_INTERVAL_MS);
+    }
   }
 
   private stopPinging(): void {
+    if (this.keepalive !== null) {
+      this.keepalive.terminate();
+      this.keepalive = null;
+    }
+    if (this.keepaliveUrl !== null) {
+      URL.revokeObjectURL(this.keepaliveUrl);
+      this.keepaliveUrl = null;
+    }
     if (this.pingTimer !== null) window.clearInterval(this.pingTimer);
     this.pingTimer = null;
   }
