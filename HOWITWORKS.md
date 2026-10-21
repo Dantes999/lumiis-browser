@@ -380,7 +380,7 @@ Fassung:
 | Spalten | 9 (stehen, Schritt 1/2, atmen, Angriff 1–3, Treffer, tot) |
 | Zeilen | 3 Ansichten (unten, rechts, oben); links spiegelt der Client |
 | Blatt | 432 × 144 px (Waffe 432 × 288, oben 3 leere „hinten") |
-| Ordner | `public/assets/styles/<paket>/{body,head,hair,armor,weapon}/` |
+| Ordner | `public/assets/{body,head,hair,armor,weapon,monster}/`, Tabellen `assets/rows.json` |
 | Manifest | `packages/client/src/styles.json` (`bodies`, `heads`, `hairs`; Rüstung/Waffe über die Items) |
 
 **Was wo hängt:** `armor/<armorFile>.png` und `weapon/<art>_<stage>.png` ergeben
@@ -397,11 +397,8 @@ aus dem Manifest.
 | `node tools/check-art.mjs pixel` | nur ein Paket |
 | `/look.html` | Ebenen + Pose + Ansicht übereinander ansehen |
 | `/sheet.html` | eine Sheet-Datei mit Raster/Animation |
-| `python3 tools/make-template-pack.py` | Platzhalter neu erzeugen (überschreibt die Vorlage) |
-
-**Alte Pakete** (`krieger_m`, `gemini_warrior`) sind Ein-Blatt-Pakete: dort ist
-`body` die fertige Figur und `armor` das volle Rüstungsblatt; sie funktionieren
-weiter, sind aber nicht modular.
+| `python3 tools/make-template-pack.py` | Platzhalter neu erzeugen (überschreibt Vorlage/Rüstungen/Waffen) |
+| `node tools/bake-lumiis2d.mjs` | die 8 Körper und 16 Haare aus der alten Zeichenroutine neu backen |
 
 **Test:** `packages/server/tests/art.test.ts` prüft alle Sheets aller Pakete
 (Existenz, Raster, Zeilenzahl).

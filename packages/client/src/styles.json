@@ -1,35 +1,8 @@
 {
   "default": "pixel",
   "packs": {
-    "krieger_m": {
-      "name": "Krieger (männlich)",
-      "cell": 48,
-      "columns": 9,
-      "footX": 24,
-      "footY": 44,
-      "body": "/assets/ruestungen/krieger_m/00_ohne_ruestung.png",
-      "head": "/assets/modelle/spieler/krieger_m.png",
-      "hair": "/assets/haare/krieger_m_1.png",
-      "armor": "/assets/ruestungen/krieger_m/{file}.png",
-      "weapon": "/assets/waffen/{art}/{stage2}.png",
-      "armorRows": "warrior"
-    },
-    "gemini_warrior": {
-      "name": "Gemini-Krieger (statischer Test)",
-      "cell": 48,
-      "columns": 9,
-      "footX": 24,
-      "footY": 44,
-      "body": "/assets/styles/gemini_warrior/body.png",
-      "head": "/assets/styles/gemini_warrior/head.png",
-      "hair": "/assets/styles/gemini_warrior/hair.png",
-      "armor": "/assets/styles/gemini_warrior/armor.png",
-      "weapon": "/assets/styles/gemini_warrior/weapon.png",
-      "armorRows": "any",
-      "rows": "/assets/styles/gemini_warrior/rows.json"
-    },
     "pixel": {
-      "name": "Pixel-Vorlage (modular)",
+      "name": "Lumiis (modular)",
       "cell": 48,
       "columns": 9,
       "footX": 24,
@@ -38,32 +11,192 @@
         {
           "id": "default",
           "name": "Basis",
-          "sheet": "/assets/styles/pixel/body/default.png"
+          "sheet": "/assets/body/default.png"
+        },
+        {
+          "id": "warrior_m",
+          "name": "Krieger (Mann)",
+          "sheet": "/assets/body/warrior_m.png"
+        },
+        {
+          "id": "warrior_f",
+          "name": "Krieger (Frau)",
+          "sheet": "/assets/body/warrior_f.png"
+        },
+        {
+          "id": "ninja_m",
+          "name": "Ninja (Mann)",
+          "sheet": "/assets/body/ninja_m.png"
+        },
+        {
+          "id": "ninja_f",
+          "name": "Ninja (Frau)",
+          "sheet": "/assets/body/ninja_f.png"
+        },
+        {
+          "id": "sura_m",
+          "name": "Sura (Mann)",
+          "sheet": "/assets/body/sura_m.png"
+        },
+        {
+          "id": "sura_f",
+          "name": "Sura (Frau)",
+          "sheet": "/assets/body/sura_f.png"
+        },
+        {
+          "id": "shaman_m",
+          "name": "Schamane (Mann)",
+          "sheet": "/assets/body/shaman_m.png"
+        },
+        {
+          "id": "shaman_f",
+          "name": "Schamane (Frau)",
+          "sheet": "/assets/body/shaman_f.png"
         }
       ],
       "heads": [
         {
           "id": "default",
           "name": "Kopf",
-          "sheet": "/assets/styles/pixel/head/default.png"
+          "sheet": "/assets/head/default.png"
+        },
+        {
+          "id": "warrior_m",
+          "name": "Krieger (Mann)",
+          "sheet": "/assets/head/warrior_m.png"
+        },
+        {
+          "id": "warrior_f",
+          "name": "Krieger (Frau)",
+          "sheet": "/assets/head/warrior_f.png"
+        },
+        {
+          "id": "ninja_m",
+          "name": "Ninja (Mann)",
+          "sheet": "/assets/head/ninja_m.png"
+        },
+        {
+          "id": "ninja_f",
+          "name": "Ninja (Frau)",
+          "sheet": "/assets/head/ninja_f.png"
+        },
+        {
+          "id": "sura_m",
+          "name": "Sura (Mann)",
+          "sheet": "/assets/head/sura_m.png"
+        },
+        {
+          "id": "sura_f",
+          "name": "Sura (Frau)",
+          "sheet": "/assets/head/sura_f.png"
+        },
+        {
+          "id": "shaman_m",
+          "name": "Schamane (Mann)",
+          "sheet": "/assets/head/shaman_m.png"
+        },
+        {
+          "id": "shaman_f",
+          "name": "Schamane (Frau)",
+          "sheet": "/assets/head/shaman_f.png"
         }
       ],
       "hairs": [
         {
           "id": "short",
           "name": "Kurz",
-          "sheet": "/assets/styles/pixel/hair/short.png"
+          "sheet": "/assets/hair/short.png"
         },
         {
           "id": "long",
           "name": "Lang",
-          "sheet": "/assets/styles/pixel/hair/long.png"
+          "sheet": "/assets/hair/long.png"
+        },
+        {
+          "id": "warrior_m_1",
+          "name": "Krieger (Mann) 1",
+          "sheet": "/assets/hair/warrior_m_1.png"
+        },
+        {
+          "id": "warrior_m_2",
+          "name": "Krieger (Mann) 2",
+          "sheet": "/assets/hair/warrior_m_2.png"
+        },
+        {
+          "id": "warrior_f_1",
+          "name": "Krieger (Frau) 1",
+          "sheet": "/assets/hair/warrior_f_1.png"
+        },
+        {
+          "id": "warrior_f_2",
+          "name": "Krieger (Frau) 2",
+          "sheet": "/assets/hair/warrior_f_2.png"
+        },
+        {
+          "id": "ninja_m_1",
+          "name": "Ninja (Mann) 1",
+          "sheet": "/assets/hair/ninja_m_1.png"
+        },
+        {
+          "id": "ninja_m_2",
+          "name": "Ninja (Mann) 2",
+          "sheet": "/assets/hair/ninja_m_2.png"
+        },
+        {
+          "id": "ninja_f_1",
+          "name": "Ninja (Frau) 1",
+          "sheet": "/assets/hair/ninja_f_1.png"
+        },
+        {
+          "id": "ninja_f_2",
+          "name": "Ninja (Frau) 2",
+          "sheet": "/assets/hair/ninja_f_2.png"
+        },
+        {
+          "id": "sura_m_1",
+          "name": "Sura (Mann) 1",
+          "sheet": "/assets/hair/sura_m_1.png"
+        },
+        {
+          "id": "sura_m_2",
+          "name": "Sura (Mann) 2",
+          "sheet": "/assets/hair/sura_m_2.png"
+        },
+        {
+          "id": "sura_f_1",
+          "name": "Sura (Frau) 1",
+          "sheet": "/assets/hair/sura_f_1.png"
+        },
+        {
+          "id": "sura_f_2",
+          "name": "Sura (Frau) 2",
+          "sheet": "/assets/hair/sura_f_2.png"
+        },
+        {
+          "id": "shaman_m_1",
+          "name": "Schamane (Mann) 1",
+          "sheet": "/assets/hair/shaman_m_1.png"
+        },
+        {
+          "id": "shaman_m_2",
+          "name": "Schamane (Mann) 2",
+          "sheet": "/assets/hair/shaman_m_2.png"
+        },
+        {
+          "id": "shaman_f_1",
+          "name": "Schamane (Frau) 1",
+          "sheet": "/assets/hair/shaman_f_1.png"
+        },
+        {
+          "id": "shaman_f_2",
+          "name": "Schamane (Frau) 2",
+          "sheet": "/assets/hair/shaman_f_2.png"
         }
       ],
-      "armor": "/assets/styles/pixel/armor/{file}.png",
-      "weapon": "/assets/styles/pixel/weapon/{art}_{stage2}.png",
-      "armorRows": "any",
-      "rows": "/assets/styles/pixel/rows.json",
+      "armor": "/assets/armor/{file}.png",
+      "weapon": "/assets/weapon/{art}_{stage2}.png",
+      "armorRows": "faust",
+      "rows": "/assets/rows.json",
       "bodyArt": "faust"
     }
   }

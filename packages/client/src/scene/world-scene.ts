@@ -116,15 +116,10 @@ export class WorldScene extends Phaser.Scene {
   }
 
   preload(): void {
-    this.load.json('rows_armor', '/assets/ruestungen/ruestungen.json');
-    this.load.json('rows_head', '/assets/modelle/spieler/spieler.json');
-    this.load.json('rows_hair', '/assets/haare/haare.json');
-    this.load.json('rows_weapon', '/assets/waffen/waffen.json');
-
-    // The graphic style decides the cell size and the sheet paths.
+    // The graphic style decides the cell size, the sheet paths and the row table.
     const chosen = activePack();
     this.pack = chosen.pack;
-    if (chosen.id !== 'krieger_m') console.info(`style pack: ${chosen.id} (${chosen.pack.name})`);
+    console.info(`style pack: ${chosen.id} (${chosen.pack.name})`);
 
     if (chosen.pack.rows !== undefined) this.load.json('rows_style', chosen.pack.rows);
 
@@ -137,7 +132,7 @@ export class WorldScene extends Phaser.Scene {
     for (const key of MONSTER_KEYS) {
       this.load.spritesheet(
         `mob_${key}`,
-        `/assets/modelle/monster/${MONSTER_TYPES[key].look}.png`,
+        `/assets/monster/${MONSTER_TYPES[key].look}.png`,
         { frameWidth: MOB_CELL_W, frameHeight: MOB_CELL_H },
       );
     }

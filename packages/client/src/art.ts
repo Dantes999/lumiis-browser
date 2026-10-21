@@ -167,10 +167,15 @@ export function readTables(scene: Phaser.Scene, pack: StylePack = defaultPack())
     };
   }
 
-  const armor = scene.cache.json.get('rows_armor') as { zeilen: Record<string, string[]> };
-  const head = scene.cache.json.get('rows_head') as { zeilen: string[] };
-  const hair = scene.cache.json.get('rows_hair') as { zeilen: string[] };
-  const weapon = scene.cache.json.get('rows_weapon') as { zeilen: string[] };
+  // Older packs ship their rows as separate tables; if none are loaded, every
+  // layer falls back to its first row instead of throwing.
+  const armor = scene.cache.json.get('rows_armor') as { zeilen: Record<string, string[]> } | undefined;
+  const head = scene.cache.json.get('rows_head') as { zeilen: string[] } | undefined;
+  const hair = scene.cache.json.get('rows_hair') as { zeilen: string[] } | undefined;
+  const weapon = scene.cache.json.get('rows_weapon') as { zeilen: string[] } | undefined;
+  if (armor === undefined || head === undefined || hair === undefined || weapon === undefined) {
+    return { armor: [], head: [], hair: [], weapon: [] };
+  }
 
   return {
     armor: armor.zeilen[pack.armorRows] ?? [],
@@ -402,7 +407,9 @@ export class PlayerView {
     const weaponDef = look.weapon === null ? null : itemDef(look.weapon);
 
     this.body.setTexture(`body_${resolve(this.bodies, look.body)}`);
-    this.head.setTexture(`head_${resolve(this.heads, look.head)}`);
+    // The head belongs to the body (same id) unless one is named explicitly.
+    const headId = look.head ?? (this.heads.some((part) => part.id === look.body) ? look.body : undefined);
+    this.head.setTexture(`head_${resolve(this.heads, headId)}`);
     this.hair.setTexture(`hair_${resolve(this.hairs, look.hair)}`);
 
     // The armour is its own transparent layer over the body; without it the

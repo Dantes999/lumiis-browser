@@ -76,21 +76,21 @@
     <p class="hint">
       Körper, Rüstung, Kopf, Haare und Waffe übereinanderlegen, Pose und Ansicht
       wählen. Alle Dateien liegen im Paket unter
-      <code>packages/client/public/assets/styles/pixel/</code>.
+      <code>packages/client/public/assets/</code>.
     </p>
 
     <div class="panel">
       <div class="grid">
         <label for="body">Körper</label>
-        <input id="body" type="text" value="/assets/styles/pixel/body/default.png" />
+        <input id="body" type="text" value="/assets/body/warrior_m.png" list="bodies" />
         <label for="armor">Rüstung</label>
-        <input id="armor" type="text" value="/assets/styles/pixel/armor/03_tiger_plattenpanzer.png" />
+        <input id="armor" type="text" value="" list="armors" placeholder="leer = keine Rüstung" />
         <label for="head">Kopf</label>
-        <input id="head" type="text" value="/assets/styles/pixel/head/default.png" />
+        <input id="head" type="text" value="/assets/head/warrior_m.png" list="heads" />
         <label for="hair">Haare</label>
-        <input id="hair" type="text" value="/assets/styles/pixel/hair/short.png" />
+        <input id="hair" type="text" value="/assets/hair/warrior_m_1.png" list="hairs" />
         <label for="weapon">Waffe</label>
-        <input id="weapon" type="text" value="/assets/styles/pixel/weapon/schwert_02.png" />
+        <input id="weapon" type="text" value="/assets/weapon/schwert_00.png" list="weapons" />
       </div>
       <div class="row" style="margin-top: 10px">
         <label class="hint">Ansicht
@@ -123,6 +123,13 @@
         <button id="reload" type="button">Neu laden</button>
       </div>
     </div>
+
+    <datalist id="bodies"></datalist>
+    <datalist id="heads"></datalist>
+    <datalist id="hairs"></datalist>
+    <datalist id="armors"></datalist>
+    <datalist id="weapons"></datalist>
+    <p class="hint">Tipp: Feld leeren und Pfeil/Doppelklick zeigt alle Dateien. Erst Körper, Kopf und Haare der gleichen Klasse wählen.</p>
 
     <canvas id="stage" width="384" height="384"></canvas>
 
@@ -160,6 +167,11 @@
         const view = Number(viewSelect.value) || 0;
         const column = Number(poseSelect.value) || 0;
         const images = await Promise.all(inputs.map((input) => load(input.value.trim())));
+
+        // Weapon back rows (0–2) lie behind the body.
+        if (images[4] !== null) {
+          context.drawImage(images[4], column * CELL, view * CELL, CELL, CELL, 0, 0, CELL * zoom, CELL * zoom);
+        }
 
         // Order: body, armour, head, hair, weapon (front rows).
         const order = [images[0], images[1], images[2], images[3]];
@@ -203,6 +215,23 @@
         cache.clear();
         draw();
       });
+
+      // Suggestions for the fields: bodies/heads/hairs from styles.json (dev server), armour and weapons from the items.
+      const fill = (id, paths) => {
+        document.getElementById(id).innerHTML = paths.map((p) => `<option value="${p}"></option>`).join('');
+      };
+      const P = '/assets/';
+      fill('armors', ['01_moenchsplattenpanzer', '02_eisenplattenpanzer', '03_tiger_plattenpanzer', '04_loewenplattenpanzer'].map((f) => `${P}armor/${f}.png`));
+      fill('weapons', ['schwert_00', 'schwert_02', 'schwert_03', 'schwert_04', 'schwert_05', 'schwert_06', 'zweihand_03'].map((f) => `${P}weapon/${f}.png`));
+      fetch('/src/styles.json')
+        .then((response) => response.json())
+        .then((styles) => {
+          const pack = styles.packs.pixel;
+          fill('bodies', pack.bodies.map((part) => part.sheet));
+          fill('heads', pack.heads.map((part) => part.sheet));
+          fill('hairs', pack.hairs.map((part) => part.sheet));
+        })
+        .catch(() => {});
 
       draw();
     </script>

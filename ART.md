@@ -4,12 +4,14 @@ Jede Figur besteht aus **getrennten PNG-Ebenen**, die im Spiel übereinander
 gelegt werden. Du zeichnest in Paint/Aseprite eine Ebene, legst sie ab, fertig.
 
 ```
-packages/client/public/assets/styles/pixel/
-  body/     default.png          ← Körper ohne Rüstung, ohne Haare
-  head/     default.png          ← Kopf/Gesicht, ohne Haare
-  hair/     short.png  long.png  ← Haare/Helm
+packages/client/public/assets/
+  body/     warrior_m.png …      ← Körper ohne Rüstung, ohne Haare
+  head/     warrior_m.png …      ← Kopf/Gesicht, ohne Haare
+  hair/     warrior_m_1.png …    ← Haare/Helm
   armor/    01_… 02_… 03_… 04_…  ← nur die Rüstungsteile (sonst transparent)
   weapon/   schwert_00.png …     ← nur die Waffe
+  monster/  boar.png …           ← Monster (40 × 32, 4 Ansichten × 5 Bilder)
+  icons/                         ← Gegenstands-Symbole
   rows.json                      ← Zeilen-Zuordnung (nicht ändern)
 ```
 
@@ -76,7 +78,7 @@ transparent — deshalb kannst du jede Rüstung mit jedem Körper kombinieren.
 2. Nur bei **Körper/Kopf/Haaren** einen Eintrag im Manifest ergänzen:
    `packages/client/src/styles.json` → Pack `pixel` → `bodies` / `heads` / `hairs`:
    ```json
-   { "id": "human_m", "name": "Mensch (m)", "sheet": "/assets/styles/pixel/body/human_m.png" }
+   { "id": "human_m", "name": "Mensch (m)", "sheet": "/assets/body/human_m.png" }
    ```
    Rüstungen und Waffen brauchen **keinen** Manifest-Eintrag — sie hängen an den
    Items (`armorFile`, `weaponArt`/`stage`).

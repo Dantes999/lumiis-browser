@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Draws the modular placeholder pixel-art pack under assets/styles/pixel.
+"""Draws the modular placeholder pixel-art layers under public/assets.
 
 Every layer is its own PNG sheet with the same grid, so they align when the
 game stacks them (weapon back, body, armour, head, hair, weapon front):
@@ -22,7 +22,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parent.parent
-OUT = ROOT / "packages" / "client" / "public" / "assets" / "styles" / "pixel"
+OUT = ROOT / "packages" / "client" / "public" / "assets"
 
 CELL = 48
 COLS = 9

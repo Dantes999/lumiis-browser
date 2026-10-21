@@ -91,7 +91,8 @@ grid, columns, anchors and file names are in **`ART.md`**:
 - cell **48×48**, **9 columns**, **3 views**; 432×144 px per layer
   (weapon 432×288, the top three rows are the empty "behind" pass)
 - feet at **(24, 44)** in every cell
-- folders: `packages/client/public/assets/styles/pixel/{body,head,hair,armor,weapon}/`
+- folders: `packages/client/public/assets/{body,head,hair,armor,weapon}/`
+  (monsters: `assets/monster/`, icons: `assets/icons/`)
 - armour is a transparent layer over the body, so every armour fits every body
 
 Tools: `node tools/check-art.mjs` (checks the grid), `/look.html` (stack the

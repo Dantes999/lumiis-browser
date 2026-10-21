@@ -20,6 +20,8 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
+    // Keep /assets for the hand-drawn pictures; bundles live in /bundle.
+    assetsDir: 'bundle',
     emptyOutDir: true,
     target: 'es2022',
     rollupOptions: {

@@ -34,6 +34,7 @@ export function createCharacterScreen(
   const picker = mustFind('channel-picker');
   const bodySelect = mustFind('character-body') as HTMLSelectElement;
   const hairSelect = mustFind('character-hair') as HTMLSelectElement;
+  bodySelect.addEventListener('change', () => pairHair());
   let lookFilled = false;
 
   /** Bodies and hairstyles come from the active style pack. */
@@ -43,6 +44,12 @@ export function createCharacterScreen(
     const { bodies, hairs } = lookOptions();
     for (const part of bodies) bodySelect.append(new Option(part.name, part.id));
     for (const part of hairs) hairSelect.append(new Option(part.name, part.id));
+  };
+
+  /** A new body brings its own first hairstyle along; free to change after. */
+  const pairHair = (): void => {
+    const match = [...hairSelect.options].find((option) => option.value === `${bodySelect.value}_1`);
+    if (match !== undefined) hairSelect.value = match.value;
   };
 
   let shownList = '';
