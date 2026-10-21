@@ -16,7 +16,7 @@ export type JoinedPlayer = {
   name: string;
   /** Map id, for the client. */
   map: string;
-  /** World key (map id, or map#zone when the map is split). */
+  /** World key: the map id, or map#ch2 for a channel. */
   world: string;
 };
 

@@ -1,17 +1,8 @@
-// The realm: one world per map (or per zone of a split map), and the players
+// The realm: one world per map (or per channel of a map), and the players
 // moving between them. A player id and a character stay the same for a whole
 // session; only the world that holds the player changes at a portal.
 
-import {
-  channelKeysOf,
-  spawnPosition,
-  worldKeyAt,
-  worldKeyOf,
-  zoneAtOrSpawn,
-  zonesOf,
-  type MapData,
-  type MapZone,
-} from '@lumiis/shared';
+import { channelKeysOf, worldKeyOf, type MapData } from '@lumiis/shared';
 import type {
   AttackResult,
   Player,
@@ -27,7 +18,7 @@ import { World as WorldClass } from './world.js';
 export type JoinSeed = PlayerSeed & { map: string };
 
 export class Realm {
-  /** Worlds by key: the map id, or map#zone for a split map. */
+  /** Worlds by key: the map id, or map#ch2 for a channel. */
   private readonly worlds = new Map<string, World>();
   private readonly maps = new Map<string, MapData>();
   private readonly worldIdByPlayer = new Map<number, string>();
@@ -38,7 +29,7 @@ export class Realm {
 
   /**
    * Builds the worlds of the given maps. With `only` set, a split map is only
-   * built for the zones in that set, so a shard worker can own single zones.
+   * built for the channels in that set, so a worker can own single channels.
    */
   constructor(
     maps: MapData[],
@@ -50,23 +41,18 @@ export class Realm {
 
     for (const map of maps) {
       this.maps.set(map.id, map);
-      for (const zone of zonesOf(map)) {
-        for (let channel = 1; channel <= this.channels; channel += 1) {
-          const key = worldKeyOf(map, zone, channel, this.channels);
-          if (only !== null && !only.has(key)) continue;
-          this.worlds.set(
-            key,
-            new WorldClass(map, map.zones === undefined ? null : zone, key, channel),
-          );
-        }
+      for (let channel = 1; channel <= this.channels; channel += 1) {
+        const key = worldKeyOf(map, channel, this.channels);
+        if (only !== null && !only.has(key)) continue;
+        this.worlds.set(key, new WorldClass(map, key, channel));
       }
     }
   }
 
-  /** The channel of this zone with the fewest players. */
-  private leastLoaded(map: MapData, zone: MapZone): World | null {
+  /** The channel of this map with the fewest players. */
+  private leastLoaded(map: MapData): World | null {
     let best: World | null = null;
-    for (const key of channelKeysOf(map, zone, this.channels)) {
+    for (const key of channelKeysOf(map, this.channels)) {
       const world = this.worlds.get(key);
       if (world === undefined) continue;
       if (best === null || world.playerCount < best.playerCount) best = world;
@@ -85,15 +71,9 @@ export class Realm {
     return [...this.maps.keys()];
   }
 
-  /** The world keys this realm owns (one per map, or per zone). */
+  /** The world keys this realm owns (one per map, or per channel). */
   worldKeys(): string[] {
     return [...this.worlds.keys()];
-  }
-
-  /** The world key at a pixel position on a map, on one channel. */
-  keyAt(mapId: string, x: number, y: number, channel = 1): string | null {
-    const map = this.maps.get(mapId);
-    return map === undefined ? null : worldKeyAt(map, x, y, channel, this.channels);
   }
 
   /** The first map; used for logging and by tests. */
@@ -129,15 +109,13 @@ export class Realm {
     const map = this.maps.get(seed.map) ?? this.maps.values().next().value;
     if (map === undefined) return null;
 
-    const spawn = spawnPosition(map);
-    const zone = zoneAtOrSpawn(map, seed.x ?? spawn.x, seed.y ?? spawn.y);
-    const world = this.leastLoaded(map, zone) ?? this.worldOfMap(map.id);
+    const world = this.leastLoaded(map) ?? this.worldOfMap(map.id);
     if (world === null) return null;
 
     return this.joinIn(world.key, seed, id);
   }
 
-  /** Adds a player to one named world (the shard host resolved the zone). */
+  /** Adds a player to one named world (the host resolved map and channel). */
   joinIn(worldKey: string, seed: PlayerSeed, id?: number): Player | null {
     const world = this.worlds.get(worldKey);
     if (world === undefined) return null;
@@ -158,38 +136,6 @@ export class Realm {
     for (const world of this.worlds.values()) {
       world.step();
       for (const warp of world.drainWarps()) this.transfer(warp);
-    }
-    this.keepPlayersInZone();
-  }
-
-  /**
-   * A player can only reach another zone through a portal, so this should never
-   * fire. If it does (a broken map, a push), put him back on solid ground.
-   */
-  private keepPlayersInZone(): void {
-    for (const world of this.worlds.values()) {
-      for (const player of world.playersOutsideZone()) {
-        const key = this.keyAt(world.map.id, player.x, player.y, world.channel);
-        const target = key === null ? undefined : this.worlds.get(key);
-
-        if (target === undefined || target === world) {
-          const spawn = spawnPosition(world.map);
-          const detached = world.detachPlayer(player.id);
-          if (detached === undefined) continue;
-          detached.x = spawn.x;
-          detached.y = spawn.y;
-          detached.moving = false;
-          world.attachPlayer(detached);
-          this.worldIdByPlayer.set(detached.id, world.key);
-          continue;
-        }
-
-        const detached = world.detachPlayer(player.id);
-        if (detached === undefined) continue;
-        detached.moving = false;
-        target.attachPlayer(detached);
-        this.worldIdByPlayer.set(detached.id, target.key);
-      }
     }
   }
 
@@ -307,12 +253,14 @@ export class Realm {
     if (from === null) return;
 
     // A portal keeps the channel: ch2 stays ch2 on the other map.
-    const key = this.keyAt(warp.to, warp.x, warp.y, from.channel);
-    const to = key === null ? undefined : this.worlds.get(key);
+    const targetMap = this.maps.get(warp.to);
+    if (targetMap === undefined) return;
+    const key = worldKeyOf(targetMap, from.channel, this.channels);
+    const to = this.worlds.get(key);
 
     if (to === undefined) {
-      // The target zone belongs to another shard: hand the player over.
-      this.outgoingWarps.push({ ...warp, world: key ?? warp.to });
+      // The target world belongs to another shard: hand the player over.
+      this.outgoingWarps.push({ ...warp, world: key });
       return;
     }
 

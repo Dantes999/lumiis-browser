@@ -9,8 +9,6 @@ import {
   channelKeysOf,
   spawnPosition,
   worldKeyOf,
-  zoneAtOrSpawn,
-  zonesOf,
   type Direction,
   type Equipment,
   type InventorySlot,
@@ -34,7 +32,7 @@ export class WorkerHost implements GameHost {
   readonly mapIds: string[];
 
   private readonly workers: Worker[] = [];
-  /** World key (map id or map#zone) to the worker that runs it. */
+  /** World key (map id, or map#ch2) to the worker that runs it. */
   private readonly worldShard = new Map<string, number>();
   private readonly maps = new Map<string, MapData>();
   private readonly playerShard = new Map<number, number>();
@@ -69,16 +67,14 @@ export class WorkerHost implements GameHost {
     this.mapIds = maps.map((map) => map.id);
     for (const map of maps) this.maps.set(map.id, map);
 
-    // Split by world: a map without zones is one world, a split map is one
-    // world per zone. Each worker gets a share, plus the map data it needs.
+    // Split by world: a map is one world, with channels one per channel.
+    // Each worker gets a share, plus the map data it needs.
     // Channel innermost: the round robin then puts the channels of the SAME map
     // on different workers, which is what spreads one crowded map.
     const worlds: Array<{ key: string; map: MapData }> = [];
     for (const map of maps) {
-      for (const zone of zonesOf(map)) {
-        for (let channel = 1; channel <= this.channels; channel += 1) {
-          worlds.push({ key: worldKeyOf(map, zone, channel, this.channels), map });
-        }
+      for (let channel = 1; channel <= this.channels; channel += 1) {
+        worlds.push({ key: worldKeyOf(map, channel, this.channels), map });
       }
     }
 
@@ -119,13 +115,12 @@ export class WorkerHost implements GameHost {
   }
 
   join(request: JoinRequest): JoinedPlayer | null {
-    const map = this.maps.get(request.map);
+    // A deleted map must not lock the character out: use the first map.
+    const map = this.maps.get(request.map) ?? this.maps.values().next().value;
     if (map === undefined) return null;
 
-    // Pick the emptiest channel of the zone the player stands in.
-    const spawn = spawnPosition(map);
-    const zone = zoneAtOrSpawn(map, request.seed.x ?? spawn.x, request.seed.y ?? spawn.y);
-    const keys = channelKeysOf(map, zone, this.channels);
+    // Pick the emptiest channel of the map.
+    const keys = channelKeysOf(map, this.channels);
     let world = keys[0] ?? request.map;
     let load = Number.POSITIVE_INFINITY;
     for (const key of keys) {
@@ -164,7 +159,7 @@ export class WorkerHost implements GameHost {
       id,
       characterId: request.characterId,
       name: request.name,
-      map: request.map,
+      map: map.id,
       world,
     };
   }

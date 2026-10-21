@@ -57,30 +57,6 @@ export type MonsterSpawn = {
   ty: number;
 };
 
-/**
- * A rectangular part of one map that runs on its own game thread. Zones are
- * only connected through portals: two zones must keep their walkable ground
- * apart, otherwise a player would see across the border and things would pop.
- */
-export type MapZone = {
-  /** Short id, unique inside the map. */
-  id: string;
-  /** Tile bounds, both inclusive. */
-  x0: number;
-  y0: number;
-  x1: number;
-  y1: number;
-};
-
-/**
- * How far one player can see. The snapshot covers the 3x3 cells around his
- * cell, and a cell is 256 px, so the farthest visible point is 511 px away.
- */
-export const ZONE_VIEW_PX = 512;
-
-/** The same distance in tiles; zone ground must be at least this far apart. */
-export const ZONE_VIEW_TILES = ZONE_VIEW_PX / TILE_SIZE;
-
 export type MapData = {
   id: string;
   width: number;
@@ -93,8 +69,6 @@ export type MapData = {
   spawns: MonsterSpawn[];
   /** Tiles that lead to other maps. */
   portals: Portal[];
-  /** Parts of the map that run on separate threads; absent means one zone. */
-  zones?: MapZone[];
 };
 
 export type MapCheck = { ok: true; map: MapData } | { ok: false; errors: string[] };
@@ -234,177 +208,6 @@ export function validateMap(input: unknown): MapCheck {
     }
   }
 
-  // ---------------------------------------------------------------- zones
-  let zones: MapZone[] | undefined;
-
-  if (raw['zones'] !== undefined) {
-    if (!Array.isArray(raw['zones'])) {
-      errors.push('zones must be an array');
-    } else {
-      const list: MapZone[] = [];
-      const seenIds = new Set<string>();
-
-      raw['zones'].forEach((entry, index) => {
-        if (typeof entry !== 'object' || entry === null) {
-          errors.push(`zone ${index} is not an object`);
-          return;
-        }
-        const zone = entry as Record<string, unknown>;
-        const zoneId = zone['id'];
-        const x0 = zone['x0'];
-        const y0 = zone['y0'];
-        const x1 = zone['x1'];
-        const y1 = zone['y1'];
-
-        if (typeof zoneId !== 'string' || !/^[a-z0-9_]{1,16}$/.test(zoneId)) {
-          errors.push(`zone ${index} needs an id of lowercase letters, digits or underscore`);
-        } else if (seenIds.has(zoneId)) {
-          errors.push(`zone id "${zoneId}" is used twice`);
-        }
-
-        if (![x0, y0, x1, y1].every(isInteger)) {
-          errors.push(`zone ${index} needs integer tile bounds`);
-        } else if (
-          isInteger(width) &&
-          isInteger(height) &&
-          ((x0 as number) < 0 ||
-            (y0 as number) < 0 ||
-            (x1 as number) >= width ||
-            (y1 as number) >= height ||
-            (x0 as number) > (x1 as number) ||
-            (y0 as number) > (y1 as number))
-        ) {
-          errors.push(`zone ${index} is outside the map or has swapped bounds`);
-        }
-
-        if (
-          typeof zoneId === 'string' &&
-          /^[a-z0-9_]{1,16}$/.test(zoneId) &&
-          [x0, y0, x1, y1].every(isInteger) &&
-          isInteger(width) &&
-          isInteger(height) &&
-          (x0 as number) >= 0 &&
-          (y0 as number) >= 0 &&
-          (x1 as number) < width &&
-          (y1 as number) < height &&
-          (x0 as number) <= (x1 as number) &&
-          (y0 as number) <= (y1 as number)
-        ) {
-          seenIds.add(zoneId);
-          list.push({
-            id: zoneId,
-            x0: x0 as number,
-            y0: y0 as number,
-            x1: x1 as number,
-            y1: y1 as number,
-          });
-        }
-      });
-
-      if (list.length !== raw['zones'].length || list.length === 0) {
-        errors.push('every zone must be valid; a split map needs at least one zone');
-      }
-      zones = list;
-
-      // Coverage and separation only make sense with valid bounds and tiles.
-      const mapArea =
-        isInteger(width) &&
-        isInteger(height) &&
-        Array.isArray(tiles) &&
-        tiles.length === (width as number) * (height as number);
-
-      if (mapArea && list.length > 0 && errors.length === 0) {
-        const w = width as number;
-        const h = height as number;
-        const grid = tiles as number[];
-
-        let uncovered = 0;
-        let shared = 0;
-        for (let ty = 0; ty < h; ty += 1) {
-          for (let tx = 0; tx < w; tx += 1) {
-            if (SOLID.has(grid[ty * w + tx] as number)) continue;
-            let hits = 0;
-            for (const zone of list) {
-              if (tx >= zone.x0 && tx <= zone.x1 && ty >= zone.y0 && ty <= zone.y1) hits += 1;
-            }
-            if (hits === 0) uncovered += 1;
-            else if (hits > 1) shared += 1;
-          }
-        }
-        if (uncovered > 0) errors.push(`${uncovered} walkable tiles are in no zone`);
-        if (shared > 0) errors.push(`${shared} walkable tiles are in more than one zone`);
-
-        const spawnX = (spawn as { x: number }).x;
-        const spawnY = (spawn as { y: number }).y;
-        const spawnZone = list.some(
-          (zone) =>
-            spawnX >= zone.x0 && spawnX <= zone.x1 && spawnY >= zone.y0 && spawnY <= zone.y1,
-        );
-        if (!spawnZone) errors.push('the spawn point is not inside a zone');
-
-        // Two zones must not see each other: measure from one zone's walkable
-        // tiles to the other's with a capped 8-neighbour flood fill.
-        for (let a = 0; a < list.length; a += 1) {
-          for (let b = a + 1; b < list.length; b += 1) {
-            const first = list[a] as MapZone;
-            const second = list[b] as MapZone;
-            const distance = new Int16Array(w * h).fill(-1);
-            const queue: number[] = [];
-
-            for (let ty = first.y0; ty <= first.y1; ty += 1) {
-              for (let tx = first.x0; tx <= first.x1; tx += 1) {
-                const index = ty * w + tx;
-                if (SOLID.has(grid[index] as number)) continue;
-                distance[index] = 0;
-                queue.push(index);
-              }
-            }
-
-            for (let head = 0; head < queue.length; head += 1) {
-              const index = queue[head] as number;
-              const step = distance[index] as number;
-              if (step >= ZONE_VIEW_TILES) continue;
-              const tx = index % w;
-              const ty = (index - tx) / w;
-              for (let dy = -1; dy <= 1; dy += 1) {
-                for (let dx = -1; dx <= 1; dx += 1) {
-                  if (dx === 0 && dy === 0) continue;
-                  const nx = tx + dx;
-                  const ny = ty + dy;
-                  if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
-                  const next = ny * w + nx;
-                  if (distance[next] !== -1) continue;
-                  distance[next] = step + 1;
-                  queue.push(next);
-                }
-              }
-            }
-
-            let tooClose = false;
-            for (let ty = second.y0; ty <= second.y1 && !tooClose; ty += 1) {
-              for (let tx = second.x0; tx <= second.x1; tx += 1) {
-                const index = ty * w + tx;
-                if (SOLID.has(grid[index] as number)) continue;
-                const value = distance[index] as number;
-                if (value !== -1 && value < ZONE_VIEW_TILES) {
-                  tooClose = true;
-                  break;
-                }
-              }
-            }
-
-            if (tooClose) {
-              errors.push(
-                `zones "${first.id}" and "${second.id}" are closer than ${ZONE_VIEW_TILES} tiles; ` +
-                  'players would see across the border',
-              );
-            }
-          }
-        }
-      }
-    }
-  }
-
   if (errors.length > 0) return { ok: false, errors };
 
   return {
@@ -417,7 +220,6 @@ export function validateMap(input: unknown): MapCheck {
       tiles: tiles as number[],
       spawns,
       portals,
-      ...(zones !== undefined ? { zones } : {}),
     },
   };
 }
@@ -435,72 +237,21 @@ export function isSolidTile(map: MapData, tileX: number, tileY: number): boolean
   return SOLID.has(tileAt(map, tileX, tileY));
 }
 
-/** The zones of a map; a map without zones is one zone named "main". */
-export const zonesOf = (map: MapData): MapZone[] =>
-  map.zones ?? [{ id: 'main', x0: 0, y0: 0, x1: map.width - 1, y1: map.height - 1 }];
-
-/** The zone a tile lies in, or null when it lies in none (walls, gaps). */
-export function zoneAtTile(map: MapData, tx: number, ty: number): MapZone | null {
-  for (const zone of zonesOf(map)) {
-    if (tx >= zone.x0 && tx <= zone.x1 && ty >= zone.y0 && ty <= zone.y1) return zone;
-  }
-  return null;
-}
-
-/** The zone a pixel position lies in. */
-export function zoneAtPixel(map: MapData, x: number, y: number): MapZone | null {
-  return zoneAtTile(map, Math.floor(x / TILE_SIZE), Math.floor(y / TILE_SIZE));
-}
-
 /**
- * Stable key of the world that runs this zone on this channel. A map without
- * zones and with one channel keeps its map id, so nothing changes for maps
- * that were never split or copied.
+ * Stable key of the world that runs this map on this channel. With one channel
+ * (the default) the key is just the map id, so nothing changes.
  */
-export const worldKeyOf = (
-  map: MapData,
-  zone: MapZone,
-  channel = 1,
-  channelCount = 1,
-): string => {
-  const parts = [map.id];
-  if (map.zones !== undefined) parts.push(zone.id);
-  if (channelCount > 1) parts.push(`ch${channel}`);
-  return parts.join('#');
-};
+export const worldKeyOf = (map: MapData, channel = 1, channelCount = 1): string =>
+  channelCount > 1 ? `${map.id}#ch${channel}` : map.id;
 
-/** The keys of all channels of one zone. */
-export const channelKeysOf = (
-  map: MapData,
-  zone: MapZone,
-  channelCount: number,
-): string[] => {
+/** The keys of all channels of a map. */
+export const channelKeysOf = (map: MapData, channelCount: number): string[] => {
   const keys: string[] = [];
   for (let channel = 1; channel <= channelCount; channel += 1) {
-    keys.push(worldKeyOf(map, zone, channel, channelCount));
+    keys.push(worldKeyOf(map, channel, channelCount));
   }
   return keys;
 };
-
-/** The zone at a pixel position, falling back to the map spawn. */
-export function zoneAtOrSpawn(map: MapData, x: number, y: number): MapZone {
-  return (
-    zoneAtPixel(map, x, y) ??
-    zoneAtTile(map, map.spawn.x, map.spawn.y) ??
-    (zonesOf(map)[0] as MapZone)
-  );
-}
-
-/** World key at a pixel position, falling back to the map spawn. */
-export function worldKeyAt(
-  map: MapData,
-  x: number,
-  y: number,
-  channel = 1,
-  channelCount = 1,
-): string {
-  return worldKeyOf(map, zoneAtOrSpawn(map, x, y), channel, channelCount);
-}
 
 /** The player's foot box. The sprite is 48 px tall, the feet are what collide. */
 export const PLAYER_HALF_WIDTH = 7;

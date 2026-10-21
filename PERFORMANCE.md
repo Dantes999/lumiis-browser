@@ -113,11 +113,10 @@ Last, keine saubere Latenzmessung.
 
 ## Wenn es wieder eng wird
 
-1. **Mehr Karten je Worker** gibt es nicht — die Zuteilung ist reihum und fest.
-   Mehr Shards helfen nur, wenn mehr Karten da sind.
-2. **Hauptprozess**: die verbleibende Arbeit ist der Socket-Versand. Der nächste
-   Schritt wäre, Snapshots zu verkleinern (nur Änderungen senden statt aller
-   Spieler mit Namen, Level, EXP, Yang) — das senkt die Bytes direkt.
-3. **Eine volle Karte** teilen geht nur, wenn Spieler derselben Karte auf
-   mehrere Worker verteilt werden; das braucht eine andere Architektur
-   (Zonen statt Karten).
+1. **Kanäle** (`CHANNELS=2..8`): jede Karte läuft mehrfach, die Spieler
+   verteilen sich darauf. Das ist der direkte Hebel für eine volle Karte.
+2. **Shards** (`SHARDS=2..8`): verteilt Karten und Kanäle auf Worker; die Kanäle
+   derselben Karte landen auf verschiedenen Workern.
+3. **Hauptprozess**: die verbleibende Arbeit ist der Socket-Versand. Weniger
+   Bytes gehen über kleinere Snapshots (Delta ist eingebaut) oder weniger
+   Wesen im Blick (Sichtweite, Obergrenze je Snapshot).

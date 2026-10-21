@@ -11,7 +11,7 @@ import type { PlayerSeed, RewardBroadcast } from '../game/world.js';
 export type WorkerInit = {
   /** Maps this worker needs (one shared map can appear in several workers). */
   maps: MapData[];
-  /** World keys it owns: map, map#zone, map#ch2 or map#zone#ch2. */
+  /** World keys it owns: the map id, or map#ch2 for a channel. */
   keys: string[];
   /** How many channels each map runs (1 = none). */
   channels: number;

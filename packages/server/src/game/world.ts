@@ -61,7 +61,6 @@ import {
 import type {
   Direction,
   Equipment,
-  MapZone,
   MoveEntry,
   SnapshotMessage,
   GroundItemSnapshot,
@@ -283,29 +282,12 @@ export class World {
 
   constructor(
     readonly map: MapData,
-    /** The part of the map this world owns; null when the map is one zone. */
-    readonly zone: MapZone | null = null,
-    /** World key: map, map#zone, map#ch2 or map#zone#ch2. */
+    /** World key: the map id, or map#ch2 for a channel. */
     readonly key: string = map.id,
     /** Channel number, 1 based; every channel is its own copy of the map. */
     readonly channel = 1,
   ) {
     this.spawnMonsters();
-  }
-
-  /** Players that stepped outside the zone (they should use a portal instead). */
-  playersOutsideZone(): Player[] {
-    if (this.zone === null) return [];
-
-    const outside: Player[] = [];
-    for (const player of this.playersById.values()) {
-      const tx = Math.floor(player.x / TILE_SIZE);
-      const ty = Math.floor(player.y / TILE_SIZE);
-      if (tx < this.zone.x0 || tx > this.zone.x1 || ty < this.zone.y0 || ty > this.zone.y1) {
-        outside.push(player);
-      }
-    }
-    return outside;
   }
 
   /** Ticks simulated since the server started. */
@@ -1407,17 +1389,6 @@ export class World {
 
   private spawnMonsters(): void {
     for (const spawn of this.map.spawns) {
-      // A split map has one world per zone: each spawns only its own monsters.
-      if (
-        this.zone !== null &&
-        (spawn.tx < this.zone.x0 ||
-          spawn.tx > this.zone.x1 ||
-          spawn.ty < this.zone.y0 ||
-          spawn.ty > this.zone.y1)
-      ) {
-        continue;
-      }
-
       const type = MONSTER_TYPES[spawn.key];
       const x = (spawn.tx + 0.5) * TILE_SIZE;
       const y = (spawn.ty + 0.9) * TILE_SIZE;
