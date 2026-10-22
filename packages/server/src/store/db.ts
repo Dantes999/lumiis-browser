@@ -300,7 +300,12 @@ export class Store {
         )
         .run(accountId, name, START_MAP, body, hair, Date.now());
 
-      return { ok: true, id: Number(info.lastInsertRowid) };
+      const id = Number(info.lastInsertRowid);
+      // EIGENE WAHL: the starter kit, so the first fights are survivable.
+      this.stmtWriteItem.run(id, 0, 'small_hp_potion', 3);
+      this.stmtWriteItem.run(id, 1, 'small_sp_potion', 2);
+
+      return { ok: true, id };
     } catch {
       return { ok: false, reason: 'That character name is taken.' };
     }

@@ -26,6 +26,7 @@ export const MONSTER_TYPES = {
     /** What it leaves behind. */
     drops: [
       { key: 'wolf_fur', chance: 0.65, min: 1, max: 2 },
+      { key: 'small_hp_potion', chance: 0.3, min: 1, max: 1 },
       { key: 'iron_sword', chance: 0.04, min: 1, max: 1 },
       { key: 'eisenplattenpanzer', chance: 0.02, min: 1, max: 1 },
     ],
@@ -44,6 +45,8 @@ export const MONSTER_TYPES = {
     yangMax: 22,
     drops: [
       { key: 'boar_tusk', chance: 0.6, min: 1, max: 1 },
+      { key: 'small_hp_potion', chance: 0.35, min: 1, max: 2 },
+      { key: 'small_sp_potion', chance: 0.2, min: 1, max: 1 },
       { key: 'padded_armor', chance: 0.08, min: 1, max: 1 },
       { key: 'langschwert', chance: 0.02, min: 1, max: 1 },
       { key: 'great_sword', chance: 0.02, min: 1, max: 1 },
@@ -106,6 +109,11 @@ export const PLAYER_RESPAWN_HP_SHARE = 0.5;
 
 /** Health regained per regeneration step (one second). */
 export const PLAYER_REGEN_HP = 1;
+/** EIGENE WAHL: skill points at level 1 and per regeneration step. */
+export const PLAYER_MAX_SP = 60;
+export const PLAYER_REGEN_SP = 2;
+/** EIGENE WAHL: potion cooldown, in ticks (one second). */
+export const POTION_COOLDOWN_TICKS = 20;
 
 /** 20 ticks = one point of health per second while alive. */
 export const PLAYER_REGEN_TICKS = 20;

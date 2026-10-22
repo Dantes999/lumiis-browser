@@ -18,7 +18,10 @@ export type Hud = {
   render(state: ViewState): void;
 };
 
-export function createHud(onSkill?: (slot: number) => void): Hud {
+export function createHud(
+  onSkill?: (slot: number) => void,
+  onPotion?: (kind: 'hp' | 'sp') => void,
+): Hud {
   const status = mustFind('status');
   const tick = mustFind('tick');
   const ping = mustFind('ping');
@@ -26,12 +29,21 @@ export function createHud(onSkill?: (slot: number) => void): Hud {
   const level = mustFind('level');
   const hp = mustFind('hp');
   const hpFill = mustFind('hp-fill');
+  const sp = mustFind('sp');
+  const spFill = mustFind('sp-fill');
   const exp = mustFind('exp');
   const expFill = mustFind('exp-fill');
   const yang = mustFind('yang');
   const attack = mustFind('attack');
   const defence = mustFind('defence');
   const buffs = mustFind('buffs');
+  const potionHp = mustFind('potion-hp');
+  const potionSp = mustFind('potion-sp');
+  const potionHpCount = potionHp.querySelector<HTMLElement>('.potion-count');
+  const potionSpCount = potionSp.querySelector<HTMLElement>('.potion-count');
+
+  potionHp.addEventListener('click', () => onPotion?.('hp'));
+  potionSp.addEventListener('click', () => onPotion?.('sp'));
 
   const skillButtons = SKILL_KEYS.map((key, slot) => {
     const button = mustFind(`skill-${slot}`);
@@ -94,6 +106,18 @@ export function createHud(onSkill?: (slot: number) => void): Hud {
       hp.textContent = `${Math.max(0, Math.round(state.self.hp))} / ${state.self.maxHp}`;
       hpFill.style.width = `${hpShare * 100}%`;
       hpFill.classList.toggle('low', hpShare <= 0.3);
+
+      const spShare = shareOf(state.self.sp, state.self.maxSp);
+      sp.textContent = `${Math.max(0, Math.round(state.self.sp))} / ${state.self.maxSp}`;
+      spFill.style.width = `${spShare * 100}%`;
+
+      const countOf = (key: string): number =>
+        state.inventory.reduce(
+          (sum, slot) => (slot !== null && slot.key === key ? sum + slot.count : sum),
+          0,
+        );
+      if (potionHpCount !== null) potionHpCount.textContent = String(countOf('small_hp_potion'));
+      if (potionSpCount !== null) potionSpCount.textContent = String(countOf('small_sp_potion'));
 
       const next = expForNextLevel(state.self.level);
       const expShare = Number.isFinite(next) ? shareOf(state.self.exp, next) : 1;

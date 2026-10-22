@@ -33,6 +33,7 @@ export type Bag = {
 export function createBag(
   onEquip: (slot: number) => void,
   onUnequip: (piece: 'weapon' | 'armor') => void,
+  onUse: (slot: number) => void,
 ): Bag {
   const panel = mustFind('bag');
   const grid = mustFind('bag-grid');
@@ -151,7 +152,12 @@ export function createBag(
     cell.addEventListener('click', () => {
       const slot = slots[index] ?? null;
       const wearable = slot !== null && itemDef(slot.key).slot !== undefined;
+      const consumable = slot !== null && itemDef(slot.key).type === 'consumable';
       if (slot === null) return;
+      if (consumable) {
+        activate(cell, slot, false, () => onUse(index));
+        return;
+      }
       if (!wearable) {
         if (touchLike()) showTip(cell, slot, false);
         return;

@@ -273,6 +273,11 @@ export class Connection {
     this.send({ t: 'unequip', piece });
   }
 
+  /** Drinks the potion in a bag slot. */
+  useItem(slot: number): void {
+    this.send({ t: 'useItem', slot });
+  }
+
   /** Chat text; /g and /w are commands the server understands. */
   sendChat(text: string): void {
     this.send({ t: 'chat', text });
@@ -500,6 +505,8 @@ export class Connection {
         applyServerPosition(player.x, player.y);
         view.self.hp = player.hp;
         view.self.maxHp = player.maxHp;
+        view.self.sp = player.sp;
+        view.self.maxSp = player.maxSp;
         view.self.level = player.level;
         view.self.exp = player.exp;
         view.self.yang = player.yang;

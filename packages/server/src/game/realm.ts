@@ -226,6 +226,12 @@ export class Realm {
       | { ok: false; reason: string };
   }
 
+  useItem(playerId: number, slot: number): { ok: true } | { ok: false; reason: string } {
+    const world = this.worldOf(playerId);
+    if (world === null) return { ok: false, reason: 'You are not in the world.' };
+    return world.useItem(playerId, slot);
+  }
+
   equip(playerId: number, slot: number): { ok: true } | { ok: false; reason: string } {
     const world = this.worldOf(playerId);
     if (world === null) return { ok: false, reason: 'You are not in the world.' };

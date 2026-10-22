@@ -245,6 +245,10 @@ export class WorkerHost implements GameHost {
     this.toPlayer(playerId, { t: 'equip', playerId, slot });
   }
 
+  useItem(playerId: number, slot: number): void {
+    this.toPlayer(playerId, { t: 'useItem', playerId, slot });
+  }
+
   unequip(playerId: number, piece: 'weapon' | 'armor'): void {
     this.toPlayer(playerId, { t: 'unequip', playerId, piece });
   }

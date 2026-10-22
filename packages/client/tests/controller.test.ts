@@ -26,6 +26,8 @@ beforeEach(() => {
     offsetY: 0,
     hp: 100,
     maxHp: 100,
+    sp: 60,
+    maxSp: 60,
     level: 1,
     exp: 0,
     yang: 0,

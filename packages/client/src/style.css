@@ -116,6 +116,15 @@ body.mobile #hud-toggle {
   background: #7ea6e0;
 }
 
+.bar-fill.sp {
+  background: #6a8fd8;
+}
+
+.potion-count {
+  font-weight: bold;
+  color: var(--accent);
+}
+
 /* Buttons inside the HUD need their own pointer events, the HUD itself has none. */
 .hud-button {
   pointer-events: auto;

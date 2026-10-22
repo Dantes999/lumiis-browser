@@ -10,7 +10,7 @@
 export type ItemSlot = 'weapon' | 'armor';
 
 /** What an item is; the tooltip shows this word. */
-export type ItemType = 'weapon' | 'armor' | 'material';
+export type ItemType = 'weapon' | 'armor' | 'material' | 'consumable';
 
 /** Which weapon pose and sheet a weapon uses. */
 export type WeaponArt = 'schwert' | 'zweihand';
@@ -41,6 +41,10 @@ export type ItemDef = {
 
   /** Armour: file name inside ruestungen/<class>_<sex>/, without .png. */
   armorFile?: string;
+
+  /** Consumables: hit points and skill points restored. */
+  heal?: number;
+  mana?: number;
 };
 
 export const ITEMS = {
@@ -207,6 +211,25 @@ export const ITEMS = {
     defense: 9,
     maxHp: 35,
   },
+  // EIGENE WAHL: potion amounts and stack size until the wiki values are set.
+  small_hp_potion: {
+    name: 'Kleiner Heiltrank',
+    type: 'consumable',
+    stackMax: 200,
+    color: '#b8433f',
+    icon: 'material/potion_red.png',
+    heal: 40,
+    desc: 'Schließt kleine Wunden. Heilt 40 TP.',
+  },
+  small_sp_potion: {
+    name: 'Kleiner Manatrank',
+    type: 'consumable',
+    stackMax: 200,
+    color: '#3f6fb8',
+    icon: 'material/potion_blue.png',
+    mana: 25,
+    desc: 'Klärt den Kopf. Gibt 25 SP.',
+  },
 } as const satisfies Record<string, ItemDef>;
 
 export type ItemKey = keyof typeof ITEMS;
@@ -219,6 +242,8 @@ export const isItemKey = (value: unknown): value is ItemKey =>
 export const itemDef = (key: ItemKey): ItemDef => ITEMS[key];
 
 export const isEquippable = (key: ItemKey): boolean => itemDef(key).slot !== undefined;
+
+export const isConsumable = (key: ItemKey): boolean => itemDef(key).type === 'consumable';
 
 /** Level needed to wear an item; 0 when it has no requirement. */
 export const requiredLevel = (key: ItemKey): number => itemDef(key).level ?? 0;
@@ -238,6 +263,7 @@ const TYPE_NAMES: Record<ItemType, string> = {
   weapon: 'Waffe',
   armor: 'Rüstung',
   material: 'Material',
+  consumable: 'Trank',
 };
 
 export function describeItem(key: ItemKey): ItemInfo {
@@ -247,6 +273,8 @@ export function describeItem(key: ItemKey): ItemInfo {
   if (def.attack !== undefined) stats.push({ label: 'Angriff', value: def.attack });
   if (def.defense !== undefined) stats.push({ label: 'Verteidigung', value: def.defense });
   if (def.maxHp !== undefined) stats.push({ label: 'Max. HP', value: def.maxHp });
+  if (def.heal !== undefined) stats.push({ label: 'Heilung', value: def.heal });
+  if (def.mana !== undefined) stats.push({ label: 'Mana', value: def.mana });
 
   return {
     name: def.name,

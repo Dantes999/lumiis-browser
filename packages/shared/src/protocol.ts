@@ -42,6 +42,9 @@ export type PlayerSnapshot = {
   moving: boolean;
   hp: number;
   maxHp: number;
+  /** Skill points; other players' values are harmless to send. */
+  sp: number;
+  maxSp: number;
   level: number;
   exp: number;
   yang: number;
@@ -115,6 +118,7 @@ export type ClientMessage =
   | { t: 'pickup'; target: number }
   | { t: 'equip'; slot: number }
   | { t: 'unequip'; piece: 'weapon' | 'armor' }
+  | { t: 'useItem'; slot: number }
   | { t: 'settings'; autoPickup: boolean; autoPickupTypes: string[] }
   | { t: 'ping'; at: number };
 
@@ -285,6 +289,15 @@ export function parseClientMessage(input: unknown): ParsedMessage {
       const piece = message.piece;
       if (piece !== 'weapon' && piece !== 'armor') return fail('unequip needs a piece');
       return { ok: true, message: { t: 'unequip', piece } };
+    }
+
+    case 'useItem': {
+      const slot = message.slot;
+      if (typeof slot !== 'number' || !Number.isInteger(slot) || slot < 0) {
+        return fail('useItem needs an inventory slot');
+      }
+      if (slot >= INVENTORY_SLOTS) return fail('useItem slot out of range');
+      return { ok: true, message: { t: 'useItem', slot } };
     }
 
     case 'pickup': {

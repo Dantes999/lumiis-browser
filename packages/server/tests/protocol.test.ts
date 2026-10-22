@@ -134,6 +134,19 @@ describe('protocol', () => {
     }
   });
 
+  it('accepts using a potion from a bag slot', () => {
+    expect(parseClientMessage({ t: 'useItem', slot: 3 })).toEqual({
+      ok: true,
+      message: { t: 'useItem', slot: 3 },
+    });
+  });
+
+  it('rejects potion slots outside the bag', () => {
+    for (const slot of [-1, 20, 1.5, '2', null, undefined]) {
+      expect(parseClientMessage({ t: 'useItem', slot }).ok).toBe(false);
+    }
+  });
+
   it('accepts chat text and trims control characters', () => {
     expect(parseClientMessage({ t: 'chat', text: '  hallo  ' })).toEqual({
       ok: true,

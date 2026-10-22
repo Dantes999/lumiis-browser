@@ -8,6 +8,9 @@ import {
   MONSTER_TYPES,
   PLAYER_DAMAGE,
   PLAYER_MAX_HP,
+  PLAYER_MAX_SP,
+  PLAYER_REGEN_TICKS,
+  POTION_COOLDOWN_TICKS,
   SKILLS,
   PLAYER_RESPAWN_HP_SHARE,
   PLAYER_RESPAWN_TICKS,
@@ -198,6 +201,8 @@ describe('world', () => {
         moving: false,
         hp: PLAYER_MAX_HP,
         maxHp: PLAYER_MAX_HP,
+        sp: PLAYER_MAX_SP,
+        maxSp: PLAYER_MAX_SP,
         level: 1,
         exp: 0,
         yang: 0,
@@ -555,10 +560,11 @@ describe('loot', () => {
   };
 
   /** Kills until a drop appears; returns it while it still lies on the ground. */
-  const killForDrop = (world: World, playerId: number) => {
+  const killForDrop = (world: World, playerId: number, key?: string) => {
     for (let attempt = 0; attempt < 12; attempt += 1) {
       killOne(world, playerId);
-      const item = world.snapshot().ground[0];
+      const ground = world.snapshot().ground;
+      const item = key === undefined ? ground[0] : ground.find((entry) => entry.key === key);
       if (item !== undefined) return item;
       for (let tick = 0; tick < MONSTER_RESPAWN_TICKS + 20; tick += 1) world.step();
     }
@@ -613,7 +619,8 @@ describe('loot', () => {
     const player = world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
     world.setPickupSettings(player.id, true, ['boar_tusk']);
 
-    const item = killForDrop(world, player.id);
+    // A wolf can also drop a potion now; take the pelt on purpose.
+    const item = killForDrop(world, player.id, 'wolf_fur');
     expect(item?.key).toBe('wolf_fur');
     if (item === undefined) return;
 
@@ -634,7 +641,7 @@ describe('loot', () => {
 
     let collected = 0;
     for (let attempt = 0; attempt < 40 && collected < 3; attempt += 1) {
-      const item = killForDrop(world, player.id);
+      const item = killForDrop(world, player.id, 'wolf_fur');
       if (item === undefined) continue;
       walkTo(world, player, item.x, item.y);
       if (world.pickup(player.id, item.id).ok) collected += 1;
@@ -1057,5 +1064,85 @@ describe('view and sleep', () => {
     }
 
     expect(moved).toBeGreaterThan(0);
+  });
+});
+
+describe('potions and skill points', () => {
+  const withBag = (...entries: Array<[number, ItemKey, number]>): InventorySlot[] => {
+    const inventory = new Array<InventorySlot>(INVENTORY_SLOTS).fill(null);
+    for (const [slot, key, count] of entries) inventory[slot] = { key, count };
+    return inventory;
+  };
+
+  it('drinks a health potion, uses one up and respects the cooldown', () => {
+    const world = new World(grassMap());
+    const player = world.addPlayer({
+      accountId: 0,
+      characterId: 0,
+      name: 'Kain',
+      inventory: withBag([0, 'small_hp_potion', 3]),
+    });
+    player.hp = 10;
+
+    expect(world.useItem(player.id, 0).ok).toBe(true);
+    expect(player.hp).toBe(50);
+    expect(player.inventory[0]).toEqual({ key: 'small_hp_potion', count: 2 });
+
+    // The second gulp within a second is refused, but does not consume one.
+    expect(world.useItem(player.id, 0).ok).toBe(false);
+    expect(player.inventory[0]).toEqual({ key: 'small_hp_potion', count: 2 });
+
+    for (let tick = 0; tick < POTION_COOLDOWN_TICKS; tick += 1) world.step();
+    const before = player.hp;
+    expect(world.useItem(player.id, 0).ok).toBe(true);
+    expect(player.hp).toBe(before + 40);
+  });
+
+  it('refuses anything that is not a potion and empty slots', () => {
+    const world = new World(grassMap());
+    const player = world.addPlayer({
+      accountId: 0,
+      characterId: 0,
+      name: 'Kain',
+      inventory: withBag([0, 'wooden_sword', 1]),
+    });
+
+    expect(world.useItem(player.id, 0).ok).toBe(false);
+    expect(world.useItem(player.id, 5).ok).toBe(false);
+    expect(world.useItem(99, 0).ok).toBe(false);
+  });
+
+  it('fills skill points with a mana potion and caps at the maximum', () => {
+    const world = new World(grassMap());
+    const player = world.addPlayer({
+      accountId: 0,
+      characterId: 0,
+      name: 'Kain',
+      inventory: withBag([0, 'small_sp_potion', 2]),
+    });
+    player.sp = PLAYER_MAX_SP - 10;
+
+    expect(world.useItem(player.id, 0).ok).toBe(true);
+    expect(player.sp).toBe(PLAYER_MAX_SP);
+  });
+
+  it('spends skill points per cast and regenerates them', () => {
+    const world = new World(grassMap());
+    const player = world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
+
+    player.sp = 12;
+    expect(world.useSkill(player.id, 'aura').ok).toBe(true);
+    expect(player.sp).toBe(12 - SKILLS.aura.spCost);
+
+    // Not enough left for the whirlwind.
+    player.sp = 1;
+    const refused = world.useSkill(player.id, 'whirlwind');
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) expect(refused.reason).toContain('Mana');
+
+    // Regeneration brings it back over time.
+    player.sp = 1;
+    for (let tick = 0; tick < PLAYER_REGEN_TICKS; tick += 1) world.step();
+    expect(player.sp).toBeGreaterThan(1);
   });
 });

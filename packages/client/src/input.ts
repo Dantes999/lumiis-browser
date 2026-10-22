@@ -20,6 +20,8 @@ export type InputOptions = {
   onAttackAim?: (dir: import('@lumiis/shared').Direction | null) => void;
   /** Y key: pick up the closest item in reach. */
   onPickup?: () => void;
+  /** Q drinks a health potion, E a mana potion. */
+  onPotion?: (kind: 'hp' | 'sp') => void;
   /** A short tap on the world (touch), in screen pixels. */
   onTap?: (screenX: number, screenY: number) => void;
   /** The left mouse button went down on the world. */
@@ -92,6 +94,7 @@ export function initInput(options: InputOptions): void {
     onAttack,
     onAttackHold,
     onPickup,
+    onPotion,
     onTap,
     onSkill,
     onWorldDown,
@@ -246,6 +249,16 @@ export function initInput(options: InputOptions): void {
     if (event.code === 'KeyY') {
       event.preventDefault();
       if (!event.repeat) onPickup?.();
+      return;
+    }
+    if (event.code === 'KeyQ') {
+      event.preventDefault();
+      if (!event.repeat) onPotion?.('hp');
+      return;
+    }
+    if (event.code === 'KeyE') {
+      event.preventDefault();
+      if (!event.repeat) onPotion?.('sp');
       return;
     }
     if (event.code === 'Digit1') {

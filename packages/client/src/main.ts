@@ -101,6 +101,17 @@ try {
   // Private mode: there is no stored session.
 }
 
+/** Drinks the first potion of a kind from the bag (Q = HP, E = SP). */
+const usePotion = (kind: 'hp' | 'sp'): void => {
+  const key = kind === 'hp' ? 'small_hp_potion' : 'small_sp_potion';
+  const slot = view.inventory.findIndex((entry) => entry !== null && entry.key === key);
+  if (slot === -1) {
+    logEvent('info', kind === 'hp' ? 'kein Heiltrank im Beutel' : 'kein Manatrank im Beutel');
+    return;
+  }
+  connection.useItem(slot);
+};
+
 initInput({
   onAttack: () => {
     swingForward();
@@ -113,6 +124,9 @@ initInput({
   },
   onPickup: () => {
     pickupNearestInRange();
+  },
+  onPotion: (kind) => {
+    usePotion(kind);
   },
   onTap: (screenX, screenY) => {
     const scene = game.scene.getScene('world');
@@ -170,10 +184,14 @@ window.addEventListener('unhandledrejection', (event) => {
 });
 logEvent('info', `client started on ${location.host}`);
 
-const hud = createHud((slot) => castSlot(slot));
+const hud = createHud(
+  (slot) => castSlot(slot),
+  (kind) => usePotion(kind),
+);
 const bag = createBag(
   (slot) => connection.equip(slot),
   (piece) => connection.unequip(piece),
+  (slot) => connection.useItem(slot),
 );
 window.setInterval(() => {
   hud.render(view);

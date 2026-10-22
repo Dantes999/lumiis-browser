@@ -93,6 +93,8 @@ export type SelfState = {
   offsetY: number;
   hp: number;
   maxHp: number;
+  sp: number;
+  maxSp: number;
   level: number;
   exp: number;
   yang: number;
@@ -152,6 +154,8 @@ export const view: ViewState = {
     offsetY: 0,
     hp: 100,
     maxHp: 100,
+    sp: 60,
+    maxSp: 60,
     level: 1,
     exp: 0,
     yang: 0,

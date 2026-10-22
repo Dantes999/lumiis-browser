@@ -33,6 +33,7 @@ export type ToWorker =
   | { t: 'skill'; playerId: number; key: SkillKey }
   | { t: 'pickup'; playerId: number; target: number }
   | { t: 'equip'; playerId: number; slot: number }
+  | { t: 'useItem'; playerId: number; slot: number }
   | { t: 'unequip'; playerId: number; piece: 'weapon' | 'armor' }
   | { t: 'settings'; playerId: number; autoPickup: boolean; types: string[] }
   /** Move the player to another channel world (same map). */

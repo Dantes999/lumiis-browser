@@ -520,6 +520,14 @@ export function attachGateway(
           handleChat(session, message.text);
           break;
         }
+        case 'useItem': {
+          if (session.player === null) {
+            send(session, { t: 'notice', text: 'Log in first.' });
+            break;
+          }
+          host.useItem(session.player.id, message.slot);
+          break;
+        }
         case 'equip': {
           if (session.player === null) {
             send(session, { t: 'notice', text: 'Log in first.' });

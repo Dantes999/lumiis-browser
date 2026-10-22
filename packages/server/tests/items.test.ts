@@ -9,7 +9,7 @@ describe('items', () => {
     for (const key of ITEM_KEYS) {
       const def = itemDef(key);
       expect(def.name.length, key).toBeGreaterThan(0);
-      expect(['weapon', 'armor', 'material'], key).toContain(def.type);
+      expect(['weapon', 'armor', 'material', 'consumable'], key).toContain(def.type);
       expect(def.color, key).toMatch(/^#[0-9a-f]{6}$/i);
       expect(def.stackMax, key).toBeGreaterThan(0);
     }
@@ -25,6 +25,24 @@ describe('items', () => {
       expect(def.level ?? 0, key).toBeGreaterThanOrEqual(0);
       expect((def.attack ?? 0) + (def.defense ?? 0), key).toBeGreaterThan(0);
     }
+  });
+
+  it('gives every consumable something to restore', () => {
+    for (const key of ITEM_KEYS) {
+      const def = itemDef(key);
+      if (def.type !== 'consumable') continue;
+      expect(def.icon, key).toBeTruthy();
+      expect((def.heal ?? 0) + (def.mana ?? 0), key).toBeGreaterThan(0);
+      expect(def.stackMax, key).toBeGreaterThan(1);
+    }
+  });
+
+  it('describes a potion for the tooltip', () => {
+    const info = describeItem('small_hp_potion');
+    expect(info.name).toBe('Kleiner Heiltrank');
+    expect(info.typeName).toBe('Trank');
+    expect(info.stats).toEqual([{ label: 'Heilung', value: 40 }]);
+    expect(info.icon).toContain('material/');
   });
 
   it('describes a sword for the tooltip', () => {

@@ -87,6 +87,11 @@
       </div>
       <div class="bar"><div id="hp-fill" class="bar-fill hp"></div></div>
       <div class="hud-row">
+        <span class="hud-label">SP</span>
+        <span id="sp" class="hud-value">60 / 60</span>
+      </div>
+      <div class="bar"><div id="sp-fill" class="bar-fill sp"></div></div>
+      <div class="hud-row">
         <span class="hud-label">EXP</span>
         <span id="exp" class="hud-value">0 / 50</span>
       </div>
@@ -121,6 +126,21 @@
           <span class="skill-name">Schwertwirbel</span>
           <span class="skill-key">2</span>
           <span class="skill-cd"></span>
+        </button>
+      </div>
+      <div class="hud-row">
+        <span class="hud-label">Tränke</span>
+      </div>
+      <div class="skills">
+        <button id="potion-hp" class="skill-button" type="button">
+          <span class="skill-name">Heiltrank</span>
+          <span class="potion-count">0</span>
+          <span class="skill-key">Q</span>
+        </button>
+        <button id="potion-sp" class="skill-button" type="button">
+          <span class="skill-name">Manatrank</span>
+          <span class="potion-count">0</span>
+          <span class="skill-key">E</span>
         </button>
       </div>
       <div id="buffs" class="buffs"></div>

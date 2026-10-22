@@ -150,6 +150,12 @@ port.on('message', (message: ToWorker) => {
       return;
     }
 
+    case 'useItem': {
+      const result = realm.useItem(message.playerId, message.slot);
+      if (!result.ok) post({ t: 'notice', playerId: message.playerId, text: result.reason });
+      return;
+    }
+
     case 'equip': {
       const result = realm.equip(message.playerId, message.slot);
       if (!result.ok) post({ t: 'notice', playerId: message.playerId, text: result.reason });

@@ -74,6 +74,7 @@ export interface GameHost {
   useSkill(playerId: number, key: SkillKey): void;
   pickup(playerId: number, itemId: number): void;
   equip(playerId: number, slot: number): void;
+  useItem(playerId: number, slot: number): void;
   unequip(playerId: number, piece: 'weapon' | 'armor'): void;
   setPickupSettings(playerId: number, autoPickup: boolean, types: string[]): void;
 
@@ -185,6 +186,11 @@ export class LocalHost implements GameHost {
 
   equip(playerId: number, slot: number): void {
     const result = this.realm.equip(playerId, slot);
+    if (!result.ok) this.notices.push({ playerId, text: result.reason });
+  }
+
+  useItem(playerId: number, slot: number): void {
+    const result = this.realm.useItem(playerId, slot);
     if (!result.ok) this.notices.push({ playerId, text: result.reason });
   }
 

@@ -12,6 +12,8 @@ export type SkillDef = {
   kind: 'buff' | 'aoe';
   /** Cooldown in ticks (20 per second). */
   cooldownTicks: number;
+  /** Skill points one cast costs. */
+  spCost: number;
   /** Buff only: how long the effect lasts, in ticks. */
   durationTicks?: number;
   /** Buff only: flat attack added while the effect runs. */
@@ -29,6 +31,7 @@ export const SKILLS: Record<SkillKey, SkillDef> = {
     name: 'Aura',
     kind: 'buff',
     cooldownTicks: 200,
+    spCost: 10,
     durationTicks: 200,
     attackBonus: 10,
   },
@@ -37,6 +40,7 @@ export const SKILLS: Record<SkillKey, SkillDef> = {
     name: 'Schwertwirbel',
     kind: 'aoe',
     cooldownTicks: 60,
+    spCost: 15,
     radius: 64,
     damageScale: 1.5,
   },

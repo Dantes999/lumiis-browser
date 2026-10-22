@@ -22,8 +22,11 @@ import {
   PICKUP_RANGE,
   PLAYER_DAMAGE,
   PLAYER_MAX_HP,
+  PLAYER_MAX_SP,
   PLAYER_REGEN_HP,
+  PLAYER_REGEN_SP,
   PLAYER_REGEN_TICKS,
+  POTION_COOLDOWN_TICKS,
   PLAYER_RESPAWN_HP_SHARE,
   PLAYER_RESPAWN_TICKS,
   TICK_MS,
@@ -132,6 +135,10 @@ export type Player = {
   moving: boolean;
   hp: number;
   maxHp: number;
+  sp: number;
+  maxSp: number;
+  /** Tick before which no potion may be used again. */
+  nextPotionAt: number;
   /** 0 while alive, otherwise the tick this player stands up again. */
   deadUntil: number;
   /** Tick of the last accepted hit, for the attack cooldown. */
@@ -335,6 +342,9 @@ export class World {
       moving: false,
       hp: seed.hp ?? PLAYER_MAX_HP,
       maxHp: PLAYER_MAX_HP,
+      sp: PLAYER_MAX_SP,
+      maxSp: PLAYER_MAX_SP,
+      nextPotionAt: 0,
       deadUntil: 0,
       lastAttackTick: -ATTACK_COOLDOWN_TICKS,
       level: seed.level ?? 1,
@@ -490,8 +500,13 @@ export class World {
         continue;
       }
 
-      if (this.tickCount % PLAYER_REGEN_TICKS === 0 && player.hp < player.maxHp) {
-        player.hp = regeneratedHp(player.hp, player.maxHp, PLAYER_REGEN_HP);
+      if (this.tickCount % PLAYER_REGEN_TICKS === 0) {
+        if (player.hp < player.maxHp) {
+          player.hp = regeneratedHp(player.hp, player.maxHp, PLAYER_REGEN_HP);
+        }
+        if (player.sp < player.maxSp) {
+          player.sp = Math.min(player.maxSp, player.sp + PLAYER_REGEN_SP);
+        }
       }
 
       if (player.buffs.size > 0) {
@@ -654,6 +669,8 @@ export class World {
     const armor = player.equipment.armor === null ? null : itemDef(player.equipment.armor);
     player.maxHp = PLAYER_MAX_HP + (armor?.maxHp ?? 0);
     player.hp = Math.min(player.hp, player.maxHp);
+    player.maxSp = PLAYER_MAX_SP;
+    player.sp = Math.min(player.sp, player.maxSp);
   }
 
   /** Active buffs as seconds remaining, for the client to draw. */
@@ -676,6 +693,9 @@ export class World {
     if ((player.skillCooldowns.get(key) ?? 0) > this.tickCount) {
       return { ok: false, reason: 'Not ready yet.' };
     }
+    if (player.sp < skill.spCost) {
+      return { ok: false, reason: 'Nicht genug Mana.' };
+    }
 
     if (skill.kind === 'buff') {
       player.buffs.set(key, this.tickCount + (skill.durationTicks ?? 0));
@@ -694,7 +714,30 @@ export class World {
       }
     }
 
+    player.sp -= skill.spCost;
     player.skillCooldowns.set(key, this.tickCount + skill.cooldownTicks);
+    return { ok: true };
+  }
+
+  /** Drinks a potion from the bag: heals, restores skill points, consumes one. */
+  useItem(playerId: number, slotIndex: number): { ok: true } | { ok: false; reason: string } {
+    const player = this.playersById.get(playerId);
+    if (player === undefined) return { ok: false, reason: 'You are not in the world.' };
+    if (player.deadUntil > 0) return { ok: false, reason: 'Not now.' };
+    if (this.tickCount < player.nextPotionAt) return { ok: false, reason: 'Noch nicht wieder.' };
+
+    const item = player.inventory[slotIndex] ?? null;
+    if (item === null) return { ok: false, reason: 'That slot is empty.' };
+
+    const def = itemDef(item.key);
+    if (def.type !== 'consumable') return { ok: false, reason: 'Das kann man nicht trinken.' };
+
+    if (def.heal !== undefined) player.hp = Math.min(player.maxHp, player.hp + def.heal);
+    if (def.mana !== undefined) player.sp = Math.min(player.maxSp, player.sp + def.mana);
+
+    player.inventory[slotIndex] = item.count > 1 ? { key: item.key, count: item.count - 1 } : null;
+    player.nextPotionAt = this.tickCount + POTION_COOLDOWN_TICKS;
+    this.inventoryUpdates.add(player.id);
     return { ok: true };
   }
 
@@ -1059,7 +1102,7 @@ export class World {
       .map((key) => `${key}=${buffs[key]}`)
       .join(',');
     return (
-      `${entry.name}|${entry.level}|${entry.exp}|${entry.yang}|${entry.maxHp}|` +
+      `${entry.name}|${entry.level}|${entry.exp}|${entry.yang}|${entry.maxHp}|${entry.sp}|${entry.maxSp}|` +
       `${entry.weapon ?? ''}|${entry.armor ?? ''}|${entry.body ?? ''}|${entry.hair ?? ''}|${buffSig}`
     );
   }
@@ -1119,6 +1162,8 @@ export class World {
         moving: player.moving,
         hp: player.hp,
         maxHp: player.maxHp,
+        sp: player.sp,
+        maxSp: player.maxSp,
         level: player.level,
         exp: player.exp,
         yang: player.yang,
@@ -1202,6 +1247,7 @@ export class World {
     player.x = spawn.x;
     player.y = spawn.y;
     player.hp = revivedHp(player.maxHp, PLAYER_RESPAWN_HP_SHARE);
+    player.sp = player.maxSp;
     player.deadUntil = 0;
     player.moving = false;
     player.lastAttackTick = this.tickCount - ATTACK_COOLDOWN_TICKS;
@@ -1395,8 +1441,11 @@ export class World {
       levelUps += 1;
     }
 
-    // Levelling up puts the player back on his feet.
-    if (levelUps > 0) player.hp = player.maxHp;
+    // Levelling up puts the player back on his feet, with full skill points.
+    if (levelUps > 0) {
+      player.hp = player.maxHp;
+      player.sp = player.maxSp;
+    }
 
     return { playerId: player.id, exp, yang, levelUps };
   }
