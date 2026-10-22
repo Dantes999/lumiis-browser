@@ -14,6 +14,7 @@ import { isItemKey, type Equipment, type InventorySlot } from './items.js';
 import { INVENTORY_SLOTS } from './items.js';
 import { isDirection } from './movement.js';
 import { isSkillKey, type SkillKey } from './skills.js';
+import { isStatKey, type StatKey, type Stats } from './progression.js';
 
 /**
  * One compact update for an entity the client already knows.
@@ -45,6 +46,9 @@ export type PlayerSnapshot = {
   /** Skill points; other players' values are harmless to send. */
   sp: number;
   maxSp: number;
+  /** Spent stats and unspent points (the client shows its own). */
+  stats: Stats;
+  points: number;
   level: number;
   exp: number;
   yang: number;
@@ -119,6 +123,7 @@ export type ClientMessage =
   | { t: 'equip'; slot: number }
   | { t: 'unequip'; piece: 'weapon' | 'armor' }
   | { t: 'useItem'; slot: number }
+  | { t: 'spendStat'; stat: StatKey }
   | { t: 'settings'; autoPickup: boolean; autoPickupTypes: string[] }
   | { t: 'ping'; at: number };
 
@@ -289,6 +294,11 @@ export function parseClientMessage(input: unknown): ParsedMessage {
       const piece = message.piece;
       if (piece !== 'weapon' && piece !== 'armor') return fail('unequip needs a piece');
       return { ok: true, message: { t: 'unequip', piece } };
+    }
+
+    case 'spendStat': {
+      if (!isStatKey(message.stat)) return fail('spendStat needs str, vit, int or dex');
+      return { ok: true, message: { t: 'spendStat', stat: message.stat } };
     }
 
     case 'useItem': {

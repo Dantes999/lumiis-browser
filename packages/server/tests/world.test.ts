@@ -10,6 +10,9 @@ import {
   PLAYER_MAX_HP,
   PLAYER_MAX_SP,
   PLAYER_REGEN_TICKS,
+  STAT_HP_PER_VIT,
+  STAT_POINTS_PER_LEVEL,
+  STAT_SP_PER_INT,
   POTION_COOLDOWN_TICKS,
   SKILLS,
   PLAYER_RESPAWN_HP_SHARE,
@@ -203,6 +206,8 @@ describe('world', () => {
         maxHp: PLAYER_MAX_HP,
         sp: PLAYER_MAX_SP,
         maxSp: PLAYER_MAX_SP,
+        stats: { str: 0, vit: 0, int: 0, dex: 0 },
+        points: 0,
         level: 1,
         exp: 0,
         yang: 0,
@@ -417,6 +422,12 @@ describe('monsters fighting back', () => {
 
     expect(player.hp).toBe(0);
     expect(player.deadUntil).toBeGreaterThan(0);
+
+    // The player is told why the screen went dark.
+    const events = world.drainEvents();
+    expect(events.some((event) => event.playerId === player.id && event.text.includes('gefallen'))).toBe(
+      true,
+    );
 
     // The dead cannot act.
     world.setInput(player.id, 1, 0);
@@ -1144,5 +1155,57 @@ describe('potions and skill points', () => {
     player.sp = 1;
     for (let tick = 0; tick < PLAYER_REGEN_TICKS; tick += 1) world.step();
     expect(player.sp).toBeGreaterThan(1);
+  });
+});
+
+describe('stats', () => {
+  it('spends a point and raises the derived numbers', () => {
+    const world = new World(grassMap());
+    const player = world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain', points: 3 });
+
+    const maxHp = player.maxHp;
+    const maxSp = player.maxSp;
+
+    expect(world.spendStat(player.id, 'vit').ok).toBe(true);
+    expect(player.stats.vit).toBe(1);
+    expect(player.points).toBe(2);
+    expect(player.maxHp).toBe(maxHp + STAT_HP_PER_VIT);
+
+    expect(world.spendStat(player.id, 'int').ok).toBe(true);
+    expect(player.maxSp).toBe(maxSp + STAT_SP_PER_INT);
+  });
+
+  it('hands out points on a level up', () => {
+    const world = new World(withWolf(9, 8));
+    const player = world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
+    const before = player.points;
+
+    expect(levelUp(world, player.id, player)).toBe(true);
+    expect(player.points).toBe(before + STAT_POINTS_PER_LEVEL);
+    expect(player.hp).toBe(player.maxHp);
+  });
+
+  it('refuses to spend points that are not there', () => {
+    const world = new World(grassMap());
+    const player = world.addPlayer({ accountId: 0, characterId: 0, name: 'Kain' });
+
+    const result = world.spendStat(player.id, 'str');
+    expect(result.ok).toBe(false);
+    expect(player.stats.str).toBe(0);
+  });
+
+  it('reports stats and points in the snapshot', () => {
+    const world = new World(grassMap());
+    const player = world.addPlayer({
+      accountId: 0,
+      characterId: 0,
+      name: 'Kain',
+      stats: { str: 1, vit: 2, int: 3, dex: 4 },
+      points: 5,
+    });
+
+    const entry = world.snapshot().players.find((row) => row.id === player.id);
+    expect(entry?.stats).toEqual({ str: 1, vit: 2, int: 3, dex: 4 });
+    expect(entry?.points).toBe(5);
   });
 });

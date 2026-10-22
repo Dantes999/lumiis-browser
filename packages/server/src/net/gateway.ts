@@ -254,6 +254,8 @@ export function attachGateway(
         yang: save.yang,
         inventory: save.inventory,
         equipment: save.equipment,
+        stats: save.stats,
+        points: save.points,
       },
     });
 
@@ -518,6 +520,14 @@ export function attachGateway(
             break;
           }
           handleChat(session, message.text);
+          break;
+        }
+        case 'spendStat': {
+          if (session.player === null) {
+            send(session, { t: 'notice', text: 'Log in first.' });
+            break;
+          }
+          host.spendStat(session.player.id, message.stat);
           break;
         }
         case 'useItem': {

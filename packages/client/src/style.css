@@ -318,6 +318,46 @@ body.mobile #hud-toggle {
   cursor: pointer;
 }
 
+.stats-points {
+  margin-bottom: 6px;
+  color: var(--accent);
+}
+
+.stats-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 200px;
+  padding: 2px 0;
+}
+
+.stats-name {
+  flex: 1;
+  color: var(--muted);
+}
+
+.stats-value {
+  min-width: 24px;
+  text-align: right;
+}
+
+.stats-plus {
+  width: 26px;
+  padding: 1px 0;
+  font: inherit;
+  font-weight: bold;
+  color: var(--text);
+  background: #232d37;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.stats-plus:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .chat-lines {
   width: min(520px, 86vw);
   height: min(300px, 42vh);

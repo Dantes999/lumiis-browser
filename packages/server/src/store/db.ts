@@ -10,12 +10,15 @@ import { promisify } from 'node:util';
 import type { DatabaseSync as Database } from 'node:sqlite';
 import {
   EMPTY_EQUIPMENT,
+  EMPTY_STATS,
   START_MAP,
+  STAT_START_POINTS,
   INVENTORY_SLOTS,
   isItemKey,
   type Equipment,
   type InventorySlot,
   type ItemKey,
+  type Stats,
 } from '@lumiis/shared';
 
 // node:sqlite is newer than the list of builtins Vite knows, so a static import
@@ -46,6 +49,9 @@ export type CharacterSave = {
   y: number;
   dir: number;
   inventory: InventorySlot[];
+  stats: Stats;
+  /** Unspent stat points. */
+  points: number;
 };
 
 export type AuthResult =
@@ -70,6 +76,11 @@ type CharacterRow = {
   x: number;
   y: number;
   dir: number;
+  stat_str: number;
+  stat_vit: number;
+  stat_int: number;
+  stat_dex: number;
+  points: number;
 };
 type ItemRow = { slot: number; item_key: string; count: number };
 
@@ -99,6 +110,11 @@ CREATE TABLE IF NOT EXISTS characters (
   armor TEXT,
   body TEXT NOT NULL DEFAULT '',
   hair TEXT NOT NULL DEFAULT '',
+  stat_str INTEGER NOT NULL DEFAULT 0,
+  stat_vit INTEGER NOT NULL DEFAULT 0,
+  stat_int INTEGER NOT NULL DEFAULT 0,
+  stat_dex INTEGER NOT NULL DEFAULT 0,
+  points INTEGER NOT NULL DEFAULT 0,
   updated_at INTEGER NOT NULL
 );
 
@@ -140,7 +156,8 @@ export class Store {
     this.stmtSaveCharacter = this.db.prepare(`
       UPDATE characters SET
         level = ?, exp = ?, yang = ?, hp = ?, map = ?, x = ?, y = ?, dir = ?,
-        weapon = ?, armor = ?, body = ?, hair = ?, updated_at = ?
+        weapon = ?, armor = ?, body = ?, hair = ?,
+        stat_str = ?, stat_vit = ?, stat_int = ?, stat_dex = ?, points = ?, updated_at = ?
       WHERE id = ?
     `);
     this.stmtClearItems = this.db.prepare('DELETE FROM character_items WHERE character_id = ?');
@@ -165,6 +182,10 @@ export class Store {
     }
     if (!columns.some((column) => column.name === 'hair')) {
       this.db.exec("ALTER TABLE characters ADD COLUMN hair TEXT NOT NULL DEFAULT ''");
+    }
+    for (const column of ['stat_str', 'stat_vit', 'stat_int', 'stat_dex', 'points']) {
+      if (columns.some((entry) => entry.name === column)) continue;
+      this.db.exec(`ALTER TABLE characters ADD COLUMN ${column} INTEGER NOT NULL DEFAULT 0`);
     }
   }
 
@@ -295,10 +316,10 @@ export class Store {
       const info = this.db
         .prepare(
           `INSERT INTO characters
-             (account_id, name, level, exp, yang, hp, map, x, y, dir, weapon, armor, body, hair, updated_at)
-           VALUES (?, ?, 1, 0, 0, 100, ?, 0, 0, 0, 'wooden_sword', NULL, ?, ?, ?)`,
+             (account_id, name, level, exp, yang, hp, map, x, y, dir, weapon, armor, body, hair, points, updated_at)
+           VALUES (?, ?, 1, 0, 0, 100, ?, 0, 0, 0, 'wooden_sword', NULL, ?, ?, ?, ?)`,
         )
-        .run(accountId, name, START_MAP, body, hair, Date.now());
+        .run(accountId, name, START_MAP, body, hair, STAT_START_POINTS, Date.now());
 
       const id = Number(info.lastInsertRowid);
       // EIGENE WAHL: the starter kit, so the first fights are survivable.
@@ -323,7 +344,7 @@ export class Store {
   loadCharacter(characterId: number): CharacterSave | null {
     const row = this.db
       .prepare(
-        'SELECT id, name, level, exp, yang, hp, map, x, y, dir, weapon, armor, body, hair FROM characters WHERE id = ?',
+        'SELECT id, name, level, exp, yang, hp, map, x, y, dir, weapon, armor, body, hair, stat_str, stat_vit, stat_int, stat_dex, points FROM characters WHERE id = ?',
       )
       .get(characterId) as unknown as CharacterRow | undefined;
 
@@ -360,6 +381,13 @@ export class Store {
       y: Number(row.y),
       dir: Number(row.dir),
       inventory,
+      stats: {
+        str: Number(row.stat_str ?? 0),
+        vit: Number(row.stat_vit ?? 0),
+        int: Number(row.stat_int ?? 0),
+        dex: Number(row.stat_dex ?? 0),
+      },
+      points: Number(row.points ?? 0),
     };
   }
 
@@ -392,6 +420,11 @@ export class Store {
           save.equipment.armor,
           save.body,
           save.hair,
+          save.stats.str,
+          save.stats.vit,
+          save.stats.int,
+          save.stats.dex,
+          save.points,
           now,
           characterId,
         );

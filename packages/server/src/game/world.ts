@@ -22,11 +22,17 @@ import {
   PICKUP_RANGE,
   PLAYER_DAMAGE,
   PLAYER_MAX_HP,
+  EMPTY_STATS,
   PLAYER_MAX_SP,
   PLAYER_REGEN_HP,
   PLAYER_REGEN_SP,
   PLAYER_REGEN_TICKS,
   POTION_COOLDOWN_TICKS,
+  STAT_ATTACK_PER_STR,
+  STAT_DEFENSE_PER_DEX,
+  STAT_HP_PER_VIT,
+  STAT_POINTS_PER_LEVEL,
+  STAT_SP_PER_INT,
   PLAYER_RESPAWN_HP_SHARE,
   PLAYER_RESPAWN_TICKS,
   TICK_MS,
@@ -51,7 +57,7 @@ import {
   tileAt,
 } from '@lumiis/shared';
 import type { CharacterSave } from '../store/db.js';
-import type { Point, SkillKey, SwingProfile } from '@lumiis/shared';
+import type { Point, SkillKey, StatKey, Stats, SwingProfile } from '@lumiis/shared';
 import { chaseDirection, findTarget, randomWalkableDirection } from './monster-ai.js';
 import {
   attackDamage,
@@ -113,6 +119,8 @@ export type PlayerSeed = {
   yang?: number;
   inventory?: InventorySlot[];
   equipment?: Equipment;
+  stats?: Stats;
+  points?: number;
 };
 
 export type Player = {
@@ -137,6 +145,9 @@ export type Player = {
   maxHp: number;
   sp: number;
   maxSp: number;
+  stats: Stats;
+  /** Unspent stat points. */
+  points: number;
   /** Tick before which no potion may be used again. */
   nextPotionAt: number;
   /** 0 while alive, otherwise the tick this player stands up again. */
@@ -344,6 +355,8 @@ export class World {
       maxHp: PLAYER_MAX_HP,
       sp: PLAYER_MAX_SP,
       maxSp: PLAYER_MAX_SP,
+      stats: seed.stats === undefined ? { ...EMPTY_STATS } : { ...seed.stats },
+      points: seed.points ?? 0,
       nextPotionAt: 0,
       deadUntil: 0,
       lastAttackTick: -ATTACK_COOLDOWN_TICKS,
@@ -414,6 +427,8 @@ export class World {
       inventory: player.inventory.map((slot) =>
         slot === null ? null : { key: slot.key, count: slot.count },
       ),
+      stats: { ...player.stats },
+      points: player.points,
     };
   }
 
@@ -667,9 +682,10 @@ export class World {
   /** Weapon, armour and health bonus follow what is equipped. */
   private recalcStats(player: Player): void {
     const armor = player.equipment.armor === null ? null : itemDef(player.equipment.armor);
-    player.maxHp = PLAYER_MAX_HP + (armor?.maxHp ?? 0);
+    player.maxHp =
+      PLAYER_MAX_HP + player.stats.vit * STAT_HP_PER_VIT + (armor?.maxHp ?? 0);
     player.hp = Math.min(player.hp, player.maxHp);
-    player.maxSp = PLAYER_MAX_SP;
+    player.maxSp = PLAYER_MAX_SP + player.stats.int * STAT_SP_PER_INT;
     player.sp = Math.min(player.sp, player.maxSp);
   }
 
@@ -741,15 +757,27 @@ export class World {
     return { ok: true };
   }
 
+  /** Puts one unspent point into a stat. */
+  spendStat(playerId: number, stat: StatKey): { ok: true } | { ok: false; reason: string } {
+    const player = this.playersById.get(playerId);
+    if (player === undefined) return { ok: false, reason: 'You are not in the world.' };
+    if (player.points <= 0) return { ok: false, reason: 'Keine Punkte übrig.' };
+
+    player.points -= 1;
+    player.stats[stat] += 1;
+    this.recalcStats(player);
+    return { ok: true };
+  }
+
   /** Normalschaden eines Schlags: Grundwert + Waffe + Aura. */
   private attackOf(player: Player): number {
     const weapon = player.equipment.weapon === null ? null : itemDef(player.equipment.weapon);
-    return attackDamage(weapon?.attack ?? 0, player.buffs);
+    return attackDamage(weapon?.attack ?? 0, player.buffs) + player.stats.str * STAT_ATTACK_PER_STR;
   }
 
   private defenseOf(player: Player): number {
     const armor = player.equipment.armor === null ? null : itemDef(player.equipment.armor);
-    return armor?.defense ?? 0;
+    return (armor?.defense ?? 0) + Math.floor(player.stats.dex / STAT_DEFENSE_PER_DEX);
   }
 
   equipmentOf(playerId: number): Equipment | null {
@@ -1103,6 +1131,7 @@ export class World {
       .join(',');
     return (
       `${entry.name}|${entry.level}|${entry.exp}|${entry.yang}|${entry.maxHp}|${entry.sp}|${entry.maxSp}|` +
+      `${entry.stats.str}.${entry.stats.vit}.${entry.stats.int}.${entry.stats.dex}|${entry.points}|` +
       `${entry.weapon ?? ''}|${entry.armor ?? ''}|${entry.body ?? ''}|${entry.hair ?? ''}|${buffSig}`
     );
   }
@@ -1164,6 +1193,8 @@ export class World {
         maxHp: player.maxHp,
         sp: player.sp,
         maxSp: player.maxSp,
+        stats: { ...player.stats },
+        points: player.points,
         level: player.level,
         exp: player.exp,
         yang: player.yang,
@@ -1240,6 +1271,10 @@ export class World {
     player.deadUntil = this.tickCount + PLAYER_RESPAWN_TICKS;
     player.moving = false;
     player.swing = null;
+    this.events.push({
+      playerId: player.id,
+      text: `Du bist gefallen. In ${Math.ceil(PLAYER_RESPAWN_TICKS / TICK_RATE)} s stehst du wieder.`,
+    });
   }
 
   private revivePlayer(player: Player): void {
@@ -1441,8 +1476,11 @@ export class World {
       levelUps += 1;
     }
 
-    // Levelling up puts the player back on his feet, with full skill points.
+    // Levelling up puts the player back on his feet, with full bars and
+    // points to spend.
     if (levelUps > 0) {
+      player.points += STAT_POINTS_PER_LEVEL * levelUps;
+      this.recalcStats(player);
       player.hp = player.maxHp;
       player.sp = player.maxSp;
     }

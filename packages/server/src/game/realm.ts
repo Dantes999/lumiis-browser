@@ -2,7 +2,7 @@
 // moving between them. A player id and a character stay the same for a whole
 // session; only the world that holds the player changes at a portal.
 
-import { channelKeysOf, worldKeyOf, type ChannelInfo, type MapData } from '@lumiis/shared';
+import { channelKeysOf, worldKeyOf, type ChannelInfo, type MapData, type StatKey } from '@lumiis/shared';
 import type {
   AttackResult,
   Player,
@@ -224,6 +224,12 @@ export class Realm {
     return world.pickup(playerId, itemId) as
       | { ok: true; key: string; count: number }
       | { ok: false; reason: string };
+  }
+
+  spendStat(playerId: number, stat: StatKey): { ok: true } | { ok: false; reason: string } {
+    const world = this.worldOf(playerId);
+    if (world === null) return { ok: false, reason: 'You are not in the world.' };
+    return world.spendStat(playerId, stat);
   }
 
   useItem(playerId: number, slot: number): { ok: true } | { ok: false; reason: string } {

@@ -273,6 +273,11 @@ export class Connection {
     this.send({ t: 'unequip', piece });
   }
 
+  /** Puts one unspent point into a stat. */
+  spendStat(stat: 'str' | 'vit' | 'int' | 'dex'): void {
+    this.send({ t: 'spendStat', stat });
+  }
+
   /** Drinks the potion in a bag slot. */
   useItem(slot: number): void {
     this.send({ t: 'useItem', slot });
@@ -507,6 +512,8 @@ export class Connection {
         view.self.maxHp = player.maxHp;
         view.self.sp = player.sp;
         view.self.maxSp = player.maxSp;
+        view.self.stats = player.stats;
+        view.self.points = player.points;
         view.self.level = player.level;
         view.self.exp = player.exp;
         view.self.yang = player.yang;

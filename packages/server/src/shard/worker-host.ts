@@ -15,6 +15,7 @@ import {
   type InventorySlot,
   type MapData,
   type SkillKey,
+  type StatKey,
 } from '@lumiis/shared';
 import type { CharacterSave, Store } from '../store/db.js';
 import type { PlayerSeed } from '../game/world.js';
@@ -247,6 +248,10 @@ export class WorkerHost implements GameHost {
 
   useItem(playerId: number, slot: number): void {
     this.toPlayer(playerId, { t: 'useItem', playerId, slot });
+  }
+
+  spendStat(playerId: number, stat: StatKey): void {
+    this.toPlayer(playerId, { t: 'spendStat', playerId, stat });
   }
 
   unequip(playerId: number, piece: 'weapon' | 'armor'): void {

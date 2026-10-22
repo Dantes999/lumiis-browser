@@ -95,6 +95,9 @@ export type SelfState = {
   maxHp: number;
   sp: number;
   maxSp: number;
+  stats: { str: number; vit: number; int: number; dex: number };
+  /** Unspent stat points. */
+  points: number;
   level: number;
   exp: number;
   yang: number;
@@ -156,6 +159,8 @@ export const view: ViewState = {
     maxHp: 100,
     sp: 60,
     maxSp: 60,
+    stats: { str: 0, vit: 0, int: 0, dex: 0 },
+    points: 0,
     level: 1,
     exp: 0,
     yang: 0,

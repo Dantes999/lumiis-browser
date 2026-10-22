@@ -371,4 +371,26 @@ describe('gateway', () => {
     kain.send(JSON.stringify({ t: 'chat', text: 'zwei' }));
     expect(await onThrottle).toMatchObject({ kind: 'system', text: expect.stringContaining('Langsamer') });
   });
+
+  it('spends a stat point and reports it in the next snapshot', async () => {
+    const port = await startServer();
+    const kain = await openSocket(port);
+    const welcome = await enterAs(kain, 'Kain');
+    const id = welcome['id'] as number;
+
+    kain.send(JSON.stringify({ t: 'spendStat', stat: 'vit' }));
+
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const message = await nextOfType(kain, 'snapshot');
+      const players = (message['players'] ?? []) as Array<Record<string, unknown>>;
+      const self = players.find((entry) => entry['id'] === id);
+      if (self === undefined) continue;
+      const stats = self['stats'] as { vit?: number } | undefined;
+      if (stats?.vit === 1) {
+        expect(self['points']).toBe(5);
+        return;
+      }
+    }
+    throw new Error('no snapshot with the spent point');
+  });
 });

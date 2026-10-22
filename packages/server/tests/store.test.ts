@@ -41,6 +41,8 @@ const sampleSave = (name: string): CharacterSave => {
     y: 200.25,
     dir: 3,
     inventory,
+    stats: { str: 2, vit: 5, int: 1, dex: 3 },
+    points: 4,
   };
 };
 
@@ -92,6 +94,10 @@ describe('characters', () => {
     store.saveCharacter(characterId, sampleSave('Kain'));
 
     const save = store.loadCharacter(characterId);
+    if (save !== null) {
+      expect(save.stats).toEqual({ str: 2, vit: 5, int: 1, dex: 3 });
+      expect(save.points).toBe(4);
+    }
     if (save === null) throw new Error('no character loaded');
 
     expect(save.name).toBe('Kain');

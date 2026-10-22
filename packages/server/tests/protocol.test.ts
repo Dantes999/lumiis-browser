@@ -134,6 +134,21 @@ describe('protocol', () => {
     }
   });
 
+  it('accepts spending a stat point on one of the four stats', () => {
+    for (const stat of ['str', 'vit', 'int', 'dex']) {
+      expect(parseClientMessage({ t: 'spendStat', stat })).toEqual({
+        ok: true,
+        message: { t: 'spendStat', stat },
+      });
+    }
+  });
+
+  it('rejects an unknown stat', () => {
+    for (const stat of ['luck', '', 1, null, undefined]) {
+      expect(parseClientMessage({ t: 'spendStat', stat }).ok).toBe(false);
+    }
+  });
+
   it('accepts using a potion from a bag slot', () => {
     expect(parseClientMessage({ t: 'useItem', slot: 3 })).toEqual({
       ok: true,

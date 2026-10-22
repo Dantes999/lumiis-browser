@@ -4,7 +4,7 @@
 // owns a set of maps and their worlds. Everything a player does is forwarded as
 // an intent; results come back as snapshots, notices, rewards and saves.
 
-import type { Equipment, InventorySlot, MapData, SkillKey } from '@lumiis/shared';
+import type { Equipment, InventorySlot, MapData, SkillKey, StatKey } from '@lumiis/shared';
 import type { CharacterSave } from '../store/db.js';
 import type { PlayerSeed, RewardBroadcast } from '../game/world.js';
 
@@ -34,6 +34,7 @@ export type ToWorker =
   | { t: 'pickup'; playerId: number; target: number }
   | { t: 'equip'; playerId: number; slot: number }
   | { t: 'useItem'; playerId: number; slot: number }
+  | { t: 'spendStat'; playerId: number; stat: StatKey }
   | { t: 'unequip'; playerId: number; piece: 'weapon' | 'armor' }
   | { t: 'settings'; playerId: number; autoPickup: boolean; types: string[] }
   /** Move the player to another channel world (same map). */

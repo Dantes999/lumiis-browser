@@ -23,6 +23,7 @@ import { createLogin } from './ui/login';
 import { createSettings } from './ui/settings';
 import { createLogPanel } from './ui/logpanel';
 import { createChatPanel } from './ui/chat';
+import { createStatsPanel } from './ui/stats';
 import { logEvent, setLogForwarder } from './log';
 
 const HUD_REFRESH_MS = 100;
@@ -168,6 +169,7 @@ initInput({
 
 createLogPanel();
 const chat = createChatPanel((text) => connection.sendChat(text));
+const statsPanel = createStatsPanel((stat) => connection.spendStat(stat));
 setChatHandler(() => chat.render());
 
 // Every client log line is mirrored to the server, which prints it in the
@@ -196,6 +198,7 @@ const bag = createBag(
 window.setInterval(() => {
   hud.render(view);
   bag.render(view.inventory, view.equipment);
+  statsPanel.render();
   channelUi.render(view);
   tickPickup();
 

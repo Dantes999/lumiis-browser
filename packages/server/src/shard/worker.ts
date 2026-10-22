@@ -150,6 +150,12 @@ port.on('message', (message: ToWorker) => {
       return;
     }
 
+    case 'spendStat': {
+      const result = realm.spendStat(message.playerId, message.stat);
+      if (!result.ok) post({ t: 'notice', playerId: message.playerId, text: result.reason });
+      return;
+    }
+
     case 'useItem': {
       const result = realm.useItem(message.playerId, message.slot);
       if (!result.ok) post({ t: 'notice', playerId: message.playerId, text: result.reason });

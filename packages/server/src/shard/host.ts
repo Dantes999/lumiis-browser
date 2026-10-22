@@ -4,7 +4,7 @@
 // host below runs each map group in its own thread. The gateway talks only to
 // this interface, so splitting the game across threads changes nothing in it.
 
-import type { ChannelInfo, Equipment, InventorySlot, SkillKey } from '@lumiis/shared';
+import type { ChannelInfo, Equipment, InventorySlot, SkillKey, StatKey } from '@lumiis/shared';
 import type { Player, PlayerSeed, RewardBroadcast } from '../game/world.js';
 import type { Realm } from '../game/realm.js';
 import type { Store } from '../store/db.js';
@@ -75,6 +75,7 @@ export interface GameHost {
   pickup(playerId: number, itemId: number): void;
   equip(playerId: number, slot: number): void;
   useItem(playerId: number, slot: number): void;
+  spendStat(playerId: number, stat: StatKey): void;
   unequip(playerId: number, piece: 'weapon' | 'armor'): void;
   setPickupSettings(playerId: number, autoPickup: boolean, types: string[]): void;
 
@@ -194,6 +195,11 @@ export class LocalHost implements GameHost {
     if (!result.ok) this.notices.push({ playerId, text: result.reason });
   }
 
+  spendStat(playerId: number, stat: StatKey): void {
+    const result = this.realm.spendStat(playerId, stat);
+    if (!result.ok) this.notices.push({ playerId, text: result.reason });
+  }
+
   unequip(playerId: number, piece: 'weapon' | 'armor'): void {
     const result = this.realm.unequip(playerId, piece);
     if (!result.ok) this.notices.push({ playerId, text: result.reason });
@@ -224,7 +230,9 @@ export class LocalHost implements GameHost {
   }
 
   drainNotices(): HostNotice[] {
-    const list = [...this.notices];
+    // World events (kill EXP, level ups, death) are notices too; the worker
+    // host forwards them from its threads, this host from its worlds.
+    const list = [...this.notices, ...this.realm.drainEvents()];
     this.notices.length = 0;
     return list;
   }
