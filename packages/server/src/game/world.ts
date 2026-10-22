@@ -60,8 +60,9 @@ import type { CharacterSave } from '../store/db.js';
 import type { Point, SkillKey, StatKey, Stats, SwingProfile } from '@lumiis/shared';
 import { chaseDirection, findTarget, randomWalkableDirection } from './monster-ai.js';
 import {
-  attackDamage,
   damageTaken,
+  magicAttackDamage,
+  magicDefense,
   damagePortion,
   regeneratedHp,
   revivedHp,
@@ -148,6 +149,11 @@ export type Player = {
   stats: Stats;
   /** Unspent stat points. */
   points: number;
+  /** Derived combat values; recalculated when stats or gear change. */
+  attack: number;
+  defense: number;
+  matk: number;
+  mdef: number;
   /** Tick before which no potion may be used again. */
   nextPotionAt: number;
   /** 0 while alive, otherwise the tick this player stands up again. */
@@ -357,6 +363,10 @@ export class World {
       maxSp: PLAYER_MAX_SP,
       stats: seed.stats === undefined ? { ...EMPTY_STATS } : { ...seed.stats },
       points: seed.points ?? 0,
+      attack: 0,
+      defense: 0,
+      matk: 0,
+      mdef: 0,
       nextPotionAt: 0,
       deadUntil: 0,
       lastAttackTick: -ATTACK_COOLDOWN_TICKS,
@@ -682,6 +692,13 @@ export class World {
   /** Weapon, armour and health bonus follow what is equipped. */
   private recalcStats(player: Player): void {
     const armor = player.equipment.armor === null ? null : itemDef(player.equipment.armor);
+    const weapon = player.equipment.weapon === null ? null : itemDef(player.equipment.weapon);
+    player.attack =
+      PLAYER_DAMAGE + (weapon?.attack ?? 0) + player.stats.str * STAT_ATTACK_PER_STR;
+    player.defense =
+      (armor?.defense ?? 0) + Math.floor(player.stats.dex / STAT_DEFENSE_PER_DEX);
+    player.matk = magicAttackDamage(weapon?.matk ?? 0, weapon?.attack ?? 0, player.stats.int);
+    player.mdef = magicDefense(player.stats.int, player.stats.vit, armor?.defense ?? 0);
     player.maxHp =
       PLAYER_MAX_HP + player.stats.vit * STAT_HP_PER_VIT + (armor?.maxHp ?? 0);
     player.hp = Math.min(player.hp, player.maxHp);
@@ -718,13 +735,19 @@ export class World {
     } else {
       // A short window so other clients can play the same spin.
       player.whirlwindUntil = this.tickCount + 12;
-      const damage = whirlwindDamage(this.attackOf(player), skill.damageScale ?? 1);
+      const base = skill.scaling === 'magical' ? player.matk : this.attackOf(player);
+      const damage = whirlwindDamage(base, skill.damageScale ?? 1);
       const radius = skill.radius ?? 0;
       for (const monster of this.monstersById.values()) {
         if (monster.respawnAt > 0) continue;
         if (Math.hypot(monster.x - player.x, monster.y - player.y) > radius) continue;
-        monster.hp -= damage;
-        monster.damageBy.set(player.id, (monster.damageBy.get(player.id) ?? 0) + damage);
+        // A magic skill has to get through the monster's magic defence.
+        const dealt =
+          skill.scaling === 'magical'
+            ? Math.max(1, damage - (MONSTER_TYPES[monster.key].mdef ?? 0))
+            : damage;
+        monster.hp -= dealt;
+        monster.damageBy.set(player.id, (monster.damageBy.get(player.id) ?? 0) + dealt);
         if (monster.targetId === null) monster.targetId = player.id;
         if (monster.hp <= 0) this.killMonster(monster, player);
       }
@@ -769,15 +792,14 @@ export class World {
     return { ok: true };
   }
 
-  /** Normalschaden eines Schlags: Grundwert + Waffe + Aura. */
+  /** Physical attack of one swing: derived attack plus the aura buff. */
   private attackOf(player: Player): number {
-    const weapon = player.equipment.weapon === null ? null : itemDef(player.equipment.weapon);
-    return attackDamage(weapon?.attack ?? 0, player.buffs) + player.stats.str * STAT_ATTACK_PER_STR;
+    const aura = player.buffs.has('aura') ? (SKILLS.aura.attackBonus ?? 0) : 0;
+    return player.attack + aura;
   }
 
   private defenseOf(player: Player): number {
-    const armor = player.equipment.armor === null ? null : itemDef(player.equipment.armor);
-    return (armor?.defense ?? 0) + Math.floor(player.stats.dex / STAT_DEFENSE_PER_DEX);
+    return player.defense;
   }
 
   equipmentOf(playerId: number): Equipment | null {
@@ -1195,6 +1217,10 @@ export class World {
         maxSp: player.maxSp,
         stats: { ...player.stats },
         points: player.points,
+        attack: player.attack,
+        defense: player.defense,
+        matk: player.matk,
+        mdef: player.mdef,
         level: player.level,
         exp: player.exp,
         yang: player.yang,
@@ -1261,10 +1287,11 @@ export class World {
 
   // ------------------------------------------------------------------ players
 
-  private hurtPlayer(player: Player, damage: number): void {
+  private hurtPlayer(player: Player, damage: number, magic = false): void {
     if (player.deadUntil > 0) return;
 
-    const taken = damageTaken(damage, this.defenseOf(player));
+    // Magic blows meet magic defence, physical blows the armour.
+    const taken = damageTaken(damage, magic ? player.mdef : this.defenseOf(player));
     player.hp = Math.max(0, player.hp - taken);
     if (player.hp > 0) return;
 
@@ -1565,7 +1592,7 @@ export class World {
 
         if (this.tickCount - monster.lastAttackTick >= MONSTER_ATTACK_COOLDOWN_TICKS) {
           monster.lastAttackTick = this.tickCount;
-          this.hurtPlayer(target, monster.damage);
+          this.hurtPlayer(target, monster.damage, MONSTER_TYPES[monster.key].magic);
         }
         return true;
       }

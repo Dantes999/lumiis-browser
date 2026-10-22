@@ -514,6 +514,10 @@ export class Connection {
         view.self.maxSp = player.maxSp;
         view.self.stats = player.stats;
         view.self.points = player.points;
+        view.self.attack = player.attack;
+        view.self.defense = player.defense;
+        view.self.matk = player.matk;
+        view.self.mdef = player.mdef;
         view.self.level = player.level;
         view.self.exp = player.exp;
         view.self.yang = player.yang;

@@ -18,6 +18,9 @@ export const MONSTER_TYPES = {
     aggro: 140,
     /** Damage per bite. */
     damage: 8,
+    /** Magic defence and whether its blows are magical (uses the player's mdef). */
+    mdef: 0,
+    magic: false,
     /** Experience for the player who kills it. */
     exp: 24,
     /** Yang dropped, as a range. */
@@ -40,6 +43,8 @@ export const MONSTER_TYPES = {
     leash: 64,
     aggro: 100,
     damage: 12,
+    mdef: 0,
+    magic: false,
     exp: 45,
     yangMin: 10,
     yangMax: 22,
@@ -63,6 +68,8 @@ export const MONSTER_TYPES = {
     leash: 0,
     aggro: 0,
     damage: 0,
+    mdef: 0,
+    magic: false,
     exp: 0,
     yangMin: 0,
     yangMax: 0,

@@ -42,6 +42,9 @@ export type ItemDef = {
   /** Armour: file name inside ruestungen/<class>_<sex>/, without .png. */
   armorFile?: string;
 
+  /** Weapons: magic attack for magic skills (falls back to half the attack). */
+  matk?: number;
+
   /** Consumables: hit points and skill points restored. */
   heal?: number;
   mana?: number;
@@ -271,6 +274,7 @@ export function describeItem(key: ItemKey): ItemInfo {
   const stats: Array<{ label: string; value: number }> = [];
 
   if (def.attack !== undefined) stats.push({ label: 'Angriff', value: def.attack });
+  if (def.matk !== undefined) stats.push({ label: 'Magieangriff', value: def.matk });
   if (def.defense !== undefined) stats.push({ label: 'Verteidigung', value: def.defense });
   if (def.maxHp !== undefined) stats.push({ label: 'Max. HP', value: def.maxHp });
   if (def.heal !== undefined) stats.push({ label: 'Heilung', value: def.heal });

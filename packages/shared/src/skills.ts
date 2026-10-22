@@ -14,6 +14,8 @@ export type SkillDef = {
   cooldownTicks: number;
   /** Skill points one cast costs. */
   spCost: number;
+  /** Which attack value the damage is built from. */
+  scaling: 'physical' | 'magical';
   /** Buff only: how long the effect lasts, in ticks. */
   durationTicks?: number;
   /** Buff only: flat attack added while the effect runs. */
@@ -32,6 +34,7 @@ export const SKILLS: Record<SkillKey, SkillDef> = {
     kind: 'buff',
     cooldownTicks: 200,
     spCost: 10,
+    scaling: 'physical',
     durationTicks: 200,
     attackBonus: 10,
   },
@@ -41,6 +44,7 @@ export const SKILLS: Record<SkillKey, SkillDef> = {
     kind: 'aoe',
     cooldownTicks: 60,
     spCost: 15,
+    scaling: 'physical',
     radius: 64,
     damageScale: 1.5,
   },

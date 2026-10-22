@@ -1,15 +1,7 @@
 // Plain DOM for the interface. Phaser draws the world; HTML draws the rest,
 // because that is what scales from desktop to phone without extra work.
 
-import {
-  PLAYER_DAMAGE,
-  SKILLS,
-  SKILL_KEYS,
-  STAT_ATTACK_PER_STR,
-  STAT_DEFENSE_PER_DEX,
-  expForNextLevel,
-  itemDef,
-} from '@lumiis/shared';
+import { SKILLS, SKILL_KEYS, expForNextLevel, itemDef } from '@lumiis/shared';
 import { cooldownFraction } from '../skill';
 import { playerCount, type ViewState } from '../state';
 
@@ -86,12 +78,8 @@ export function createHud(
       const weapon = state.equipment.weapon === null ? null : itemDef(state.equipment.weapon);
       const armor = state.equipment.armor === null ? null : itemDef(state.equipment.armor);
       const aura = state.self.buffs['aura'] !== undefined ? SKILLS.aura.attackBonus ?? 0 : 0;
-      attack.textContent = String(
-        PLAYER_DAMAGE + (weapon?.attack ?? 0) + aura + state.self.stats.str * STAT_ATTACK_PER_STR,
-      );
-      defence.textContent = String(
-        (armor?.defense ?? 0) + Math.floor(state.self.stats.dex / STAT_DEFENSE_PER_DEX),
-      );
+      attack.textContent = String(state.self.attack + aura);
+      defence.textContent = String(state.self.defense);
 
       // Cooldown veil on the skill buttons.
       for (const entry of skillButtons) {

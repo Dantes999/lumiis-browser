@@ -6,12 +6,43 @@
 //
 // Everything here is a pure function: same input, same output, no state.
 
-import { PLAYER_DAMAGE, SKILLS, type SkillKey } from '@lumiis/shared';
+import {
+  PLAYER_DAMAGE,
+  SKILLS,
+  STAT_MAGIC_PER_INT,
+  STAT_MDEF_ARMOR_SHARE,
+  STAT_MDEF_PER_INT,
+  STAT_MDEF_PER_VIT,
+  type SkillKey,
+} from '@lumiis/shared';
 
 /** Attack of a player: bare hand + weapon + aura buff. */
 export function attackDamage(weaponAttack: number, buffs: ReadonlyMap<SkillKey, number>): number {
   const aura = buffs.has('aura') ? (SKILLS.aura.attackBonus ?? 0) : 0;
   return PLAYER_DAMAGE + weaponAttack + aura;
+}
+
+/**
+ * Magic attack of a player: the weapon's magic value, or half its physical
+ * attack when it has none, plus INT. (Scaled from the old project's
+ * `2 x level + 2 x INT + weapon magic attack`.)
+ */
+export function magicAttackDamage(
+  weaponMagic: number,
+  weaponAttack: number,
+  int: number,
+): number {
+  const base = weaponMagic > 0 ? weaponMagic : Math.floor(weaponAttack / 2);
+  return PLAYER_DAMAGE + base + int * STAT_MAGIC_PER_INT;
+}
+
+/** Magic defence: INT and VIT, plus half the armour's defence. */
+export function magicDefense(int: number, vit: number, armorDefense: number): number {
+  return (
+    Math.floor(int / STAT_MDEF_PER_INT) +
+    Math.floor(vit / STAT_MDEF_PER_VIT) +
+    Math.floor(armorDefense / STAT_MDEF_ARMOR_SHARE)
+  );
 }
 
 /** What a blow really removes after armour. A hit always takes at least one. */

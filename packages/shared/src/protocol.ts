@@ -49,6 +49,11 @@ export type PlayerSnapshot = {
   /** Spent stats and unspent points (the client shows its own). */
   stats: Stats;
   points: number;
+  /** Derived combat values, so the client never recomputes them on its own. */
+  attack: number;
+  defense: number;
+  matk: number;
+  mdef: number;
   level: number;
   exp: number;
   yang: number;

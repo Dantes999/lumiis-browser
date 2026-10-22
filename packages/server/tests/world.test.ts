@@ -208,6 +208,10 @@ describe('world', () => {
         maxSp: PLAYER_MAX_SP,
         stats: { str: 0, vit: 0, int: 0, dex: 0 },
         points: 0,
+        attack: PLAYER_DAMAGE,
+        defense: 0,
+        matk: PLAYER_DAMAGE,
+        mdef: 0,
         level: 1,
         exp: 0,
         yang: 0,
@@ -1207,5 +1211,76 @@ describe('stats', () => {
     const entry = world.snapshot().players.find((row) => row.id === player.id);
     expect(entry?.stats).toEqual({ str: 1, vit: 2, int: 3, dex: 4 });
     expect(entry?.points).toBe(5);
+  });
+});
+
+describe('magic values', () => {
+  it('derives attack, magic attack and both defences from stats and gear', () => {
+    const world = new World(grassMap());
+    const player = world.addPlayer({
+      accountId: 0,
+      characterId: 0,
+      name: 'Kain',
+      stats: { str: 1, vit: 6, int: 4, dex: 2 },
+      equipment: { weapon: 'wooden_sword', armor: null },
+    });
+
+    expect(player.attack).toBe(PLAYER_DAMAGE + 4 + 1 * 2);
+    expect(player.defense).toBe(1);
+    expect(player.matk).toBe(PLAYER_DAMAGE + 2 + 4 * 2);
+    expect(player.mdef).toBe(2 + 2);
+  });
+
+  it('uses the magic value of a skill when it is magical', () => {
+    // The dummy has plenty of health, so the number is not clamped by death.
+    const map = grassMap();
+    map.spawns = [{ kind: 'mob', key: 'dummy', tx: 9, ty: 8 }];
+    const world = new World(map);
+    const player = world.addPlayer({
+      accountId: 0,
+      characterId: 0,
+      name: 'Kain',
+      stats: { str: 0, vit: 0, int: 10, dex: 0 },
+    });
+    const monster = world.getMonster(1);
+    if (monster === undefined) throw new Error('no monster');
+    const before = monster.hp;
+
+    const skill = SKILLS.whirlwind;
+    const original = skill.scaling;
+    skill.scaling = 'magical';
+    try {
+      expect(world.useSkill(player.id, 'whirlwind').ok).toBe(true);
+    } finally {
+      skill.scaling = original;
+    }
+
+    // No weapon: magic attack is base + INT x 2; the wolf has no magic defence.
+    const expected = Math.round(player.matk * (skill.damageScale ?? 1));
+    expect(before - monster.hp).toBe(expected);
+  });
+
+  it('lets a magical monster blow meet magic defence', () => {
+    const world = new World(boxedWolf());
+    const player = world.addPlayer({
+      accountId: 0,
+      characterId: 0,
+      name: 'Kain',
+      stats: { str: 0, vit: 0, int: 10, dex: 0 },
+    });
+    expect(player.mdef).toBe(5);
+
+    const wolf = MONSTER_TYPES.wolf as { magic: boolean };
+    const before = player.hp;
+    wolf.magic = true;
+    try {
+      world.step(); // the wolf notices
+      world.step(); // and bites
+    } finally {
+      wolf.magic = false;
+    }
+
+    // 8 damage minus 5 magic defence; a physical bite would take all 8.
+    expect(player.hp).toBe(before - 3);
   });
 });

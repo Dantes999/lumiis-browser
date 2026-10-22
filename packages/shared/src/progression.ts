@@ -23,6 +23,15 @@ export const STAT_ATTACK_PER_STR = 2;
 /** Two points of dexterity give one point of defence. */
 export const STAT_DEFENSE_PER_DEX = 2;
 export const STAT_POINTS_PER_LEVEL = 3;
+// EIGENE WAHL: magic weights. Scaled down from the old project (2 x level +
+// 2 x INT + weapon magic attack) to this game's 12 base damage.
+export const STAT_MAGIC_PER_INT = 2;
+/** Two INT give one point of magic defence. */
+export const STAT_MDEF_PER_INT = 2;
+/** Three VIT give one point of magic defence. */
+export const STAT_MDEF_PER_VIT = 3;
+/** Half the armour defence counts as magic defence. */
+export const STAT_MDEF_ARMOR_SHARE = 2;
 /** A new character may already put a few points in. */
 export const STAT_START_POINTS = 6;
 

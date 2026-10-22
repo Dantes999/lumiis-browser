@@ -98,6 +98,11 @@ export type SelfState = {
   stats: { str: number; vit: number; int: number; dex: number };
   /** Unspent stat points. */
   points: number;
+  /** Derived combat values, straight from the server. */
+  attack: number;
+  defense: number;
+  matk: number;
+  mdef: number;
   level: number;
   exp: number;
   yang: number;
@@ -161,6 +166,10 @@ export const view: ViewState = {
     maxSp: 60,
     stats: { str: 0, vit: 0, int: 0, dex: 0 },
     points: 0,
+    attack: 12,
+    defense: 0,
+    matk: 12,
+    mdef: 0,
     level: 1,
     exp: 0,
     yang: 0,

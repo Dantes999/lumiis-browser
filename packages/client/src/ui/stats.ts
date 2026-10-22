@@ -38,6 +38,12 @@ export function createStatsPanel(onSpend: (stat: StatKey) => void): StatsPanel {
   const close = mustFind('stats-close');
   const points = mustFind('stats-points');
   const rows = mustFind('stats-rows');
+  const derived = {
+    attack: mustFind('derived-atk'),
+    matk: mustFind('derived-matk'),
+    defense: mustFind('derived-def'),
+    mdef: mustFind('derived-mdef'),
+  };
 
   const values = new Map<StatKey, HTMLElement>();
   const buttons = new Map<StatKey, HTMLButtonElement>();
@@ -76,6 +82,10 @@ export function createStatsPanel(onSpend: (stat: StatKey) => void): StatsPanel {
   close.addEventListener('click', () => panel.classList.add('hidden'));
 
   function render(): void {
+    derived.attack.textContent = String(view.self.attack);
+    derived.matk.textContent = String(view.self.matk);
+    derived.defense.textContent = String(view.self.defense);
+    derived.mdef.textContent = String(view.self.mdef);
     points.textContent = String(view.self.points);
     for (const key of STAT_KEYS) {
       const value = values.get(key);
