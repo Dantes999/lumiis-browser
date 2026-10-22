@@ -109,6 +109,8 @@ export type ClientMessage =
   | { t: 'attack'; target?: number; dir?: number }
   | { t: 'skill'; key: SkillKey }
   | { t: 'log'; level: 'info' | 'warn' | 'error'; text: string }
+  /** Chat text; commands /g (global) and /w Name (whisper) are parsed by the server. */
+  | { t: 'chat'; text: string }
   | { t: 'resume'; token: string }
   | { t: 'pickup'; target: number }
   | { t: 'equip'; slot: number }
@@ -142,6 +144,14 @@ export type ServerMessage =
   | { t: 'authError'; reason: string }
   | { t: 'pong'; at: number }
   | { t: 'notice'; text: string }
+  | {
+      t: 'chat';
+      kind: 'map' | 'global' | 'whisper' | 'system';
+      from: string;
+      text: string;
+      /** Set for whispers: the other side. */
+      to?: string;
+    }
   | {
       t: 'reward';
       /** Where the monster fell. */
@@ -250,6 +260,16 @@ export function parseClientMessage(input: unknown): ParsedMessage {
         return fail('log text must be 1 to 500 characters');
       }
       return { ok: true, message: { t: 'log', level, text } };
+    }
+
+    case 'chat': {
+      const text = message.text;
+      if (typeof text !== 'string') return fail('chat needs text');
+      // Control characters would let a client paint over other lines.
+      const clean = text.replace(/[\u0000-\u001f\u007f]/g, ' ').trim();
+      if (clean.length === 0) return fail('chat needs text');
+      if (clean.length > 200) return fail('chat text is longer than 200 characters');
+      return { ok: true, message: { t: 'chat', text: clean } };
     }
 
     case 'equip': {

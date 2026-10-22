@@ -309,6 +309,69 @@ body.mobile #hud-toggle {
   cursor: pointer;
 }
 
+.chat-lines {
+  width: min(520px, 86vw);
+  height: min(300px, 42vh);
+  padding: 6px;
+  overflow: auto;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #cfe3f5;
+  background: #0e141a;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.chat-line {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.chat-global {
+  color: #e8c46a;
+}
+
+.chat-whisper {
+  color: #d79ad0;
+}
+
+.chat-system {
+  color: #8fa3b5;
+}
+
+.chat-send-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.chat-send-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.chat-send-row select,
+.chat-send-row button,
+.chat-close {
+  padding: 2px 8px;
+  font: inherit;
+  color: var(--text);
+  background: #232d37;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.chat-hint {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.chat-close {
+  margin-top: 6px;
+}
+
 .log-lines {
   width: min(560px, 86vw);
   height: min(420px, 60vh);

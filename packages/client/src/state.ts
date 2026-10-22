@@ -36,6 +36,16 @@ export type RemotePlayer = {
   renderY: number;
 };
 
+/** One chat line in the window. */
+export type ChatLine = {
+  kind: 'map' | 'global' | 'whisper' | 'system';
+  from: string;
+  text: string;
+  /** Set for whispers: the other side. */
+  to?: string;
+  at: number;
+};
+
 /** An item lying on the ground. */
 export type GroundItemState = {
   id: number;
@@ -102,6 +112,8 @@ export type ViewState = {
   inventory: InventorySlot[];
   equipment: Equipment;
   notice: string | null;
+  /** Last chat lines, oldest first. */
+  chat: ChatLine[];
   /** Last login failure, shown in the login box. */
   authError: string | null;
   /** Characters of the logged in account, null until the server sent them. */
@@ -151,6 +163,7 @@ export const view: ViewState = {
   inventory: [],
   equipment: { weapon: null, armor: null },
   notice: null,
+  chat: [],
   authError: null,
   characters: null,
   mapId: null,

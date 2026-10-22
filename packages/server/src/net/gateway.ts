@@ -31,6 +31,8 @@ type Session = {
   accountId: number | null;
   /** Remote address, so two clients can be told apart in the log. */
   address: string;
+  /** When the last chat line was accepted, for the throttle. */
+  chatAt: number;
 };
 
 export type Gateway = {
@@ -114,6 +116,79 @@ export function attachGateway(
     const slots = host.inventoryOf(playerId);
     const equipment = host.equipmentOf(playerId);
     if (slots !== null && equipment !== null) send(session, { t: 'inventory', slots, equipment });
+  };
+
+  /** Chat is cheap but spammable: one line every 400 ms per connection. */
+  const CHAT_INTERVAL_MS = 400;
+  const openSessions = (): Session[] =>
+    [...sessions].filter(
+      (session) => session.player !== null && session.socket.readyState === WebSocket.OPEN,
+    );
+
+  /** Map chat stays in the world (map + channel); global crosses every world. */
+  const chatRecipients = (global: boolean, worldId: string | null): Session[] =>
+    openSessions().filter((session) => {
+      if (global) return true;
+      const player = session.player;
+      return player !== null && worldId !== null && host.worldIdOf(player.id) === worldId;
+    });
+
+  /** Chat mistakes land in the chat window, not in the HUD notice slot. */
+  const systemLine = (session: Session, text: string): void => {
+    send(session, { t: 'chat', kind: 'system', from: '', text });
+  };
+
+  const handleChat = (session: Session, text: string): void => {
+    const player = session.player;
+    if (player === null) return;
+
+    const now = Date.now();
+    if (now - session.chatAt < CHAT_INTERVAL_MS) {
+      systemLine(session, 'Langsamer tippen.');
+      return;
+    }
+    session.chatAt = now;
+
+    const trimmed = text.trim();
+    if (trimmed.length === 0) return;
+
+    // /w Name text — a private line to one player, anywhere in the world.
+    if (/^\/w\s/i.test(trimmed)) {
+      const rest = trimmed.slice(2).trim();
+      const space = rest.indexOf(' ');
+      if (space <= 0) {
+        systemLine(session, 'Benutzung: /w Name Text');
+        return;
+      }
+      const wanted = rest.slice(0, space);
+      const body = rest.slice(space + 1).trim();
+      if (body.length === 0) {
+        systemLine(session, 'Benutzung: /w Name Text');
+        return;
+      }
+      const target = openSessions().find(
+        (entry) => entry.player !== null && entry.player.name.toLowerCase() === wanted.toLowerCase(),
+      );
+      const targetPlayer = target?.player;
+      if (target === undefined || targetPlayer === null || targetPlayer === undefined) {
+        systemLine(session, `Niemand heißt "${wanted}".`);
+        return;
+      }
+      const line = { t: 'chat' as const, kind: 'whisper' as const, from: player.name, to: targetPlayer.name, text: body };
+      send(target, line);
+      send(session, line);
+      console.log(`[chat whisper ${player.name} -> ${targetPlayer.name}] ${body}`);
+      return;
+    }
+
+    const global = /^\/g\s/i.test(trimmed);
+    const body = global ? trimmed.slice(2).trim() : trimmed;
+    if (body.length === 0) return;
+
+    const worldId = host.worldIdOf(player.id);
+    const line = { t: 'chat' as const, kind: global ? ('global' as const) : ('map' as const), from: player.name, text: body };
+    for (const recipient of chatRecipients(global, worldId)) send(recipient, line);
+    console.log(`[chat ${global ? 'global' : 'map'} ${player.name}] ${body}`);
   };
 
   const MAX_LOGIN_ATTEMPTS = 6;
@@ -287,6 +362,7 @@ export function attachGateway(
     const session: Session = {
       socket,
       player: null,
+      chatAt: 0,
       tokens: MAX_MESSAGES_PER_SECOND,
       tokensAt: performance.now(),
       loginAttempts: 0,
@@ -434,6 +510,14 @@ export function attachGateway(
             break;
           }
           host.useSkill(session.player.id, message.key);
+          break;
+        }
+        case 'chat': {
+          if (session.player === null) {
+            send(session, { t: 'notice', text: 'Log in first.' });
+            break;
+          }
+          handleChat(session, message.text);
           break;
         }
         case 'equip': {

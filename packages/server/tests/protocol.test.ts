@@ -134,6 +134,23 @@ describe('protocol', () => {
     }
   });
 
+  it('accepts chat text and trims control characters', () => {
+    expect(parseClientMessage({ t: 'chat', text: '  hallo  ' })).toEqual({
+      ok: true,
+      message: { t: 'chat', text: 'hallo' },
+    });
+    expect(parseClientMessage({ t: 'chat', text: 'a\u0000b\u001fc' })).toEqual({
+      ok: true,
+      message: { t: 'chat', text: 'a b c' },
+    });
+  });
+
+  it('rejects empty, too long or non-text chat', () => {
+    for (const text of ['', '   ', '\u0000\u0001', 'x'.repeat(201), 42, null, undefined]) {
+      expect(parseClientMessage({ t: 'chat', text }).ok).toBe(false);
+    }
+  });
+
   it('rejects unknown message types', () => {
     expect(parseClientMessage({ t: 'teleport', x: 1, y: 1 }).ok).toBe(false);
   });

@@ -105,6 +105,7 @@
       </div>
       <button id="bag-toggle" class="hud-button" type="button">Bag</button>
       <button id="settings-toggle" class="hud-button" type="button">Settings</button>
+      <button id="chat-toggle" class="hud-button" type="button">Chat</button>
       <button id="log-toggle" class="hud-button" type="button">Log</button>
 
       <div class="hud-row">
@@ -147,6 +148,21 @@
     </div>
 
     <div id="item-tip" class="item-tip hidden"></div>
+
+    <div id="chat" class="panel hidden">
+      <div class="panel-title">Chat</div>
+      <div id="chat-lines" class="chat-lines"></div>
+      <div class="chat-send-row">
+        <select id="chat-scope" aria-label="Chat scope">
+          <option value="map">Karte</option>
+          <option value="global">Global</option>
+        </select>
+        <input id="chat-input" maxlength="200" autocomplete="off" spellcheck="false" placeholder="Enter zum Senden, /w Name Text" />
+        <button id="chat-send" type="button">Senden</button>
+      </div>
+      <div class="chat-hint">/g Text = global · /w Name Text = flüstern</div>
+      <button id="chat-close" type="button" class="chat-close">Schließen</button>
+    </div>
 
     <div id="log" class="panel hidden">
       <div class="panel-title">Log</div>

@@ -35,6 +35,23 @@ const closedWith = (socket: WebSocket, timeoutMs = 2000): Promise<number> =>
     });
   });
 
+/** Fails when a message of `type` arrives within `ms`; resolves when it stays quiet. */
+const silenceOfType = (socket: WebSocket, type: string, ms = 500): Promise<void> =>
+  new Promise((resolve, reject) => {
+    const onMessage = (data: WebSocket.RawData): void => {
+      const message = JSON.parse(data.toString()) as Record<string, unknown>;
+      if (message['t'] !== type) return;
+      clearTimeout(timer);
+      socket.off('message', onMessage);
+      reject(new Error(`unexpected ${type}: ${JSON.stringify(message)}`));
+    };
+    const timer = setTimeout(() => {
+      socket.off('message', onMessage);
+      resolve();
+    }, ms);
+    socket.on('message', onMessage);
+  });
+
 const nextOfType = async (socket: WebSocket, type: string): Promise<Record<string, unknown>> => {
   for (let attempt = 0; attempt < 40; attempt += 1) {
     const message = (await nextMessage(socket)) as Record<string, unknown>;
@@ -275,5 +292,83 @@ describe('gateway', () => {
     const error = await nextOfType(socket, 'authError');
     expect(String(error['reason'])).toContain('Session expired');
     socket.close();
+  });
+
+  /** Two players on purpose on the same channel (the server spreads them out). */
+  const enterTwo = async (): Promise<{ kain: WebSocket; bora: WebSocket; channel: number }> => {
+    const port = await startServer({ channels: 2 });
+    const kain = await openSocket(port);
+    const bora = await openSocket(port);
+    const first = await enterAs(kain, 'Kain');
+    const second = await enterAs(bora, 'Bora');
+    const channel = first['channel'] as number;
+    if (second['channel'] !== channel) {
+      bora.send(JSON.stringify({ t: 'switchChannel', channel }));
+      await nextOfType(bora, 'channel');
+    }
+    return { kain, bora, channel };
+  };
+
+  it('sends map chat to everyone in the same channel', async () => {
+    const { kain, bora } = await enterTwo();
+
+    // Listen before sending: ws drops messages that arrive with no listener.
+    const onKain = nextOfType(kain, 'chat');
+    const onBora = nextOfType(bora, 'chat');
+    kain.send(JSON.stringify({ t: 'chat', text: 'hallo' }));
+
+    expect(await onKain).toMatchObject({ kind: 'map', from: 'Kain', text: 'hallo' });
+    expect(await onBora).toMatchObject({ kind: 'map', from: 'Kain', text: 'hallo' });
+  });
+
+  it('keeps map chat in its channel and lets /g cross it', async () => {
+    const { kain, bora, channel } = await enterTwo();
+    bora.send(JSON.stringify({ t: 'switchChannel', channel: channel === 1 ? 2 : 1 }));
+    await nextOfType(bora, 'channel');
+
+    const onKain = nextOfType(kain, 'chat');
+    kain.send(JSON.stringify({ t: 'chat', text: 'nur kanal eins' }));
+    expect(await onKain).toMatchObject({ kind: 'map', text: 'nur kanal eins' });
+    await silenceOfType(bora, 'chat', 450);
+
+    const onKainGlobal = nextOfType(kain, 'chat');
+    const onBoraGlobal = nextOfType(bora, 'chat');
+    kain.send(JSON.stringify({ t: 'chat', text: '/g alle' }));
+    expect(await onKainGlobal).toMatchObject({ kind: 'global', from: 'Kain', text: 'alle' });
+    expect(await onBoraGlobal).toMatchObject({ kind: 'global', from: 'Kain', text: 'alle' });
+  });
+
+  it('whispers to one name and tells the sender when nobody has it', async () => {
+    const { kain, bora } = await enterTwo();
+
+    const onSystem = nextOfType(kain, 'chat');
+    kain.send(JSON.stringify({ t: 'chat', text: '/w Niemand hallo' }));
+    expect(await onSystem).toMatchObject({ kind: 'system', text: expect.stringContaining('Niemand') });
+
+    // The chat throttle is 400 ms; wait it out between two lines.
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    const onBora = nextOfType(bora, 'chat');
+    const onKain = nextOfType(kain, 'chat');
+    kain.send(JSON.stringify({ t: 'chat', text: '/w bora geheim' }));
+
+    expect(await onBora).toMatchObject({
+      kind: 'whisper',
+      from: 'Kain',
+      to: 'Bora',
+      text: 'geheim',
+    });
+    expect(await onKain).toMatchObject({ kind: 'whisper', to: 'Bora', text: 'geheim' });
+  });
+
+  it('throttles chat', async () => {
+    const { kain } = await enterTwo();
+
+    const onFirst = nextOfType(kain, 'chat');
+    kain.send(JSON.stringify({ t: 'chat', text: 'eins' }));
+    expect(await onFirst).toMatchObject({ text: 'eins' });
+
+    const onThrottle = nextOfType(kain, 'chat');
+    kain.send(JSON.stringify({ t: 'chat', text: 'zwei' }));
+    expect(await onThrottle).toMatchObject({ kind: 'system', text: expect.stringContaining('Langsamer') });
   });
 });

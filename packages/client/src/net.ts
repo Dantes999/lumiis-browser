@@ -38,6 +38,13 @@ export type RewardMessage = {
 
 let rewardHandler: ((reward: RewardMessage) => void) | null = null;
 
+/** The chat window redraws itself when a line arrives. */
+let chatHandler: (() => void) | null = null;
+
+export const setChatHandler = (fn: (() => void) | null): void => {
+  chatHandler = fn;
+};
+
 /** The scene listens here to throw experience orbs. */
 export const setRewardHandler = (fn: ((reward: RewardMessage) => void) | null): void => {
   rewardHandler = fn;
@@ -266,6 +273,11 @@ export class Connection {
     this.send({ t: 'unequip', piece });
   }
 
+  /** Chat text; /g and /w are commands the server understands. */
+  sendChat(text: string): void {
+    this.send({ t: 'chat', text });
+  }
+
   setPickupSettings(autoPickup: boolean, autoPickupTypes: string[]): void {
     this.send({ t: 'settings', autoPickup, autoPickupTypes });
   }
@@ -413,6 +425,17 @@ export class Connection {
       case 'notice':
         view.notice = message.text;
         view.noticeUntil = performance.now() + 3000;
+        break;
+      case 'chat':
+        view.chat.push({
+          kind: message.kind,
+          from: message.from,
+          text: message.text,
+          to: message.to,
+          at: Date.now(),
+        });
+        if (view.chat.length > 100) view.chat.splice(0, view.chat.length - 100);
+        chatHandler?.();
         break;
       case 'reward':
         rewardHandler?.(message);
