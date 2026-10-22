@@ -401,6 +401,8 @@ export class World {
       whirlwindUntil: 0,
     };
     this.recalcStats(player);
+    // Skill points are not part of the save; a login starts with full ones.
+    player.sp = player.maxSp;
 
     // A fresh or moved character may stand somewhere that is not walkable.
     if (!canStand(this.map, player.x, player.y)) {

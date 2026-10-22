@@ -14,6 +14,7 @@ import {
   EMPTY_STATS,
   START_MAP,
   STAT_START_POINTS,
+  STAT_HP_PER_VIT,
   INVENTORY_SLOTS,
   bodyIdFor,
   classOfBody,
@@ -338,12 +339,13 @@ export class Store {
           `INSERT INTO characters
              (account_id, name, level, exp, yang, hp, map, x, y, dir, weapon, armor,
               body, hair, cls, sex, points, stat_str, stat_vit, stat_int, stat_dex, updated_at)
-           VALUES (?, ?, 1, 0, 0, 100, ?, 0, 0, 0, 'wooden_sword', NULL,
+           VALUES (?, ?, 1, 0, 0, ?, ?, 0, 0, 0, 'wooden_sword', NULL,
                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           accountId,
           name,
+          CLASSES[cls].hp + CLASSES[cls].base.vit * STAT_HP_PER_VIT,
           START_MAP,
           bodyIdFor(cls, sex),
           hair,
