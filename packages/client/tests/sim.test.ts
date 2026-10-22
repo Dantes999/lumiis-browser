@@ -26,6 +26,7 @@ const grassMap: MapData = {
 const place = (x: number, y: number, dir = 6): void => {
   view.self = {
     name: 'Kain',
+    cls: 'warrior',
     body: '',
     hair: '',
     x,

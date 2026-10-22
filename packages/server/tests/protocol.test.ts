@@ -134,6 +134,26 @@ describe('protocol', () => {
     }
   });
 
+  it('accepts a character with a class, a sex and a hairstyle', () => {
+    expect(
+      parseClientMessage({
+        t: 'createCharacter',
+        name: 'Lyra',
+        cls: 'shaman',
+        sex: 'f',
+        hair: 'shaman_f_1',
+      }),
+    ).toEqual({
+      ok: true,
+      message: { t: 'createCharacter', name: 'Lyra', cls: 'shaman', sex: 'f', hair: 'shaman_f_1' },
+    });
+  });
+
+  it('rejects an unknown class or sex', () => {
+    expect(parseClientMessage({ t: 'createCharacter', name: 'Lyra', cls: 'archer' }).ok).toBe(false);
+    expect(parseClientMessage({ t: 'createCharacter', name: 'Lyra', sex: 'x' }).ok).toBe(false);
+  });
+
   it('accepts spending a stat point on one of the four stats', () => {
     for (const stat of ['str', 'vit', 'int', 'dex']) {
       expect(parseClientMessage({ t: 'spendStat', stat })).toEqual({

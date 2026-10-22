@@ -29,6 +29,8 @@ const sampleSave = (name: string): CharacterSave => {
 
   return {
     name,
+    cls: 'warrior',
+    sex: 'm',
     body: 'default',
     hair: 'helmet',
     equipment: { weapon: 'iron_sword', armor: 'padded_armor' },
@@ -176,5 +178,21 @@ describe('characters', () => {
     expect(save.level).toBe(2);
     expect(save.inventory[2]).toBeNull();
     expect(save.inventory[0]).toEqual({ key: 'boar_tusk', count: 2 });
+  });
+});
+
+describe('classes in the save', () => {
+  it('stores the class and derives the look id', async () => {
+    const accountId = await register('Lyra', 'secret123');
+
+    const created = store.createCharacter(accountId, 'Lyra', 'shaman', 'f', 'shaman_f_1');
+    if (!created.ok) throw new Error('create failed');
+
+    const save = store.loadCharacter(created.id);
+    expect(save?.cls).toBe('shaman');
+    expect(save?.sex).toBe('f');
+    expect(save?.body).toBe('shaman_f');
+    expect(save?.stats).toEqual({ str: 3, vit: 4, int: 6, dex: 3 });
+    expect(save?.points).toBe(6);
   });
 });

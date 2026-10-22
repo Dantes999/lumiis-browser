@@ -4,6 +4,7 @@
 import type {
   ChannelInfo,
   CharacterSummary,
+  ClassKey,
   Direction,
   Equipment,
   InventorySlot,
@@ -77,6 +78,7 @@ export type MonsterState = {
  */
 export type SelfState = {
   name: string;
+  cls: ClassKey;
   /** Look ids of the style pack manifest. */
   body: string;
   hair: string;
@@ -149,6 +151,7 @@ export const view: ViewState = {
   selfId: null,
   self: {
     name: '',
+    cls: 'warrior',
     body: '',
     hair: '',
     x: 0,

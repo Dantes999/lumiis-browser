@@ -41,9 +41,11 @@
         <label for="character-name">New character</label>
         <input id="character-name" maxlength="16" autocomplete="off" spellcheck="false" />
         <div class="look-row">
-          <label for="character-body">Body</label>
-          <select id="character-body"></select>
-          <label for="character-hair">Head</label>
+          <label for="character-class">Klasse</label>
+          <select id="character-class"></select>
+          <label for="character-sex">Geschlecht</label>
+          <select id="character-sex"></select>
+          <label for="character-hair">Haare</label>
           <select id="character-hair"></select>
         </div>
         <div id="character-error" class="login-error"></div>
@@ -172,6 +174,7 @@
 
     <div id="stats" class="panel hidden">
       <div class="panel-title">Werte</div>
+      <div class="stats-class" id="stats-class"></div>
       <div class="stats-points">Punkte: <span id="stats-points">0</span></div>
       <div id="stats-rows"></div>
       <div class="stats-derived">

@@ -15,6 +15,7 @@ import { INVENTORY_SLOTS } from './items.js';
 import { isDirection } from './movement.js';
 import { isSkillKey, type SkillKey } from './skills.js';
 import { isStatKey, type StatKey, type Stats } from './progression.js';
+import { isClassKey, isSex, type ClassKey, type Sex } from './classes.js';
 
 /**
  * One compact update for an entity the client already knows.
@@ -116,7 +117,7 @@ export type ClientMessage =
   | { t: 'select'; id: number; channel?: number }
   | { t: 'channels'; id?: number }
   | { t: 'switchChannel'; channel: number }
-  | { t: 'createCharacter'; name: string; body?: string; hair?: string }
+  | { t: 'createCharacter'; name: string; cls?: ClassKey; sex?: Sex; hair?: string }
   | { t: 'input'; dx: number; dy: number }
   | { t: 'attack'; target?: number; dir?: number }
   | { t: 'skill'; key: SkillKey }
@@ -145,6 +146,8 @@ export type ServerMessage =
       /** Look ids of the style pack manifest (body and headwear). */
       body: string;
       hair: string;
+      /** The class behind that look. */
+      cls: ClassKey;
       /** Channel number, 1 based. */
       channel: number;
       /** How many channels this map has. */
@@ -360,18 +363,25 @@ export function parseClientMessage(input: unknown): ParsedMessage {
       const name = message.name;
       if (typeof name !== 'string' || !NAME_PATTERN.test(name)) return fail('invalid character name');
 
-      // Look ids are chosen from the style pack; the server only checks the shape.
-      const look = (value: unknown): string | undefined => {
-        if (value === undefined) return undefined;
-        if (typeof value !== 'string' || !/^[a-z0-9_]{0,24}$/.test(value)) return undefined;
-        return value;
-      };
-      const body = look(message.body);
-      const hair = look(message.hair);
-      if (message.body !== undefined && body === undefined) return fail('invalid body id');
-      if (message.hair !== undefined && hair === undefined) return fail('invalid hair id');
+      if (message.cls !== undefined && !isClassKey(message.cls)) return fail('unknown class');
+      if (message.sex !== undefined && !isSex(message.sex)) return fail('unknown sex');
 
-      return { ok: true, message: { t: 'createCharacter', name, body, hair } };
+      // Look ids are chosen from the style pack; the server only checks the shape.
+      const hair = message.hair;
+      if (hair !== undefined && (typeof hair !== 'string' || !/^[a-z0-9_]{0,24}$/.test(hair))) {
+        return fail('invalid hair id');
+      }
+
+      return {
+        ok: true,
+        message: {
+          t: 'createCharacter',
+          name,
+          ...(message.cls !== undefined ? { cls: message.cls } : {}),
+          ...(message.sex !== undefined ? { sex: message.sex } : {}),
+          ...(hair !== undefined ? { hair } : {}),
+        },
+      };
     }
 
     case 'settings': {

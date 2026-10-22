@@ -318,6 +318,11 @@ body.mobile #hud-toggle {
   cursor: pointer;
 }
 
+.stats-class {
+  margin-bottom: 4px;
+  color: var(--text);
+}
+
 .stats-points {
   margin-bottom: 6px;
   color: var(--accent);

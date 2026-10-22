@@ -378,19 +378,53 @@ describe('gateway', () => {
     const welcome = await enterAs(kain, 'Kain');
     const id = welcome['id'] as number;
 
+    /** Waits for a snapshot that contains the player as a full entry. */
+    const selfInSnapshot = async (): Promise<Record<string, unknown>> => {
+      for (let attempt = 0; attempt < 40; attempt += 1) {
+        const message = await nextOfType(kain, 'snapshot');
+        const players = (message['players'] ?? []) as Array<Record<string, unknown>>;
+        const self = players.find((entry) => entry['id'] === id);
+        if (self !== undefined) return self;
+      }
+      throw new Error('no snapshot with the player');
+    };
+
+    const before = await selfInSnapshot();
+    const stats = before['stats'] as { vit: number };
+    const points = before['points'] as number;
+
     kain.send(JSON.stringify({ t: 'spendStat', stat: 'vit' }));
 
     for (let attempt = 0; attempt < 40; attempt += 1) {
-      const message = await nextOfType(kain, 'snapshot');
-      const players = (message['players'] ?? []) as Array<Record<string, unknown>>;
-      const self = players.find((entry) => entry['id'] === id);
-      if (self === undefined) continue;
-      const stats = self['stats'] as { vit?: number } | undefined;
-      if (stats?.vit === 1) {
-        expect(self['points']).toBe(5);
+      const self = await selfInSnapshot();
+      const now = self['stats'] as { vit: number };
+      if (now.vit === stats.vit + 1) {
+        expect(self['points']).toBe(points - 1);
         return;
       }
     }
     throw new Error('no snapshot with the spent point');
+  });
+
+  it('creates a character of the chosen class and sex', async () => {
+    const port = await startServer();
+    const socket = await openSocket(port);
+
+    socket.send(JSON.stringify({ t: 'login', name: 'Lyra', password: 'secret123', mode: 'register' }));
+    await nextOfType(socket, 'characters');
+    socket.send(
+      JSON.stringify({
+        t: 'createCharacter',
+        name: 'Lyra',
+        cls: 'shaman',
+        sex: 'f',
+        hair: 'shaman_f_1',
+      }),
+    );
+
+    const welcome = await nextOfType(socket, 'welcome');
+    expect(welcome['cls']).toBe('shaman');
+    expect(welcome['body']).toBe('shaman_f');
+    expect(welcome['hair']).toBe('shaman_f_1');
   });
 });

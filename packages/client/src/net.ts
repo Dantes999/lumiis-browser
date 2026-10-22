@@ -13,11 +13,13 @@ import {
   swingMs,
 } from '@lumiis/shared';
 import type {
+  ClassKey,
   ClientMessage,
   GroundItemSnapshot,
   MonsterSnapshot,
   PlayerSnapshot,
   ServerMessage,
+  Sex,
   SkillKey,
   SnapshotMessage,
 } from '@lumiis/shared';
@@ -217,12 +219,13 @@ export class Connection {
     this.send({ t: 'switchChannel', channel });
   }
 
-  createCharacter(name: string, hair?: string, body?: string): void {
+  createCharacter(name: string, cls: ClassKey, sex: Sex, hair?: string): void {
     this.send({
       t: 'createCharacter',
       name,
+      cls,
+      sex,
       ...(hair !== undefined ? { hair } : {}),
-      ...(body !== undefined ? { body } : {}),
     });
   }
 
@@ -396,6 +399,7 @@ export class Connection {
         view.mapId = message.map;
         view.self.body = message.body;
         view.self.hair = message.hair;
+        view.self.cls = message.cls;
         view.channel = message.channel;
         view.channelCount = message.channelCount;
         view.channelOptions = null;

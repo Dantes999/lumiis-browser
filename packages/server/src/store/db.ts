@@ -9,15 +9,21 @@ import { createRequire } from 'node:module';
 import { promisify } from 'node:util';
 import type { DatabaseSync as Database } from 'node:sqlite';
 import {
+  CLASSES,
   EMPTY_EQUIPMENT,
   EMPTY_STATS,
   START_MAP,
   STAT_START_POINTS,
   INVENTORY_SLOTS,
+  bodyIdFor,
+  classOfBody,
+  isClassKey,
   isItemKey,
+  type ClassKey,
   type Equipment,
   type InventorySlot,
   type ItemKey,
+  type Sex,
   type Stats,
 } from '@lumiis/shared';
 
@@ -36,6 +42,9 @@ export type CharacterSummary = { id: number; name: string; level: number };
 
 export type CharacterSave = {
   name: string;
+  /** Class and sex the character was created with. */
+  cls: ClassKey;
+  sex: Sex;
   /** Body and headwear ids of the look (see the style pack manifest). */
   body: string;
   hair: string;
@@ -64,6 +73,8 @@ type AccountRow = { id: number; name: string; salt: string; hash: string };
 type CharacterRow = {
   id: number;
   name: string;
+  cls: string | null;
+  sex: string | null;
   body: string | null;
   hair: string | null;
   weapon: string | null;
@@ -110,6 +121,8 @@ CREATE TABLE IF NOT EXISTS characters (
   armor TEXT,
   body TEXT NOT NULL DEFAULT '',
   hair TEXT NOT NULL DEFAULT '',
+  cls TEXT NOT NULL DEFAULT '',
+  sex TEXT NOT NULL DEFAULT '',
   stat_str INTEGER NOT NULL DEFAULT 0,
   stat_vit INTEGER NOT NULL DEFAULT 0,
   stat_int INTEGER NOT NULL DEFAULT 0,
@@ -182,6 +195,12 @@ export class Store {
     }
     if (!columns.some((column) => column.name === 'hair')) {
       this.db.exec("ALTER TABLE characters ADD COLUMN hair TEXT NOT NULL DEFAULT ''");
+    }
+    if (!columns.some((column) => column.name === 'cls')) {
+      this.db.exec("ALTER TABLE characters ADD COLUMN cls TEXT NOT NULL DEFAULT ''");
+    }
+    if (!columns.some((column) => column.name === 'sex')) {
+      this.db.exec("ALTER TABLE characters ADD COLUMN sex TEXT NOT NULL DEFAULT ''");
     }
     for (const column of ['stat_str', 'stat_vit', 'stat_int', 'stat_dex', 'points']) {
       if (columns.some((entry) => entry.name === column)) continue;
@@ -301,7 +320,8 @@ export class Store {
   createCharacter(
     accountId: number,
     name: string,
-    body = '',
+    cls: ClassKey = 'warrior',
+    sex: Sex = 'm',
     hair = '',
   ): CreateResult {
     const count = this.listCharacters(accountId).length;
@@ -316,10 +336,26 @@ export class Store {
       const info = this.db
         .prepare(
           `INSERT INTO characters
-             (account_id, name, level, exp, yang, hp, map, x, y, dir, weapon, armor, body, hair, points, updated_at)
-           VALUES (?, ?, 1, 0, 0, 100, ?, 0, 0, 0, 'wooden_sword', NULL, ?, ?, ?, ?)`,
+             (account_id, name, level, exp, yang, hp, map, x, y, dir, weapon, armor,
+              body, hair, cls, sex, points, stat_str, stat_vit, stat_int, stat_dex, updated_at)
+           VALUES (?, ?, 1, 0, 0, 100, ?, 0, 0, 0, 'wooden_sword', NULL,
+                   ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
-        .run(accountId, name, START_MAP, body, hair, STAT_START_POINTS, Date.now());
+        .run(
+          accountId,
+          name,
+          START_MAP,
+          bodyIdFor(cls, sex),
+          hair,
+          cls,
+          sex,
+          STAT_START_POINTS,
+          CLASSES[cls].base.str,
+          CLASSES[cls].base.vit,
+          CLASSES[cls].base.int,
+          CLASSES[cls].base.dex,
+          Date.now(),
+        );
 
       const id = Number(info.lastInsertRowid);
       // EIGENE WAHL: the starter kit, so the first fights are survivable.
@@ -344,7 +380,7 @@ export class Store {
   loadCharacter(characterId: number): CharacterSave | null {
     const row = this.db
       .prepare(
-        'SELECT id, name, level, exp, yang, hp, map, x, y, dir, weapon, armor, body, hair, stat_str, stat_vit, stat_int, stat_dex, points FROM characters WHERE id = ?',
+        'SELECT id, name, level, exp, yang, hp, map, x, y, dir, weapon, armor, body, hair, cls, sex, stat_str, stat_vit, stat_int, stat_dex, points FROM characters WHERE id = ?',
       )
       .get(characterId) as unknown as CharacterRow | undefined;
 
@@ -367,9 +403,17 @@ export class Store {
       armor: isItemKey(row.armor) ? row.armor : null,
     };
 
+    // Characters from before classes only have a look id; that is enough.
+    const look = String(row.body ?? '');
+    const fallback = classOfBody(look);
+    const cls = isClassKey(row.cls) ? row.cls : fallback.cls;
+    const sex: Sex = row.sex === 'm' || row.sex === 'f' ? row.sex : fallback.sex;
+
     return {
       name: row.name,
-      body: String(row.body ?? ''),
+      cls,
+      sex,
+      body: look === '' ? bodyIdFor(cls, sex) : look,
       hair: String(row.hair ?? ''),
       equipment,
       level: Number(row.level),

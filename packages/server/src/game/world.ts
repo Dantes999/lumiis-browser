@@ -22,6 +22,7 @@ import {
   PICKUP_RANGE,
   PLAYER_DAMAGE,
   PLAYER_MAX_HP,
+  CLASSES,
   EMPTY_STATS,
   PLAYER_MAX_SP,
   PLAYER_REGEN_HP,
@@ -57,7 +58,15 @@ import {
   tileAt,
 } from '@lumiis/shared';
 import type { CharacterSave } from '../store/db.js';
-import type { Point, SkillKey, StatKey, Stats, SwingProfile } from '@lumiis/shared';
+import type {
+  ClassKey,
+  Point,
+  Sex,
+  SkillKey,
+  StatKey,
+  Stats,
+  SwingProfile,
+} from '@lumiis/shared';
 import { chaseDirection, findTarget, randomWalkableDirection } from './monster-ai.js';
 import {
   damageTaken,
@@ -108,6 +117,9 @@ export type PlayerSeed = {
   accountId: number;
   characterId: number;
   name: string;
+  /** Class and sex; defaults to warrior/m when missing. */
+  cls?: ClassKey;
+  sex?: Sex;
   /** Look ids of the style pack manifest; empty means "the default". */
   body?: string;
   hair?: string;
@@ -131,6 +143,8 @@ export type Player = {
   /** Row in the characters table; the save is written under it. */
   characterId: number;
   name: string;
+  cls: ClassKey;
+  sex: Sex;
   /** Look ids of the style pack manifest; empty means "the default". */
   body: string;
   hair: string;
@@ -350,6 +364,8 @@ export class World {
       accountId: seed.accountId,
       characterId: seed.characterId,
       name: seed.name,
+      cls: seed.cls ?? 'warrior',
+      sex: seed.sex ?? 'm',
       body: seed.body ?? '',
       hair: seed.hair ?? '',
       x: seed.x ?? spawn.x,
@@ -423,6 +439,8 @@ export class World {
 
     return {
       name: player.name,
+      cls: player.cls,
+      sex: player.sex,
       body: player.body,
       hair: player.hair,
       equipment: { ...player.equipment },
@@ -693,16 +711,25 @@ export class World {
   private recalcStats(player: Player): void {
     const armor = player.equipment.armor === null ? null : itemDef(player.equipment.armor);
     const weapon = player.equipment.weapon === null ? null : itemDef(player.equipment.weapon);
-    player.attack =
-      PLAYER_DAMAGE + (weapon?.attack ?? 0) + player.stats.str * STAT_ATTACK_PER_STR;
+    const growth = CLASSES[player.cls];
+    // Primary and secondary stat, like the old project's atkStats (4 : 2 / 3).
+    const [primary, secondary] = growth.atkStats;
+    const statAttack = Math.floor(
+      (4 * player.stats[primary] + 2 * player.stats[secondary]) / 3,
+    );
+    player.attack = PLAYER_DAMAGE + (weapon?.attack ?? 0) + statAttack;
     player.defense =
       (armor?.defense ?? 0) + Math.floor(player.stats.dex / STAT_DEFENSE_PER_DEX);
     player.matk = magicAttackDamage(weapon?.matk ?? 0, weapon?.attack ?? 0, player.stats.int);
     player.mdef = magicDefense(player.stats.int, player.stats.vit, armor?.defense ?? 0);
     player.maxHp =
-      PLAYER_MAX_HP + player.stats.vit * STAT_HP_PER_VIT + (armor?.maxHp ?? 0);
+      growth.hp +
+      growth.hpPerLevel * (player.level - 1) +
+      player.stats.vit * STAT_HP_PER_VIT +
+      (armor?.maxHp ?? 0);
     player.hp = Math.min(player.hp, player.maxHp);
-    player.maxSp = PLAYER_MAX_SP + player.stats.int * STAT_SP_PER_INT;
+    player.maxSp =
+      growth.sp + growth.spPerLevel * (player.level - 1) + player.stats.int * STAT_SP_PER_INT;
     player.sp = Math.min(player.sp, player.maxSp);
   }
 

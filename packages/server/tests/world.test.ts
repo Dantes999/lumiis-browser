@@ -13,6 +13,7 @@ import {
   STAT_HP_PER_VIT,
   STAT_POINTS_PER_LEVEL,
   STAT_SP_PER_INT,
+  CLASSES,
   POTION_COOLDOWN_TICKS,
   SKILLS,
   PLAYER_RESPAWN_HP_SHARE,
@@ -1282,5 +1283,59 @@ describe('magic values', () => {
 
     // 8 damage minus 5 magic defence; a physical bite would take all 8.
     expect(player.hp).toBe(before - 3);
+  });
+});
+
+describe('classes', () => {
+  it('gives a class its own health, skill points and attack stat', () => {
+    const world = new World(grassMap());
+    const shaman = world.addPlayer({
+      accountId: 0,
+      characterId: 0,
+      name: 'Lyra',
+      cls: 'shaman',
+      stats: { str: 0, vit: 0, int: 6, dex: 0 },
+    });
+
+    expect(shaman.maxHp).toBe(CLASSES.shaman.hp);
+    expect(shaman.maxSp).toBe(CLASSES.shaman.sp + 6 * STAT_SP_PER_INT);
+    // Shaman attack uses INT first: (4 x 6 + 2 x 0) / 3 = 8.
+    expect(shaman.attack).toBe(PLAYER_DAMAGE + 8);
+  });
+
+  it('lets the secondary stat count less than the primary one', () => {
+    const world = new World(grassMap());
+    const ninja = world.addPlayer({
+      accountId: 0,
+      characterId: 0,
+      name: 'Kage',
+      cls: 'ninja',
+      stats: { str: 6, vit: 0, int: 0, dex: 0 },
+    });
+    const warrior = world.addPlayer({
+      accountId: 0,
+      characterId: 0,
+      name: 'Kain',
+      cls: 'warrior',
+      stats: { str: 6, vit: 0, int: 0, dex: 0 },
+    });
+
+    // For the ninja STR is secondary (2/3), for the warrior primary (4/3).
+    expect(ninja.attack).toBe(PLAYER_DAMAGE + 4);
+    expect(warrior.attack).toBe(PLAYER_DAMAGE + 8);
+  });
+
+  it('grows health and skill points per level', () => {
+    const world = new World(grassMap());
+    const player = world.addPlayer({
+      accountId: 0,
+      characterId: 0,
+      name: 'Kain',
+      cls: 'warrior',
+      level: 3,
+    });
+
+    expect(player.maxHp).toBe(CLASSES.warrior.hp + CLASSES.warrior.hpPerLevel * 2);
+    expect(player.maxSp).toBe(CLASSES.warrior.sp + CLASSES.warrior.spPerLevel * 2);
   });
 });

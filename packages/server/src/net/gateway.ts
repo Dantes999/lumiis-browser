@@ -15,7 +15,7 @@ import {
   encode,
   parseClientMessage,
 } from '@lumiis/shared';
-import type { ClientMessage, Direction, InventorySlot } from '@lumiis/shared';
+import type { ClassKey, ClientMessage, Direction, InventorySlot, Sex } from '@lumiis/shared';
 import type { GameHost, JoinedPlayer } from '../shard/host.js';
 import { signToken, verifyToken } from '../store/token.js';
 import { MAX_CHARACTERS, type Store } from '../store/db.js';
@@ -256,6 +256,8 @@ export function attachGateway(
         equipment: save.equipment,
         stats: save.stats,
         points: save.points,
+        cls: save.cls,
+        sex: save.sex,
       },
     });
 
@@ -274,6 +276,7 @@ export function attachGateway(
       map: player.map,
       body: save.body,
       hair: save.hair,
+      cls: save.cls,
       channel: player.channel,
       channelCount: player.channelCount,
     });
@@ -341,13 +344,19 @@ export function attachGateway(
     );
   };
 
-  const handleCreate = (session: Session, name: string, body = '', hair = ''): void => {
+  const handleCreate = (
+    session: Session,
+    name: string,
+    cls: ClassKey,
+    sex: Sex,
+    hair = '',
+  ): void => {
     if (session.accountId === null) {
       send(session, { t: 'authError', reason: 'Log in first.' });
       return;
     }
 
-    const result = store.createCharacter(session.accountId, name, body, hair);
+    const result = store.createCharacter(session.accountId, name, cls, sex, hair);
     if (!result.ok) {
       send(session, { t: 'authError', reason: result.reason });
       sendCharacters(session, session.accountId);
@@ -488,7 +497,13 @@ export function attachGateway(
           break;
         }
         case 'createCharacter':
-          handleCreate(session, message.name, message.body ?? '', message.hair ?? '');
+          handleCreate(
+            session,
+            message.name,
+            message.cls ?? 'warrior',
+            message.sex ?? 'm',
+            message.hair ?? '',
+          );
           break;
         case 'input':
           if (session.player === null) {

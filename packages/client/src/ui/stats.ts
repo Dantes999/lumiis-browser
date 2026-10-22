@@ -5,7 +5,7 @@
 // (more health, more skill points, harder hits, better defence) is applied on
 // the server and shows in the HUD on the next snapshot.
 
-import { STAT_KEYS, type StatKey } from '@lumiis/shared';
+import { CLASSES, STAT_KEYS, type StatKey } from '@lumiis/shared';
 import { view } from '../state';
 
 const mustFind = (id: string): HTMLElement => {
@@ -37,6 +37,7 @@ export function createStatsPanel(onSpend: (stat: StatKey) => void): StatsPanel {
   const toggle = mustFind('stats-toggle');
   const close = mustFind('stats-close');
   const points = mustFind('stats-points');
+  const className = mustFind('stats-class');
   const rows = mustFind('stats-rows');
   const derived = {
     attack: mustFind('derived-atk'),
@@ -82,6 +83,7 @@ export function createStatsPanel(onSpend: (stat: StatKey) => void): StatsPanel {
   close.addEventListener('click', () => panel.classList.add('hidden'));
 
   function render(): void {
+    className.textContent = CLASSES[view.self.cls]?.name ?? '';
     derived.attack.textContent = String(view.self.attack);
     derived.matk.textContent = String(view.self.matk);
     derived.defense.textContent = String(view.self.defense);

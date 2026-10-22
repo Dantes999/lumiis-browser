@@ -1,7 +1,16 @@
 // The character screen: pick one of the account's characters or create a new
 // one. It appears right after the login and disappears once the world loads.
 
-import type { ChannelInfo, CharacterSummary } from '@lumiis/shared';
+import {
+  CLASSES,
+  CLASS_KEYS,
+  SEXES,
+  SEX_NAMES,
+  type ClassKey,
+  type CharacterSummary,
+  type Sex,
+  type ChannelInfo,
+} from '@lumiis/shared';
 import { lookOptions } from '../art';
 
 const mustFind = (id: string): HTMLElement => {
@@ -24,7 +33,7 @@ export function createCharacterScreen(
   onPick: (id: number) => void,
   /** A channel was chosen: enter the world there. */
   onSelect: (id: number, channel: number) => void,
-  onCreate: (name: string, body: string, hair: string) => void,
+  onCreate: (name: string, cls: ClassKey, sex: Sex, hair: string) => void,
 ): CharacterScreen {
   const overlay = mustFind('characters');
   const list = mustFind('character-list');
@@ -32,25 +41,42 @@ export function createCharacterScreen(
   const error = mustFind('character-error');
   const createButton = mustFind('character-create') as HTMLButtonElement;
   const picker = mustFind('channel-picker');
-  const bodySelect = mustFind('character-body') as HTMLSelectElement;
+  const classSelect = mustFind('character-class') as HTMLSelectElement;
+  const sexSelect = mustFind('character-sex') as HTMLSelectElement;
   const hairSelect = mustFind('character-hair') as HTMLSelectElement;
-  bodySelect.addEventListener('change', () => pairHair());
   let lookFilled = false;
 
-  /** Bodies and hairstyles come from the active style pack. */
+  /** Classes are fixed data; the hairstyles come from the style pack. */
   const fillLooks = (): void => {
     if (lookFilled) return;
     lookFilled = true;
-    const { bodies, hairs } = lookOptions();
-    for (const part of bodies) bodySelect.append(new Option(part.name, part.id));
-    for (const part of hairs) hairSelect.append(new Option(part.name, part.id));
+    for (const key of CLASS_KEYS) classSelect.append(new Option(CLASSES[key].name, key));
+    for (const sex of SEXES) sexSelect.append(new Option(SEX_NAMES[sex], sex));
+    refreshHairs();
   };
 
-  /** A new body brings its own first hairstyle along; free to change after. */
+  /** Only the hairstyles of this class and sex; any body may borrow none. */
+  const refreshHairs = (): void => {
+    const prefix = `${classSelect.value}_${sexSelect.value}_`;
+    const { hairs } = lookOptions();
+    const matching = hairs.filter((part) => part.id.startsWith(prefix));
+    const list = matching.length > 0 ? matching : hairs;
+    const previous = hairSelect.value;
+    hairSelect.textContent = '';
+    for (const part of list) hairSelect.append(new Option(part.name, part.id));
+    if (list.some((part) => part.id === previous)) hairSelect.value = previous;
+  };
+
   const pairHair = (): void => {
-    const match = [...hairSelect.options].find((option) => option.value === `${bodySelect.value}_1`);
+    refreshHairs();
+    const match = [...hairSelect.options].find((option) =>
+      option.value.startsWith(`${classSelect.value}_${sexSelect.value}_`),
+    );
     if (match !== undefined) hairSelect.value = match.value;
   };
+
+  classSelect.addEventListener('change', pairHair);
+  sexSelect.addEventListener('change', pairHair);
 
   let shownList = '';
   let shownError = '';
@@ -66,7 +92,12 @@ export function createCharacterScreen(
     error.textContent = '';
     shownError = '';
     nameInput.value = '';
-    onCreate(name, bodySelect.value, hairSelect.value);
+    onCreate(
+      name,
+      classSelect.value as ClassKey,
+      sexSelect.value as Sex,
+      hairSelect.value,
+    );
   };
 
   createButton.addEventListener('click', submit);
